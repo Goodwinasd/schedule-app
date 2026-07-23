@@ -1,0 +1,28 @@
+ * Tip: There are .env files present. Install python-dotenv to use them.
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.10.17:5001
+Press CTRL+C to quit
+127.0.0.1 - - [23/Jul/2026 11:50:10] "GET /api/bell-schedule HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:50:26] "POST /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:50:26] "GET /api/groups HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:50:26] "DELETE /api/groups/7 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "GET /api/groups HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "GET /api/days HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/groups HTTP/1.1" 201 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/groups HTTP/1.1" 400 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/days HTTP/1.1" 201 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/days/44/lessons HTTP/1.1" 201 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "DELETE /api/lessons/24 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "GET /api/trash HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/lessons/24/restore HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "GET /api/schedule-table?group=Gruppa%2001-09/25&monday=2026-07-27 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "DELETE /api/days/44 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "GET /api/trash HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "POST /api/days/44/restore HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "GET /api/schedule-table?group=Gruppa%2001-09/25&monday=2026-07-27 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "DELETE /api/lessons/24 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "DELETE /api/days/44 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jul/2026 11:52:51] "DELETE /api/groups/8 HTTP/1.1" 200 -

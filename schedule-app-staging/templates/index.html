@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Расписание</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=7">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="header-content">
+                <h1 id="header-title" onclick="goHome()" style="cursor:pointer">Расписание</h1>
+                <div class="header-actions">
+                    <button id="btn-back" class="btn btn-ghost" onclick="goHome()" style="display:none">← Назад</button>
+                    <button id="btn-avail" class="btn btn-ghost" onclick="showAvailability()" style="display:none">Свободные окна</button>
+                    <button id="btn-admin" class="btn btn-ghost" onclick="showAdminPanel()" style="display:none">Справочники</button>
+                    <button id="btn-login" class="btn btn-ghost" onclick="showLoginModal()">Войти</button>
+                    <button id="btn-logout" class="btn btn-ghost" onclick="logout()" style="display:none">Выйти</button>
+                </div>
+            </div>
+        </header>
+        <main>
+            <div id="home-view">
+                <div class="section-block">
+                    <h2 class="section-title">Студенты</h2>
+                    <div id="groups-grid" class="select-grid"></div>
+                </div>
+                <div class="section-block">
+                    <h2 class="section-title">Преподаватели</h2>
+                    <div id="teachers-grid" class="select-grid"></div>
+                </div>
+                <div class="section-block">
+                    <h2 class="section-title">Аудитории</h2>
+                    <div id="classrooms-grid" class="select-grid"></div>
+                </div>
+                <div class="section-block">
+                    <h2 class="section-title">Заочное отделение</h2>
+                    <div id="distance-grid" class="select-grid"></div>
+                </div>
+            </div>
+            <div id="schedule-view" style="display:none">
+                <div id="week-carousel" class="week-carousel"></div>
+                <div id="schedule-table-container"></div>
+                <div id="admin-panel" class="admin-panel" style="display:none">
+                    <button class="btn btn-primary btn-add-day" onclick="showAddWeekModal()">
+                        <span class="plus-icon">+</span> Добавить неделю
+                    </button>
+                </div>
+                <div id="print-panel" class="print-panel">
+                    <button class="btn btn-ghost btn-print" onclick="printSchedule()">🖨 Печать</button>
+                    <button class="btn btn-ghost btn-print" onclick="exportSchedule('xlsx')">📊 Excel</button>
+                    <button class="btn btn-ghost btn-print" onclick="exportSchedule('docx')">📝 Word</button>
+                    <button class="btn btn-ghost btn-print" onclick="exportSchedule('pdf')">📄 PDF</button>
+                </div>
+            </div>
+            <div id="availability-view" style="display:none">
+                <div id="avail-carousel" class="week-carousel"></div>
+                <div class="avail-controls">
+                    <div class="avail-day-tabs" id="avail-day-tabs"></div>
+                    <div class="avail-mode-toggle">
+                        <button class="btn btn-ghost btn-sm active" id="avail-mode-teacher" onclick="setAvailMode('teacher')">Преподаватели</button>
+                        <button class="btn btn-ghost btn-sm" id="avail-mode-classroom" onclick="setAvailMode('classroom')">Аудитории</button>
+                    </div>
+                    <label class="checkbox-label" style="margin-left:12px">
+                        <input type="checkbox" id="avail-free-only" onchange="renderAvailTable()"> Только свободные
+                    </label>
+                    <label class="checkbox-label" style="margin-left:12px">
+                        <input type="checkbox" id="avail-show-all-periods" onchange="renderAvailTable()"> 7-8 пара
+                    </label>
+                </div>
+                <div id="avail-table-container"></div>
+            </div>
+        </main>
+    </div>
+    <div id="modal-overlay" class="modal-overlay" onclick="closeModals()"></div>
+    <div id="login-modal" class="modal" style="display:none">
+        <div class="modal-content">
+            <h2>Вход</h2>
+            <input type="password" id="login-password" placeholder="Пароль" class="input">
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModals()">Отмена</button>
+                <button class="btn btn-primary" onclick="login()">Войти</button>
+            </div>
+        </div>
+    </div>
+    <div id="add-week-modal" class="modal" style="display:none">
+        <div class="modal-content modal-wide">
+            <h2>Добавить неделю</h2>
+            <label class="field-label">Группа</label>
+            <div class="field-row">
+                <select id="week-group" class="input"></select>
+                <button class="btn btn-ghost btn-sm" onclick="quickAddGroup()">+</button>
+            </div>
+            <label class="field-label">Понедельник (дата)</label>
+            <input type="date" id="week-start-date" class="input">
+            <div class="week-preview" id="week-preview"></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModals()">Отмена</button>
+                <button class="btn btn-primary" onclick="addWeek()">Добавить 6 дней</button>
+            </div>
+        </div>
+    </div>
+    <div id="add-lesson-modal" class="modal" style="display:none">
+        <div class="modal-content modal-wide">
+            <h2>Новый урок</h2>
+            <div id="validation-warnings" style="display:none"></div>
+            <select id="lesson-period" class="input"></select>
+            <label class="field-label">Предмет</label>
+            <div class="field-row">
+                <select id="lesson-subject" class="input" onchange="validateLesson()"></select>
+                <button class="btn btn-ghost btn-sm" onclick="quickAdd('subjects', 'lesson-subject')">+</button>
+            </div>
+            <label class="field-label">Преподаватель</label>
+            <div class="field-row">
+                <select id="lesson-teacher" class="input" onchange="validateLesson()"></select>
+                <button class="btn btn-ghost btn-sm" onclick="quickAdd('teachers', 'lesson-teacher')">+</button>
+            </div>
+            <label class="field-label">Аудитория</label>
+            <div class="field-row">
+                <select id="lesson-classroom" class="input" onchange="validateLesson()"></select>
+                <button class="btn btn-ghost btn-sm" onclick="quickAdd('classrooms', 'lesson-classroom')">+</button>
+            </div>
+            <label class="field-label">Группа</label>
+            <div class="field-row">
+                <select id="lesson-group" class="input"></select>
+                <button class="btn btn-ghost btn-sm" onclick="quickAdd('groups', 'lesson-group')">+</button>
+            </div>
+            <label class="field-label">Подгруппа</label>
+            <select id="lesson-subgroup" class="input">
+                <option value="">Вся группа</option>
+                <option value="1">Подгруппа 1</option>
+                <option value="2">Подгруппа 2</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" onclick="deleteCurrentLesson()">Удалить</button>
+                <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" onclick="addSubgroupLesson()">+ Подгруппа</button>
+                <div style="flex:1"></div>
+                <button class="btn btn-ghost" onclick="closeModals()">Отмена</button>
+                <button class="btn btn-primary" id="btn-save-lesson" onclick="addLesson()">Добавить</button>
+            </div>
+        </div>
+    </div>
+    <div id="references-modal" class="modal modal-wide" style="display:none">
+        <div class="modal-content modal-wide">
+            <h2>Справочники</h2>
+            <div class="ref-grid">
+            <div class="ref-section">
+                <h3>Предметы</h3>
+                <div class="ref-list" id="ref-subjects"></div>
+                <div class="field-row">
+                    <input type="text" id="ref-subjects-input" placeholder="Новый предмет" class="input">
+                    <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">Преподаватель</option></select>
+                    <button class="btn btn-primary btn-sm" onclick="addSubject()">Добавить</button>
+                </div>
+            </div>
+            <div class="ref-section">
+                <h3>Преподаватели</h3>
+                <div class="ref-list" id="ref-teachers"></div>
+                <div class="field-row">
+                    <input type="text" id="ref-teachers-input" placeholder="ФИО преподавателя" class="input">
+                    <button class="btn btn-primary btn-sm" onclick="addRefItem('teachers', 'ref-teachers-input', 'ref-teachers')">Добавить</button>
+                </div>
+            </div>
+            <div class="ref-section">
+                <h3>Группы</h3>
+                <div class="ref-list" id="ref-groups"></div>
+                <div class="field-row">
+                    <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input" style="max-width:140px">
+                    <select id="ref-groups-course" class="input" style="max-width:90px">
+                        <option value="1">1 курс</option>
+                        <option value="2">2 курс</option>
+                        <option value="3">3 курс</option>
+                        <option value="4">4 курс</option>
+                    </select>
+                    <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> Заочн.</label>
+                    <button class="btn btn-primary btn-sm" onclick="addGroup()">Добавить</button>
+                </div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" onclick="advanceCourses()">Перевести курсы →</button>
+            </div>
+            <div class="ref-section">
+                <h3>Аудитории</h3>
+                <div class="ref-list" id="ref-classrooms"></div>
+                <div class="field-row">
+                    <input type="text" id="ref-classrooms-input" placeholder="Номер аудитории" class="input">
+                    <button class="btn btn-primary btn-sm" onclick="addRefItem('classrooms', 'ref-classrooms-input', 'ref-classrooms')">Добавить</button>
+                </div>
+            </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeModals()">Готово</button>
+            </div>
+        </div>
+    </div>
+    <div id="print-header" class="print-header">
+        <h1 id="print-title"></h1>
+        <p id="print-subtitle"></p>
+    </div>
+    <script src="/static/js/app.js?v=11"></script>
+</body>
+</html>

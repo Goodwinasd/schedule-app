@@ -1,0 +1,32 @@
+ * Tip: There are .env files present. Install python-dotenv to use them.
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.10.17:5001
+Press CTRL+C to quit
+[2026-07-23 13:50:56,316] ERROR in app: Exception on /api/availability [GET]
+Traceback (most recent call last):
+  File "C:\Users\maverick\AppData\Local\Programs\Python\Python314\Lib\site-packages\flask\app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "C:\Users\maverick\AppData\Local\Programs\Python\Python314\Lib\site-packages\flask\app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "C:\Users\maverick\AppData\Local\Programs\Python\Python314\Lib\site-packages\flask_cors\extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "C:\Users\maverick\AppData\Local\Programs\Python\Python314\Lib\site-packages\flask\app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\maverick\AppData\Local\Programs\Python\Python314\Lib\site-packages\flask\app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\maverick\Documents\Default Project\schedule-app-staging\app.py", line 1445, in availability
+    lessons = conn.execute(f'''
+              ~~~~~~~~~~~~^^^^^
+        SELECT l.period, sd.date, sd.day_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<12 lines>...
+          AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ''', date_list).fetchall()
+    ^^^^^^^^^^^^^^^
+sqlite3.OperationalError: no such column: l.group_id
+127.0.0.1 - - [23/Jul/2026 13:50:56] "GET /api/availability?monday=2026-07-20 HTTP/1.1" 500 -
