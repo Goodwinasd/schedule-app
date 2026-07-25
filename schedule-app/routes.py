@@ -1973,8 +1973,8 @@ def availability():
                    s.name AS subject_name, l.subject_id
             FROM lessons l
             JOIN schedule_days sd ON l.day_id = sd.id
-            LEFT JOIN teachers t ON l.teacher_id = t.id
-            LEFT JOIN classrooms_list c ON l.classroom_id = c.id
+            LEFT JOIN teachers t ON l.teacher_id = t.id AND t.deleted_at IS NULL
+            LEFT JOIN classrooms_list c ON l.classroom_id = c.id AND c.deleted_at IS NULL
             LEFT JOIN groups_list g ON l.group_id = g.id
             LEFT JOIN subjects s ON l.subject_id = s.id
             WHERE sd.date IN ({placeholders})
@@ -1982,8 +1982,8 @@ def availability():
               AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
         ''', date_list).fetchall()
 
-        all_teachers = conn.execute('SELECT id, name FROM teachers ORDER BY name').fetchall()
-        all_classrooms = conn.execute('SELECT id, name FROM classrooms_list ORDER BY CAST(name AS INTEGER), name').fetchall()
+        all_teachers = conn.execute('SELECT id, name FROM teachers WHERE deleted_at IS NULL ORDER BY name').fetchall()
+        all_classrooms = conn.execute('SELECT id, name FROM classrooms_list WHERE deleted_at IS NULL ORDER BY CAST(name AS INTEGER), name').fetchall()
 
         teacher_busy = {}
         classroom_busy = {}
