@@ -1,0 +1,6 @@
+.env
+schedule.db
+schedule_backup_*.db
+backups/
+__pycache__/
+*.pyc
