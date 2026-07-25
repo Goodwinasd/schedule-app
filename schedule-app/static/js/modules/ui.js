@@ -166,7 +166,7 @@ export async function addWeek() {
 
 export async function restoreWeek() {
     if (!state.currentMonday) return;
-    if (!confirm('Восстановить все удаленные дни и уроки за эту неделю?')) return;
+    if (!confirm('Восстановить все удаленные дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
     const res = await api('/api/week/restore?monday=' + m, { method: 'POST' });
     if (res.error) { alert(res.error); return; }
@@ -176,7 +176,7 @@ export async function restoreWeek() {
 
 export async function deleteWeek() {
     if (!state.currentMonday) return;
-    if (!confirm('Удалить все дни и уроки за эту неделю?')) return;
+    if (!confirm('Удалить все дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
     const res = await api('/api/week?monday=' + m, { method: 'DELETE' });
     if (res.error) { alert(res.error); return; }
@@ -216,7 +216,7 @@ function checkConflictsForLesson(lesson, dayDate, period) {
                 conflicts.push({ type: 'error', msg: 'Аудитория занята в этот период' });
             }
             if (other.group_id === lesson.group_id && (other.subgroup || null) === (lesson.subgroup || null)) {
-                conflicts.push({ type: 'warning', msg: 'Дублирование урока для группы' });
+                conflicts.push({ type: 'warning', msg: 'Дублирование пары для группы' });
             }
         }
     }
@@ -302,7 +302,7 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     state.currentLessonDayGroup = dayGroup || '';
     state.currentEditLessonId = null;
     openModal('add-lesson-modal');
-    document.querySelector('#add-lesson-modal h2').textContent = 'Новый урок';
+    document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
     const sBtn = document.getElementById('btn-save-lesson');
     sBtn.textContent = 'Добавить'; sBtn.disabled = false;
     document.getElementById('validation-warnings').style.display = 'none';
@@ -351,7 +351,7 @@ export async function addLesson() {
         if (dayRes.error) { alert(dayRes.error); return; }
         dayId = dayRes.id;
     }
-    if (!dayId) { alert('Не удалось определить день для урока'); return; }
+    if (!dayId) { alert('Не удалось определить день для пары'); return; }
     const res = await api(`/api/days/${dayId}/lessons`, { method: 'POST', body: JSON.stringify(d) });
     if (res.error) {
         const el = document.getElementById('validation-warnings');
@@ -367,7 +367,7 @@ export function editLesson(lesson) {
     state.currentLessonDayId = lesson.day_id || null;
     state.currentEditLessonId = lesson.id;
     openModal('add-lesson-modal');
-    document.querySelector('#add-lesson-modal h2').textContent = 'Редактировать урок';
+    document.querySelector('#add-lesson-modal h2').textContent = 'Редактировать пара';
     const sBtn = document.getElementById('btn-save-lesson');
     sBtn.textContent = 'Сохранить'; sBtn.disabled = false;
     document.getElementById('validation-warnings').style.display = 'none';
@@ -406,7 +406,7 @@ export function addSubgroupLesson() {
 
 export async function deleteCurrentLesson() {
     if (!state.currentEditLessonId) return;
-    if (!confirm('Удалить урок?')) return;
+    if (!confirm('Удалить пара?')) return;
     await api(`/api/lessons/${state.currentEditLessonId}`, { method: 'DELETE' });
     closeModals();
     loadScheduleTable();
@@ -415,7 +415,7 @@ export async function deleteCurrentLesson() {
 function resetLessonModal() {
     state.currentEditLessonId = null;
     state.currentLessonDate = null;
-    document.querySelector('#add-lesson-modal h2').textContent = 'Новый урок';
+    document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
     const btn = document.getElementById('btn-save-lesson');
     btn.textContent = 'Добавить'; btn.disabled = false; btn.onclick = addLesson;
     document.getElementById('validation-warnings').style.display = 'none';
@@ -517,7 +517,7 @@ async function loadTrashTab() {
         ...(data.groups || []).map(i => ({...i, type: 'groups'})),
     ]);
     document.getElementById('trash-days').innerHTML = renderTrashSection('Дни', (data.days || []).map(i => ({...i, type: 'days'})));
-    document.getElementById('trash-lessons').innerHTML = renderTrashSection('Уроки', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
+    document.getElementById('trash-lessons').innerHTML = renderTrashSection('Пары', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
 }
 
 function renderTrashSection(title, items) {
@@ -571,9 +571,9 @@ async function loadHealthTab() {
         html += '<div style="margin:8px 0;color:#2e7d32;font-size:13px">Конфликтов не найдено</div>';
     }
     if (data.orphaned_lessons && data.orphaned_lessons.length) {
-        html += `<div style="margin:8px 0;color:#e65100"><strong>Сиротские уроки (${data.orphaned_lessons.length}):</strong> ID: ${data.orphaned_lessons.map(l => l.id).join(', ')}</div>`;
+        html += `<div style="margin:8px 0;color:#e65100"><strong>Сиротские пары (${data.orphaned_lessons.length}):</strong> ID: ${data.orphaned_lessons.map(l => l.id).join(', ')}</div>`;
     } else {
-        html += '<div style="margin:8px 0;color:#2e7d32;font-size:13px">Сиротских уроков нет</div>';
+        html += '<div style="margin:8px 0;color:#2e7d32;font-size:13px">Сиротских пар нет</div>';
     }
     cont.innerHTML = html;
 }

@@ -817,7 +817,7 @@ async function addLesson() {
     }
 
     if (!dayId) {
-        alert('Не удалось определить день для урока');
+        alert('Не удалось определить день для пары');
         return;
     }
 
@@ -913,7 +913,7 @@ function addSubgroupLesson() {
 
 async function deleteCurrentLesson() {
     if (!currentEditLessonId) return;
-    if (!confirm('Удалить урок?')) return;
+    if (!confirm('Удалить пара?')) return;
     await api(`/api/lessons/${currentEditLessonId}`, { method: 'DELETE' });
     closeModals();
     loadScheduleTable();
