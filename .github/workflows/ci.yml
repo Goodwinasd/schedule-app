@@ -21,11 +21,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r schedule-app/requirements.txt
+          pip install -r schedule-app/requirements-dev.txt
 
       - name: Run tests
         env:
           SCHEDULE_PASSWORD: TestPass123!
         run: |
+          cd schedule-app
           python -m pytest tests/ tests/integration/ -v --tb=short -q
