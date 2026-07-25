@@ -1273,3 +1273,22 @@ select.input:disabled {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
+
+/* ---- Conflict indicators ---- */
+.cell-conflict-error {
+    background: #fce4e4 !important;
+    border-left: 4px solid #d32f2f !important;
+}
+.cell-conflict-warning {
+    background: #fff8e1 !important;
+    border-left: 4px solid #f9a825 !important;
+}
+.lesson-content[title] {
+    cursor: help;
+}
+.lesson-content.cell-conflict-error .lesson-subject {
+    color: #c62828 !important;
+}
+.lesson-content.cell-conflict-warning .lesson-subject {
+    color: #f57f17 !important;
+}

@@ -17,7 +17,7 @@ import {
     addRefItem, deleteRefItem, quickAdd, quickAddGroup,
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
-    selectAvailDay, setAvailMode, loadAvailability, updateUI,
+    selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
 } from './ui.js';
 
 /* Привязка к window для onclick-вызовов из HTML */
@@ -32,7 +32,7 @@ Object.assign(window, {
     addRefItem, deleteRefItem, quickAdd, quickAddGroup,
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
-    selectAvailDay, setAvailMode, loadAvailability, updateUI,
+    selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
 });

@@ -13,6 +13,15 @@ export function updateUI() {
     g('btn-avail').style.display = state.isAdmin ? '' : 'none';
     g('admin-panel').style.display = (state.isAdmin && state.currentScheduleType) ? '' : 'none';
     g('print-panel').style.display = state.currentScheduleType ? '' : 'none';
+    const cb = g('btn-toggle-conflicts');
+    if (cb) cb.style.display = state.isAdmin && state.currentScheduleType ? '' : 'none';
+}
+
+export function toggleConflicts() {
+    state.showConflicts = !state.showConflicts;
+    const cb = document.getElementById('btn-toggle-conflicts');
+    if (cb) cb.textContent = state.showConflicts ? '✔ Конфликты' : 'Конфликты';
+    loadScheduleTable();
 }
 window._onUnauthorized = updateUI;
 
@@ -192,6 +201,30 @@ export async function loadScheduleTable() {
     cont.innerHTML = renderScheduleTable(data);
 }
 
+function checkConflictsForLesson(lesson, dayDate, period) {
+    if (!state.showConflicts) return null;
+    const conflicts = [];
+    for (const id of Object.keys(state.lessonsMap)) {
+        const other = state.lessonsMap[id];
+        if (other.id === lesson.id) continue;
+        if (other.period !== period) continue;
+        if (other.day_id === lesson.day_id) {
+            if (other.teacher_id && other.teacher_id === lesson.teacher_id) {
+                conflicts.push({ type: 'error', msg: 'Преподаватель занят в этот период' });
+            }
+            if (other.classroom_id && other.classroom_id === lesson.classroom_id) {
+                conflicts.push({ type: 'error', msg: 'Аудитория занята в этот период' });
+            }
+            if (other.group_id === lesson.group_id && (other.subgroup || null) === (lesson.subgroup || null)) {
+                conflicts.push({ type: 'warning', msg: 'Дублирование урока для группы' });
+            }
+        }
+    }
+    if (conflicts.length === 0) return null;
+    const hasError = conflicts.some(c => c.type === 'error');
+    return { cls: hasError ? 'cell-conflict-error' : 'cell-conflict-warning', tooltip: conflicts.map(c => c.msg).join('; ') };
+}
+
 function renderScheduleTable(data) {
     const { days, periods } = data;
     Object.keys(state.lessonsMap).forEach(k => delete state.lessonsMap[k]);
@@ -219,7 +252,10 @@ function renderScheduleTable(data) {
                         state.lessonsMap[l.id] = l;
                         const meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
                         const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
-                        return `<div class="lesson-content"${oc}><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
+                        const conflict = checkConflictsForLesson(l, day.date, p.period);
+                        const cCls = conflict ? ' ' + conflict.cls : '';
+                        const tip = conflict ? ` title="${escapeHtml(conflict.tooltip)}"` : '';
+                        return `<div class="lesson-content${cCls}"${oc}${tip}><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
                     }).join('');
                     html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}">${inner}</td>`;
                 } else {

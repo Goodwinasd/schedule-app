@@ -23,5 +23,6 @@ const state = {
     availMonday: null,
     availSelectedDay: null,
     availData: null,
+    showConflicts: false,
 };
 export default state;
