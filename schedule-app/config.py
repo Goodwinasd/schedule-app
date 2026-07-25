@@ -51,8 +51,9 @@ PORT = int(os.environ.get('FLASK_PORT', 5000))
 # ---- Database ----
 
 DB_DIR = os.path.dirname(__file__)
+DB_NAME = 'schedule.db'
 DATA_DIR = os.environ.get('SCHEDULE_DATA_DIR', os.path.join(DB_DIR, 'data'))
-DB_PATH = os.path.join(DATA_DIR, 'schedule.db')
+DB_PATH = os.path.join(DATA_DIR, DB_NAME)
 BACKUPS_DIR = os.environ.get('SCHEDULE_BACKUPS_DIR', os.path.join(DB_DIR, 'backups'))
 
 # ---- Bell schedule ----
