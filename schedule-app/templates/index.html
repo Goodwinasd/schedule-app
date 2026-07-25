@@ -15,10 +15,10 @@
             <div class="header-content">
                 <h1 id="header-title" onclick="goHome()">Расписание</h1>
                 <div class="header-actions">
-                    <button id="btn-avail" class="btn btn-ghost" onclick="showAvailability()" style="display:none">Свободные окна</button>
-                    <button id="btn-admin" class="btn btn-ghost" onclick="showAdminPanel()" style="display:none">Администрирование</button>
-                    <button id="btn-login" class="btn btn-ghost" onclick="showLoginModal()">Войти</button>
-                    <button id="btn-logout" class="btn btn-ghost" onclick="logout()" style="display:none">Выйти</button>
+                    <button id="btn-avail" class="btn btn-ghost" onclick="showAvailability()" style="display:none">📅 Свободные окна</button>
+                    <button id="btn-admin" class="btn btn-ghost" onclick="showAdminPanel()" style="display:none">⚙️ Администрирование</button>
+                    <button id="btn-login" class="btn btn-ghost" onclick="showLoginModal()">🔒 Войти</button>
+                    <button id="btn-logout" class="btn btn-ghost" onclick="logout()" style="display:none">🚪 Выйти</button>
                 </div>
             </div>
         </header>
@@ -46,13 +46,13 @@
                 <div id="schedule-table-container"></div>
                 <div id="admin-panel" class="admin-panel" style="display:none">
                     <button class="btn btn-primary btn-add-day" onclick="showAddWeekModal()">
-                        <span class="plus-icon">+</span> Добавить неделю
+                        ➕ Добавить неделю
                     </button>
                     <button class="btn btn-ghost btn-restore-week" onclick="restoreWeek()" style="margin-left:8px">
-                        ↻ Восстановить неделю
+                        🔄 Восстановить неделю
                     </button>
                     <button class="btn btn-danger btn-restore-week" onclick="deleteWeek()" style="margin-left:8px">
-                        🗑 Удалить неделю
+                        🗑️ Удалить неделю
                     </button>
                 </div>
                 <div id="print-panel" class="print-panel">
@@ -87,8 +87,8 @@
             <h2>Вход</h2>
             <input type="password" id="login-password" placeholder="Пароль" class="input">
             <div class="modal-actions">
-                <button class="btn btn-ghost" onclick="closeModals()">Отмена</button>
-                <button class="btn btn-primary" onclick="login()">Войти</button>
+                <button class="btn btn-ghost" onclick="closeModals()">❌ Отмена</button>
+                <button class="btn btn-primary" onclick="login()">🔒 Войти</button>
             </div>
         </div>
     </div>
@@ -104,7 +104,7 @@
             <input type="date" id="week-start-date" class="input">
             <div class="week-preview" id="week-preview"></div>
             <div class="modal-actions">
-                <button class="btn btn-ghost" onclick="closeModals()">Отмена</button>
+                <button class="btn btn-ghost" onclick="closeModals()">❌ Отмена</button>
                 <button class="btn btn-primary" onclick="addWeek()">Добавить 6 дней</button>
             </div>
         </div>
@@ -144,7 +144,7 @@
                 <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" onclick="deleteCurrentLesson()">Удалить</button>
                 <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" onclick="addSubgroupLesson()">+ Подгруппа</button>
                 <div style="flex:1"></div>
-                <button class="btn btn-ghost" onclick="closeModals()">Отмена</button>
+                <button class="btn btn-ghost" onclick="closeModals()">❌ Отмена</button>
                 <button class="btn btn-primary" id="btn-save-lesson" onclick="addLesson()">Добавить</button>
             </div>
         </div>
@@ -152,8 +152,8 @@
     <div id="references-modal" class="modal modal-wide modal-admin" style="display:none">
         <div class="modal-content modal-wide">
             <div class="ref-header">
-                <h2>Администрирование</h2>
-                <button class="ref-done" onclick="closeModals()">Готово</button>
+                <h2>⚙️ Администрирование</h2>
+                <button class="ref-done" onclick="closeModals()">✅ Готово</button>
             </div>
             <div class="admin-tabs">
                 <button class="admin-tab active" data-tab="refs" onclick="switchAdminTab('refs')">Справочники</button>

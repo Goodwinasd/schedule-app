@@ -2011,52 +2011,7 @@ def availability():
         conn.close()
 
 
-@bp.route('/api/export-debug')
-def export_debug():
-    """Диагностика экспорта — показывает какие данные попадут в файл
-    ---
-    parameters:
-      - in: query
-        name: type
-        type: string
-        enum: [group, teacher, classroom]
-      - in: query
-        name: name
-        type: string
-      - in: query
-        name: id
-        type: integer
-      - in: query
-        name: monday
-        type: string
-    responses:
-      200:
-        description: JSON с week_dates, non_empty_cells, total_cells
-    """
-    schedule_type = request.args.get('type', 'teacher')
-    name = request.args.get('name', '')
-    entity_id = request.args.get('id', '')
-    monday = request.args.get('monday', '')
 
-    if entity_id:
-        try:
-            entity_id = int(entity_id)
-        except (ValueError, TypeError):
-            entity_id = None
-
-    wd, periods = _get_export_data(schedule_type, name, monday, entity_id)
-
-    result = {'week_dates': [{'date': d['date'], 'day_name': d['day_name']} for d in wd]}
-    cells = []
-    for p in periods:
-        for d in wd:
-            val = p['lessons'].get(d['date'], '')
-            if val:
-                cells.append({'period': p['period'], 'date': d['date'], 'value': val})
-    result['non_empty_cells'] = cells
-    result['total_cells'] = sum(1 for p in periods for d in wd if p['lessons'].get(d['date'], ''))
-
-    return jsonify(result)
 
 
 @bp.route('/api/db/health')

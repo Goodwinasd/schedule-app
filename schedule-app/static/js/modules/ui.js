@@ -3,6 +3,20 @@ import { DAY_ORDER } from './config.js';
 import { escapeHtml, getMonday, addDays, toISODate, getWeekNumber, formatChipRange, formatDateRange, shiftLabel, populateSelect, populateSelectByName } from './utils.js';
 import { api } from './api.js';
 
+function showToast(message, type) {
+    let container = document.getElementById('toast-container');
+    if (!container) { container = document.createElement('div'); container.id = 'toast-container'; document.body.appendChild(container); }
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.textContent = message;
+    t.onclick = () => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); };
+    container.appendChild(t);
+    setTimeout(() => { if (t.parentNode) { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); } }, 4000);
+}
+
+function alertError(msg) { showToast(msg, 'error'); }
+function alertSuccess(msg) { showToast(msg, 'success'); }
+
 /* ======================== Navigation ======================== */
 
 export function updateUI() {
@@ -407,7 +421,8 @@ export function addSubgroupLesson() {
 export async function deleteCurrentLesson() {
     if (!state.currentEditLessonId) return;
     if (!confirm('Удалить пара?')) return;
-    await api(`/api/lessons/${state.currentEditLessonId}`, { method: 'DELETE' });
+    const res = await api(`/api/lessons/${state.currentEditLessonId}`, { method: 'DELETE' });
+    if (res.error) { alert(res.error); return; }
     closeModals();
     loadScheduleTable();
 }
@@ -452,11 +467,23 @@ export function validateLesson() {
 /* ======================== Homepage & References ======================== */
 
 export async function loadReferences() {
-    [state.subjectsList, state.teachersList, state.groupsList, state.classroomsList] = await Promise.all([
+    const refs = await Promise.all([
         api('/api/subjects'), api('/api/teachers'), api('/api/groups'), api('/api/classrooms'),
     ]);
-    state.teachersWithSchedule = await api('/api/teachers');
-    state.classroomsWithSchedule = await api('/api/classrooms');
+    const labels = ['subjects', 'teachers', 'groups', 'classrooms'];
+    for (let i = 0; i < refs.length; i++) {
+        if (refs[i].error) { console.error('loadReferences failed:', labels[i], refs[i].error); return; }
+    }
+    state.subjectsList = refs[0];
+    state.teachersList = refs[1];
+    state.groupsList = refs[2];
+    state.classroomsList = refs[3];
+    const tws = await api('/api/teachers');
+    if (tws.error) { console.error('loadReferences teachers:', tws.error); }
+    else { state.teachersWithSchedule = tws; }
+    const cws = await api('/api/classrooms');
+    if (cws.error) { console.error('loadReferences classrooms:', cws.error); }
+    else { state.classroomsWithSchedule = cws; }
 }
 
 export function renderHomePage() {
@@ -510,14 +537,18 @@ export function switchAdminTab(tab) {
 
 async function loadTrashTab() {
     const data = await api('/api/trash');
-    document.getElementById('trash-refs').innerHTML = renderTrashSection('Справочники', [
+    if (data.error) { document.getElementById('trash-refs').innerHTML = '<div style="color:var(--danger)">Ошибка загрузки корзины</div>'; return; }
+    const refs = document.getElementById('trash-refs');
+    if (refs) refs.innerHTML = renderTrashSection('Справочники', [
         ...(data.subjects || []).map(i => ({...i, type: 'subjects'})),
         ...(data.teachers || []).map(i => ({...i, type: 'teachers'})),
         ...(data.classrooms || []).map(i => ({...i, type: 'classrooms'})),
         ...(data.groups || []).map(i => ({...i, type: 'groups'})),
     ]);
-    document.getElementById('trash-days').innerHTML = renderTrashSection('Дни', (data.days || []).map(i => ({...i, type: 'days'})));
-    document.getElementById('trash-lessons').innerHTML = renderTrashSection('Пары', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
+    const days = document.getElementById('trash-days');
+    if (days) days.innerHTML = renderTrashSection('Дни', (data.days || []).map(i => ({...i, type: 'days'})));
+    const lessons = document.getElementById('trash-lessons');
+    if (lessons) lessons.innerHTML = renderTrashSection('Пары', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
 }
 
 function renderTrashSection(title, items) {
@@ -555,6 +586,7 @@ async function loadHealthTab() {
     const cont = document.getElementById('db-health-content');
     cont.innerHTML = '<div class="loading">Загрузка...</div>';
     const data = await api('/api/db/health');
+    if (data.error) { cont.innerHTML = '<div style="color:var(--danger)">Ошибка загрузки диагностики</div>'; return; }
     let html = `<div style="margin:8px 0;font-size:13px"><strong>Целостность БД:</strong> ${escapeHtml(data.integrity_check)}</div>`;
     html += '<table class="ref-table"><tr><th>Таблица</th><th>Всего</th><th>Удалено</th></tr>';
     for (const [t, info] of Object.entries(data.tables)) {
@@ -587,6 +619,8 @@ function populateSubjectTeacherSelect() {
 export async function renderRefList(endpoint, containerId) {
     const items = await api(`/api/${endpoint}`);
     const container = document.getElementById(containerId);
+    if (!container) return;
+    if (items.error) { container.innerHTML = '<div style="font-size:13px;color:var(--danger)">Ошибка загрузки</div>'; return; }
     if (endpoint === 'subjects') state.subjectsList = items;
     else if (endpoint === 'teachers') state.teachersList = items;
     else if (endpoint === 'groups') state.groupsList = items;
@@ -782,6 +816,11 @@ export function availCarouselSkip(n) {
 
 export async function loadAvailability() {
     state.availData = await api(`/api/availability?monday=${toISODate(state.availMonday)}`);
+    if (state.availData.error) {
+        const cont = document.getElementById('avail-table-container');
+        if (cont) cont.innerHTML = '<div style="padding:20px;color:var(--danger)">Ошибка загрузки данных доступности</div>';
+        return;
+    }
     renderAvailDayTabs();
     renderAvailTable();
 }

@@ -6,7 +6,7 @@ import logging
 import config
 
 logger = logging.getLogger(__name__)
-SLOW_THRESHOLD_MS = int(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '100'))
+SLOW_THRESHOLD_MS = int(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '500'))
 _slow_counter = 0
 
 
