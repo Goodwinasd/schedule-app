@@ -1,0 +1,27 @@
+/** @type {import('./types').AppState} */
+const state = {
+    isAdmin: false,
+    csrfToken: '',
+    bellSchedule: [],
+    currentLessonDayId: null,
+    currentLessonDate: null,
+    currentEditLessonId: null,
+    currentLessonDayGroup: '',
+    validationTimeout: null,
+    subjectsList: [],
+    teachersList: [],
+    groupsList: [],
+    classroomsList: [],
+    teachersWithSchedule: [],
+    classroomsWithSchedule: [],
+    currentScheduleType: '',
+    currentScheduleId: null,
+    currentScheduleName: '',
+    currentMonday: null,
+    lessonsMap: {},
+    availMode: 'teacher',
+    availMonday: null,
+    availSelectedDay: null,
+    availData: null,
+};
+export default state;

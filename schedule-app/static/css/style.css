@@ -165,6 +165,13 @@ main {
     box-shadow: 0 0 0 2px var(--accent);
 }
 
+.input:disabled,
+select.input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--bg);
+}
+
 .input option {
     background: var(--surface);
     color: var(--text);
@@ -549,6 +556,12 @@ main {
 .plus-icon {
     font-size: 20px;
     font-weight: 300;
+}
+
+.btn-restore-week {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-radius: 12px;
 }
 
 /* ---- Modals ---- */

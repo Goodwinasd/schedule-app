@@ -7,6 +7,7 @@ let isAdmin = false;
 let csrfToken = '';
 let bellSchedule = [];
 let currentLessonDayId = null;
+let currentLessonDate = null;
 let currentEditLessonId = null;
 let currentLessonDayGroup = '';
 
@@ -369,20 +370,34 @@ function printSchedule() {
 
 function exportSchedule(format) {
     const monday = toISODate(currentMonday);
-    const url = `/api/export?type=${encodeURIComponent(currentScheduleType)}&name=${encodeURIComponent(currentScheduleName)}&monday=${monday}&format=${format}`;
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const params = { type: currentScheduleType, name: currentScheduleName, id: currentScheduleId, monday, format };
+    console.log('Export params:', params);
+    const url = `/api/export?type=${encodeURIComponent(currentScheduleType)}&name=${encodeURIComponent(currentScheduleName)}&id=${encodeURIComponent(currentScheduleId)}&monday=${monday}&format=${format}`;
+    fetch(url, { method: 'HEAD' }).then(res => {
+        if (!res.ok) {
+            return res.json().then(body => {
+                alert(body.error || `Ошибка экспорта (${res.status})`);
+            }).catch(() => {
+                alert(`Ошибка экспорта (${res.status})`);
+            });
+        }
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }).catch(err => {
+        console.error('Export error:', err);
+        alert('Ошибка сети при экспорте');
+    });
 }
 
 function renderScheduleTable(data) {
     const days = data.days;
     const periods = data.periods;
     lessonsMap = {};
-    const canEdit = isAdmin && currentScheduleType === 'group';
+    const canEdit = isAdmin && (currentScheduleType === 'group' || currentScheduleType === 'teacher');
 
     let html = '<div class="schedule-table-wrap"><table class="schedule-table">';
 
@@ -434,8 +449,15 @@ function renderScheduleTable(data) {
                     html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}">${inner}</td>`;
                 } else {
                     const dayId = day.day_id;
-                    const onclick = canEdit && dayId ? ` onclick="showAddLessonModal(${dayId}, ${period.period}, ${currentScheduleId})"` : '';
-                    html += `<td class="day-cell empty-cell${canEdit ? ' addable-cell' : ''}"${onclick}></td>`;
+                    let onclick = '';
+                    if (canEdit && (dayId || currentScheduleType === 'teacher')) {
+                        if (currentScheduleType === 'teacher') {
+                            onclick = ` onclick="showAddLessonModal(${dayId || 'null'}, ${period.period}, '${day.date}', null, ${currentScheduleId})"`;
+                        } else {
+                            onclick = ` onclick="showAddLessonModal(${dayId}, ${period.period}, ${currentScheduleId})"`;
+                        }
+                    }
+                    html += `<td class="day-cell empty-cell${canEdit && (dayId || currentScheduleType === 'teacher') ? ' addable-cell' : ''}"${onclick}></td>`;
                 }
             }
         }
@@ -625,6 +647,32 @@ async function addWeek() {
     loadScheduleTable();
 }
 
+async function restoreWeek() {
+    if (!currentMonday) return;
+    if (!confirm('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0432\u0441\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u043d\u044b\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
+    const monday = toISODate(currentMonday);
+    const res = await api('/api/week/restore?monday=' + monday, { method: 'POST' });
+    if (res.error) {
+        alert(res.error);
+        return;
+    }
+    alert('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e \u0434\u043d\u0435\u0439: ' + res.days_restored);
+    loadScheduleTable();
+}
+
+async function deleteWeek() {
+    if (!currentMonday) return;
+    if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
+    const monday = toISODate(currentMonday);
+    const res = await api('/api/week?monday=' + monday, { method: 'DELETE' });
+    if (res.error) {
+        alert(res.error);
+        return;
+    }
+    alert('\u0423\u0434\u0430\u043b\u0435\u043d\u043e \u0434\u043d\u0435\u0439: ' + res.days_deleted);
+    loadScheduleTable();
+}
+
 // ---- Validation ----
 
 let validationTimeout = null;
@@ -676,8 +724,9 @@ async function validateLesson() {
 
 // ---- Lessons ----
 
-function showAddLessonModal(dayId, period, dayGroup) {
+function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) {
     currentLessonDayId = dayId;
+    currentLessonDate = dateStr || null;
     currentLessonDayGroup = dayGroup || '';
     currentEditLessonId = null;
     openModal('add-lesson-modal');
@@ -700,6 +749,29 @@ function showAddLessonModal(dayId, period, dayGroup) {
     populateSelect('lesson-group', groupsList, '\u2014 \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u2014');
     populateSelect('lesson-classroom', classroomsList, '\u2014 \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u2014');
 
+    var teacherField = document.getElementById('lesson-teacher');
+    var groupLabel = document.querySelector('#add-lesson-modal .field-label[for="lesson-group"]');
+    if (!groupLabel) {
+        var labels = document.querySelectorAll('#add-lesson-modal .field-label');
+        for (var i = 0; i < labels.length; i++) {
+            if (labels[i].textContent === '\u0413\u0440\u0443\u043f\u043f\u0430' || labels[i].innerText === '\u0413\u0440\u0443\u043f\u043f\u0430') {
+                groupLabel = labels[i];
+                break;
+            }
+        }
+    }
+
+    if (currentScheduleType === 'teacher' && teacherId) {
+        teacherField.value = teacherId;
+        teacherField.disabled = true;
+        document.getElementById('lesson-group').value = '';
+    } else {
+        teacherField.disabled = false;
+        if (currentLessonDayGroup) {
+            document.getElementById('lesson-group').value = currentLessonDayGroup;
+        }
+    }
+
     document.getElementById('lesson-subject').onchange = function() {
         const subjectId = parseInt(this.value);
         if (!subjectId) return;
@@ -707,7 +779,7 @@ function showAddLessonModal(dayId, period, dayGroup) {
         if (subject && subject.default_teacher_id) {
             const teacherSelect = document.getElementById('lesson-teacher');
             const current = parseInt(teacherSelect.value);
-            if (!current) teacherSelect.value = subject.default_teacher_id;
+            if (!teacherSelect.disabled && !current) teacherSelect.value = subject.default_teacher_id;
         }
         validateLesson();
     };
@@ -715,10 +787,6 @@ function showAddLessonModal(dayId, period, dayGroup) {
     document.getElementById('lesson-group').onchange = function() {
         document.getElementById('lesson-subgroup').value = '';
     };
-
-    if (currentLessonDayGroup) {
-        document.getElementById('lesson-group').value = currentLessonDayGroup;
-    }
 }
 
 async function addLesson() {
@@ -729,7 +797,31 @@ async function addLesson() {
     const groupId = parseInt(document.getElementById('lesson-group').value) || null;
     const subgroup = parseInt(document.getElementById('lesson-subgroup').value) || null;
 
-    const res = await api(`/api/days/${currentLessonDayId}/lessons`, {
+    // Если day_id нет (teacher-режим, пустая ячейка) — сначала создаём день
+    let dayId = currentLessonDayId;
+    if (!dayId && currentLessonDate && groupId) {
+        const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+        const d = new Date(currentLessonDate + 'T00:00:00');
+        const dayName = dayNames[d.getDay() === 0 ? 6 : d.getDay() - 1];
+        const groupObj = groupsList.find(g => g.id === groupId);
+        const groupName = groupObj ? groupObj.name : '';
+        const dayRes = await api('/api/days', {
+            method: 'POST',
+            body: JSON.stringify({ day_name: dayName, date: currentLessonDate, group_name: groupName }),
+        });
+        if (dayRes.error) {
+            alert(dayRes.error);
+            return;
+        }
+        dayId = dayRes.id;
+    }
+
+    if (!dayId) {
+        alert('Не удалось определить день для урока');
+        return;
+    }
+
+    const res = await api(`/api/days/${dayId}/lessons`, {
         method: 'POST',
         body: JSON.stringify({ period, subject_id: subjectId, teacher_id: teacherId, classroom_id: classroomId, group_id: groupId, subgroup }),
     });
@@ -773,6 +865,12 @@ function editLesson(lesson) {
     document.getElementById('lesson-classroom').value = lesson.classroom_id || '';
     document.getElementById('lesson-group').value = lesson.group_id || '';
     document.getElementById('lesson-subgroup').value = lesson.subgroup || '';
+
+    if (currentScheduleType === 'teacher') {
+        document.getElementById('lesson-teacher').disabled = true;
+    } else {
+        document.getElementById('lesson-teacher').disabled = false;
+    }
 
     document.getElementById('btn-save-lesson').onclick = () => saveLesson(lesson.id);
 }
@@ -823,6 +921,7 @@ async function deleteCurrentLesson() {
 
 function resetLessonModal() {
     currentEditLessonId = null;
+    currentLessonDate = null;
     document.querySelector('#add-lesson-modal h2').textContent = '\u041d\u043e\u0432\u044b\u0439 \u0443\u0440\u043e\u043a';
     const btn = document.getElementById('btn-save-lesson');
     btn.textContent = '\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c';
@@ -831,6 +930,7 @@ function resetLessonModal() {
     document.getElementById('validation-warnings').style.display = 'none';
     document.getElementById('btn-delete-lesson').style.display = 'none';
     document.getElementById('btn-add-subgroup').style.display = 'none';
+    document.getElementById('lesson-teacher').disabled = false;
 }
 
 // ---- References ----

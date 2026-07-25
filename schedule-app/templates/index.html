@@ -48,6 +48,12 @@
                     <button class="btn btn-primary btn-add-day" onclick="showAddWeekModal()">
                         <span class="plus-icon">+</span> Добавить неделю
                     </button>
+                    <button class="btn btn-ghost btn-restore-week" onclick="restoreWeek()" style="margin-left:8px">
+                        ↻ Восстановить неделю
+                    </button>
+                    <button class="btn btn-danger btn-restore-week" onclick="deleteWeek()" style="margin-left:8px">
+                        🗑 Удалить неделю
+                    </button>
                 </div>
                 <div id="print-panel" class="print-panel">
                     <button class="btn btn-ghost btn-print" onclick="printSchedule()">🖨 Печать</button>
@@ -146,49 +152,49 @@
     <div id="references-modal" class="modal modal-wide" style="display:none">
         <div class="modal-content modal-wide">
             <div class="ref-header">
-                <h2>\u0421\u043f\u0440\u0430\u0432\u043e\u0447\u043d\u0438\u043a\u0438</h2>
-                <button class="ref-done" onclick="closeModals()">\u0413\u043e\u0442\u043e\u0432\u043e</button>
+                <h2>Справочники</h2>
+                <button class="ref-done" onclick="closeModals()">Готово</button>
             </div>
             <div class="ref-grid">
             <div class="ref-section">
-                <h3>\u041f\u0440\u0435\u0434\u043c\u0435\u0442\u044b</h3>
+                <h3>Предметы</h3>
                 <div class="ref-list" id="ref-subjects"></div>
                 <div class="field-row">
-                    <input type="text" id="ref-subjects-input" placeholder="\u041d\u043e\u0432\u044b\u0439 \u043f\u0440\u0435\u0434\u043c\u0435\u0442" class="input">
-                    <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">\u041f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c</option></select>
-                    <button class="btn btn-primary btn-sm" onclick="addSubject()">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>
+                    <input type="text" id="ref-subjects-input" placeholder="Новый предмет" class="input">
+                    <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">Преподаватель</option></select>
+                    <button class="btn btn-primary btn-sm" onclick="addSubject()">Добавить</button>
                 </div>
             </div>
             <div class="ref-section">
-                <h3>\u041f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u0438</h3>
+                <h3>Преподаватели</h3>
                 <div class="ref-list" id="ref-teachers"></div>
                 <div class="field-row">
-                    <input type="text" id="ref-teachers-input" placeholder="\u0424\u0418\u041e \u043f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044f" class="input">
-                    <button class="btn btn-primary btn-sm" onclick="addRefItem('teachers', 'ref-teachers-input', 'ref-teachers')">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>
+                    <input type="text" id="ref-teachers-input" placeholder="ФИО преподавателя" class="input">
+                    <button class="btn btn-primary btn-sm" onclick="addRefItem('teachers', 'ref-teachers-input', 'ref-teachers')">Добавить</button>
                 </div>
             </div>
             <div class="ref-section">
-                <h3>\u0413\u0440\u0443\u043f\u043f\u044b</h3>
+                <h3>Группы</h3>
                 <div class="ref-list" id="ref-groups"></div>
                 <div class="field-row">
-                    <input type="text" id="ref-groups-input" placeholder="\u041d\u043e\u043c\u0435\u0440 \u0433\u0440\u0443\u043f\u043f\u044b" class="input" style="max-width:140px">
+                    <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input" style="max-width:140px">
                     <select id="ref-groups-course" class="input" style="max-width:90px">
-                        <option value="1">1 \u043a\u0443\u0440\u0441</option>
-                        <option value="2">2 \u043a\u0443\u0440\u0441</option>
-                        <option value="3">3 \u043a\u0443\u0440\u0441</option>
-                        <option value="4">4 \u043a\u0443\u0440\u0441</option>
+                        <option value="1">1 курс</option>
+                        <option value="2">2 курс</option>
+                        <option value="3">3 курс</option>
+                        <option value="4">4 курс</option>
                     </select>
-                    <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> \u0417\u0430\u043e\u0447\u043d.</label>
-                    <button class="btn btn-primary btn-sm" onclick="addGroup()">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>
+                    <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> Заочн.</label>
+                    <button class="btn btn-primary btn-sm" onclick="addGroup()">Добавить</button>
                 </div>
-                <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" onclick="advanceCourses()">\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u043a\u0443\u0440\u0441\u044b \u2192</button>
+                <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" onclick="advanceCourses()">Перевести курсы →</button>
             </div>
             <div class="ref-section">
-                <h3>\u0410\u0443\u0434\u0438\u0442\u043e\u0440\u0438\u0438</h3>
+                <h3>Аудитории</h3>
                 <div class="ref-list" id="ref-classrooms"></div>
                 <div class="field-row">
-                    <input type="text" id="ref-classrooms-input" placeholder="\u041d\u043e\u043c\u0435\u0440 \u0430\u0443\u0434\u0438\u0442\u043e\u0440\u0438\u0438" class="input">
-                    <button class="btn btn-primary btn-sm" onclick="addRefItem('classrooms', 'ref-classrooms-input', 'ref-classrooms')">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>
+                    <input type="text" id="ref-classrooms-input" placeholder="Номер аудитории" class="input">
+                    <button class="btn btn-primary btn-sm" onclick="addRefItem('classrooms', 'ref-classrooms-input', 'ref-classrooms')">Добавить</button>
                 </div>
             </div>
             </div>
@@ -198,6 +204,6 @@
         <h1 id="print-title"></h1>
         <p id="print-subtitle"></p>
     </div>
-    <script src="/static/js/app.js?v=11"></script>
+    <script type="module" src="/static/js/modules/main.js"></script>
 </body>
 </html>
