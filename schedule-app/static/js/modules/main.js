@@ -18,6 +18,7 @@ import {
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
+    switchAdminTab, restoreTrashItem, purgeTrash,
 } from './ui.js';
 
 /* Привязка к window для onclick-вызовов из HTML */
@@ -33,6 +34,7 @@ Object.assign(window, {
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
+    switchAdminTab, restoreTrashItem, purgeTrash,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
 });

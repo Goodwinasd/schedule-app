@@ -149,54 +149,74 @@
             </div>
         </div>
     </div>
-    <div id="references-modal" class="modal modal-wide" style="display:none">
+    <div id="references-modal" class="modal modal-wide modal-admin" style="display:none">
         <div class="modal-content modal-wide">
             <div class="ref-header">
-                <h2>Справочники</h2>
+                <h2>Администрирование</h2>
                 <button class="ref-done" onclick="closeModals()">Готово</button>
             </div>
-            <div class="ref-grid">
-            <div class="ref-section">
-                <h3>Предметы</h3>
-                <div class="ref-list" id="ref-subjects"></div>
-                <div class="field-row">
-                    <input type="text" id="ref-subjects-input" placeholder="Новый предмет" class="input">
-                    <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">Преподаватель</option></select>
-                    <button class="btn btn-primary btn-sm" onclick="addSubject()">Добавить</button>
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="refs" onclick="switchAdminTab('refs')">Справочники</button>
+                <button class="admin-tab" data-tab="trash" onclick="switchAdminTab('trash')">Корзина</button>
+                <button class="admin-tab" data-tab="health" onclick="switchAdminTab('health')">Диагностика</button>
+            </div>
+            <div id="admin-tab-refs" class="admin-tab-content active">
+                <div class="ref-grid">
+                <div class="ref-section">
+                    <h3>Предметы</h3>
+                    <div class="ref-list" id="ref-subjects"></div>
+                    <div class="field-row">
+                        <input type="text" id="ref-subjects-input" placeholder="Новый предмет" class="input">
+                        <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">Преподаватель</option></select>
+                        <button class="btn btn-primary btn-sm" onclick="addSubject()">Добавить</button>
+                    </div>
+                </div>
+                <div class="ref-section">
+                    <h3>Преподаватели</h3>
+                    <div class="ref-list" id="ref-teachers"></div>
+                    <div class="field-row">
+                        <input type="text" id="ref-teachers-input" placeholder="ФИО преподавателя" class="input">
+                        <button class="btn btn-primary btn-sm" onclick="addRefItem('teachers', 'ref-teachers-input', 'ref-teachers')">Добавить</button>
+                    </div>
+                </div>
+                <div class="ref-section">
+                    <h3>Группы</h3>
+                    <div class="ref-list" id="ref-groups"></div>
+                    <div class="field-row">
+                        <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input" style="max-width:140px">
+                        <select id="ref-groups-course" class="input" style="max-width:90px">
+                            <option value="1">1 курс</option>
+                            <option value="2">2 курс</option>
+                            <option value="3">3 курс</option>
+                            <option value="4">4 курс</option>
+                        </select>
+                        <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> Заочн.</label>
+                        <button class="btn btn-primary btn-sm" onclick="addGroup()">Добавить</button>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" onclick="advanceCourses()">Перевести курсы →</button>
+                </div>
+                <div class="ref-section">
+                    <h3>Аудитории</h3>
+                    <div class="ref-list" id="ref-classrooms"></div>
+                    <div class="field-row">
+                        <input type="text" id="ref-classrooms-input" placeholder="Номер аудитории" class="input">
+                        <button class="btn btn-primary btn-sm" onclick="addRefItem('classrooms', 'ref-classrooms-input', 'ref-classrooms')">Добавить</button>
+                    </div>
+                </div>
                 </div>
             </div>
-            <div class="ref-section">
-                <h3>Преподаватели</h3>
-                <div class="ref-list" id="ref-teachers"></div>
-                <div class="field-row">
-                    <input type="text" id="ref-teachers-input" placeholder="ФИО преподавателя" class="input">
-                    <button class="btn btn-primary btn-sm" onclick="addRefItem('teachers', 'ref-teachers-input', 'ref-teachers')">Добавить</button>
+            <div id="admin-tab-trash" class="admin-tab-content">
+                <h3>Корзина</h3>
+                <div id="trash-refs"></div>
+                <div id="trash-days"></div>
+                <div id="trash-lessons"></div>
+                <div style="margin-top:12px">
+                    <button class="btn btn-danger" onclick="purgeTrash()">Очистить корзину (старше 30 дней)</button>
                 </div>
             </div>
-            <div class="ref-section">
-                <h3>Группы</h3>
-                <div class="ref-list" id="ref-groups"></div>
-                <div class="field-row">
-                    <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input" style="max-width:140px">
-                    <select id="ref-groups-course" class="input" style="max-width:90px">
-                        <option value="1">1 курс</option>
-                        <option value="2">2 курс</option>
-                        <option value="3">3 курс</option>
-                        <option value="4">4 курс</option>
-                    </select>
-                    <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> Заочн.</label>
-                    <button class="btn btn-primary btn-sm" onclick="addGroup()">Добавить</button>
-                </div>
-                <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" onclick="advanceCourses()">Перевести курсы →</button>
-            </div>
-            <div class="ref-section">
-                <h3>Аудитории</h3>
-                <div class="ref-list" id="ref-classrooms"></div>
-                <div class="field-row">
-                    <input type="text" id="ref-classrooms-input" placeholder="Номер аудитории" class="input">
-                    <button class="btn btn-primary btn-sm" onclick="addRefItem('classrooms', 'ref-classrooms-input', 'ref-classrooms')">Добавить</button>
-                </div>
-            </div>
+            <div id="admin-tab-health" class="admin-tab-content">
+                <h3>Диагностика БД</h3>
+                <div id="db-health-content"></div>
             </div>
         </div>
     </div>

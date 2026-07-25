@@ -2057,3 +2057,50 @@ def export_debug():
     result['total_cells'] = sum(1 for p in periods for d in wd if p['lessons'].get(d['date'], ''))
 
     return jsonify(result)
+
+
+@bp.route('/api/db/health')
+@login_required
+def db_health():
+    conn = get_db()
+    integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+    tables_info = {}
+    with_deleted = {'schedule_days', 'lessons', 'subjects', 'teachers', 'groups_list', 'classrooms_list'}
+    for t in ['schedule_days', 'lessons', 'subjects', 'teachers', 'groups_list', 'classrooms_list', 'excluded_dates', 'lesson_history']:
+        total = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        d = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE deleted_at IS NOT NULL").fetchone()[0] if t in with_deleted else 0
+        tables_info[t] = {"total": total, "deleted": d}
+    conflicts = conn.execute('''
+        SELECT l1.id AS id1, l2.id AS id2, sd.date, l1.period,
+               t1.name AS t1n, t2.name AS t2n
+        FROM lessons l1 JOIN lessons l2 ON l1.id < l2.id
+        JOIN schedule_days sd ON l1.day_id = sd.id
+        LEFT JOIN teachers t1 ON l1.teacher_id = t1.id
+        LEFT JOIN teachers t2 ON l2.teacher_id = t2.id
+        WHERE l1.day_id = l2.day_id AND l1.period = l2.period
+          AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL
+          AND (l1.teacher_id = l2.teacher_id OR l1.classroom_id = l2.classroom_id
+               OR (l1.group_id = l2.group_id AND (l1.subgroup IS NULL OR l1.subgroup = l2.subgroup)))
+    ''').fetchall()
+    orphaned = []
+    for t, col in [('subjects','subject_id'),('teachers','teacher_id'),('classrooms_list','classroom_id'),('groups_list','group_id')]:
+        rows = conn.execute(f"SELECT l.id FROM lessons l LEFT JOIN {t} r ON l.{col}=r.id WHERE l.{col} IS NOT NULL AND r.id IS NULL AND l.deleted_at IS NULL").fetchall()
+        orphaned.extend([dict(r) for r in rows])
+    conn.close()
+    return jsonify({"integrity_check": integrity, "tables": tables_info, "conflicts": [dict(r) for r in conflicts], "orphaned_lessons": orphaned})
+
+
+@bp.route('/api/db/purge-trash', methods=['POST'])
+@login_required
+def purge_trash():
+    conn = get_db()
+    result = {}
+    for t in ['lessons', 'schedule_days', 'subjects', 'teachers', 'groups_list', 'classrooms_list']:
+        cnt = conn.execute(f"DELETE FROM {t} WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')").rowcount
+        if cnt:
+            result[t] = cnt
+    conn.execute("DELETE FROM lesson_history WHERE changed_at < datetime('now', '-30 days')")
+    conn.commit()
+    conn.close()
+    refs_cache.invalidate_prefix('ref_list_')
+    return jsonify({"purged": result})

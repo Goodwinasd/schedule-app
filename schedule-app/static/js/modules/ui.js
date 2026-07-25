@@ -489,6 +489,93 @@ export function showAdminPanel() {
     openModal('references-modal');
     ['subjects', 'teachers', 'groups', 'classrooms'].forEach(e => renderRefList(e, `ref-${e}`));
     populateSubjectTeacherSelect();
+    document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    const first = document.querySelector('.admin-tab');
+    if (first) first.classList.add('active');
+    const firstContent = document.getElementById('admin-tab-refs');
+    if (firstContent) firstContent.classList.add('active');
+}
+
+export function switchAdminTab(tab) {
+    document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    const tabBtn = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
+    if (tabBtn) tabBtn.classList.add('active');
+    const content = document.getElementById(`admin-tab-${tab}`);
+    if (content) content.classList.add('active');
+    if (tab === 'trash') loadTrashTab();
+    if (tab === 'health') loadHealthTab();
+}
+
+async function loadTrashTab() {
+    const data = await api('/api/trash');
+    document.getElementById('trash-refs').innerHTML = renderTrashSection('Справочники', [
+        ...(data.subjects || []).map(i => ({...i, type: 'subjects'})),
+        ...(data.teachers || []).map(i => ({...i, type: 'teachers'})),
+        ...(data.classrooms || []).map(i => ({...i, type: 'classrooms'})),
+        ...(data.groups || []).map(i => ({...i, type: 'groups'})),
+    ]);
+    document.getElementById('trash-days').innerHTML = renderTrashSection('Дни', (data.days || []).map(i => ({...i, type: 'days'})));
+    document.getElementById('trash-lessons').innerHTML = renderTrashSection('Уроки', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
+}
+
+function renderTrashSection(title, items) {
+    if (!items.length) return `<div style="margin:8px 0;font-size:13px;color:var(--text-secondary)">${title}: пусто</div>`;
+    let html = `<div style="margin:8px 0"><strong>${title}</strong> (${items.length})</div>`;
+    for (const item of items) {
+        const name = item.name || item.day_name || `ID ${item.id}`;
+        const date = item.deleted_at ? item.deleted_at.slice(0, 10) : '';
+        const ep = item.type === 'days' ? 'days' : item.type === 'lessons' ? 'lessons' : item.type;
+        html += `<div class="trash-item"><span class="trash-label">${escapeHtml(name)}</span><span class="trash-date">${date}</span>`;
+        html += `<button class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${ep}',${item.id})">\u21BA</button>`;
+        html += '</div>';
+    }
+    return html;
+}
+
+export async function restoreTrashItem(endpoint, id) {
+    if (!confirm('Восстановить?')) return;
+    const url = endpoint === 'days' ? `/api/days/${id}/restore` : endpoint === 'lessons' ? `/api/lessons/${id}/restore` : `/api/${endpoint}/${id}/restore`;
+    const res = await api(url, { method: 'POST' });
+    if (res.error) { alert(res.error); return; }
+    loadTrashTab();
+}
+
+export async function purgeTrash() {
+    if (!confirm('Удалить навсегда записи старше 30 дней?')) return;
+    if (!confirm('Это действие необратимо. Продолжить?')) return;
+    const res = await api('/api/db/purge-trash', { method: 'POST' });
+    if (res.error) { alert(res.error); return; }
+    alert('Очищено: ' + Object.values(res.purged || {}).reduce((a, b) => a + b, 0) + ' записей');
+    loadTrashTab();
+}
+
+async function loadHealthTab() {
+    const cont = document.getElementById('db-health-content');
+    cont.innerHTML = '<div class="loading">Загрузка...</div>';
+    const data = await api('/api/db/health');
+    let html = `<div style="margin:8px 0;font-size:13px"><strong>Целостность БД:</strong> ${escapeHtml(data.integrity_check)}</div>`;
+    html += '<table class="ref-table"><tr><th>Таблица</th><th>Всего</th><th>Удалено</th></tr>';
+    for (const [t, info] of Object.entries(data.tables)) {
+        html += `<tr><td>${t}</td><td>${info.total}</td><td>${info.deleted}</td></tr>`;
+    }
+    html += '</table>';
+    if (data.conflicts && data.conflicts.length) {
+        html += `<div style="margin:8px 0;color:#c62828"><strong>Конфликты (${data.conflicts.length}):</strong></div><table class="ref-table"><tr><th>ID1</th><th>ID2</th><th>Дата</th><th>Пара</th></tr>`;
+        for (const c of data.conflicts) {
+            html += `<tr><td>${c.id1}</td><td>${c.id2}</td><td>${c.date || ''}</td><td>${c.period}</td></tr>`;
+        }
+        html += '</table>';
+    } else {
+        html += '<div style="margin:8px 0;color:#2e7d32;font-size:13px">Конфликтов не найдено</div>';
+    }
+    if (data.orphaned_lessons && data.orphaned_lessons.length) {
+        html += `<div style="margin:8px 0;color:#e65100"><strong>Сиротские уроки (${data.orphaned_lessons.length}):</strong> ID: ${data.orphaned_lessons.map(l => l.id).join(', ')}</div>`;
+    } else {
+        html += '<div style="margin:8px 0;color:#2e7d32;font-size:13px">Сиротских уроков нет</div>';
+    }
+    cont.innerHTML = html;
 }
 
 function populateSubjectTeacherSelect() {
