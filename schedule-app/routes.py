@@ -1992,9 +1992,9 @@ def availability():
             t_id = l['teacher_id']
             c_id = l['classroom_id']
             info = {'group': l['group_name'], 'subject': l['subject_name'], 'teacher': l['teacher_name'], 'classroom': l['classroom_name']}
-            if t_id:
+            if t_id and l['teacher_name']:
                 teacher_busy.setdefault(t_id, {})[key] = info
-            if c_id:
+            if c_id and l['classroom_name']:
                 classroom_busy.setdefault(c_id, {})[key] = info
 
         periods = [{'period': b['period'], 'start': b['start'], 'end': b['end']} for b in BELL_SCHEDULE]
