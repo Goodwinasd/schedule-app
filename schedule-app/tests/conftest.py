@@ -23,7 +23,7 @@ def app():
     config.HOST = '127.0.0.1'
     config.PORT = 5000
 
-    db_module.init_db()
+    db_module.run_alembic_upgrade()
 
     from app import app as flask_app
     flask_app.testing = True
@@ -76,7 +76,7 @@ def _clean_tables():
     try:
         conn = db_module.get_db()
         tables = ['lesson_history', 'lessons', 'schedule_days', 'groups_list',
-                  'classrooms_list', 'teachers', 'subjects', 'excluded_dates']
+                  'classrooms_list', 'subjects', 'teachers', 'excluded_dates']
         for t in tables:
             conn.execute(f'DELETE FROM {t}')
         conn.commit()

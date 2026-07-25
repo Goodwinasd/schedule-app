@@ -11,7 +11,7 @@ from flasgger import Swagger
 from config import (
     SECRET_KEY, PERMANENT_SESSION_LIFETIME, BACKUPS_DIR, DB_PATH, DATA_DIR, DEBUG, HOST, PORT
 )
-from db import get_db, init_db, run_alembic_upgrade
+from db import get_db, run_alembic_upgrade
 from routes import bp
 
 app = Flask(__name__)
@@ -47,6 +47,5 @@ if __name__ == '__main__':
             if date_part < cutoff:
                 os.remove(os.path.join(BACKUPS_DIR, f))
     run_alembic_upgrade()
-    init_db()
     _cleanup_old_deleted()
     app.run(debug=DEBUG, host=HOST, port=PORT)
