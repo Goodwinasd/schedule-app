@@ -496,7 +496,7 @@ def generic_crud(table, label, order_by='id', extra_fields=None):
             if cached is not None:
                 return jsonify(cached)
             conn = get_db()
-            items = conn.execute(f'SELECT * FROM {table} ORDER BY {order_by}').fetchall()
+            items = conn.execute(f"SELECT * FROM {table} WHERE deleted_at IS NULL ORDER BY {order_by}").fetchall()
             conn.close()
             result = [dict(i) for i in items]
             refs_cache.set(cache_key, result)
@@ -603,7 +603,7 @@ def generic_crud(table, label, order_by='id', extra_fields=None):
     def make_delete(label, table):
         @login_required
         def delete_item(item_id):
-            """Удалить запись из справочника
+            """Мягкое удаление записи из справочника
             ---
             parameters:
               - in: path
@@ -612,14 +612,14 @@ def generic_crud(table, label, order_by='id', extra_fields=None):
                 required: true
             responses:
               200:
-                description: success
+                description: success (установлен deleted_at)
             """
             conn = get_db()
-            conn.execute(f'DELETE FROM {table} WHERE id = ?', (item_id,))
+            conn.execute(f"UPDATE {table} SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL", (item_id,))
             conn.commit()
             conn.close()
             refs_cache.invalidate_prefix(f'ref_list_{table}')
-            return jsonify({"success": True})
+            return jsonify({"success": True, "warning": "Запись помечена как удалённая. Она может использоваться в расписании."})
         delete_item.__name__ = f'delete_{label}'
         return delete_item
 
@@ -1504,10 +1504,15 @@ def get_trash():
     deleted_lessons = conn.execute(
         LESSON_SELECT_WITH_DAY + ' WHERE l.deleted_at IS NOT NULL AND l.deleted_at >= datetime(\'now\', \'-30 days\') ORDER BY l.deleted_at DESC'
     ).fetchall()
+    deleted_refs = {}
+    for table, label in [('subjects', 'subjects'), ('teachers', 'teachers'), ('classrooms_list', 'classrooms'), ('groups_list', 'groups')]:
+        rows = conn.execute(f"SELECT id, name, deleted_at FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at >= datetime('now', '-30 days') ORDER BY deleted_at DESC").fetchall()
+        deleted_refs[label] = [dict(r) for r in rows]
     conn.close()
     return jsonify({
         "days": [dict(d) for d in deleted_days],
-        "lessons": [dict(l) for l in deleted_lessons]
+        "lessons": [dict(l) for l in deleted_lessons],
+        **deleted_refs,
     })
 
 
@@ -1646,6 +1651,24 @@ generic_crud('teachers', 'teachers', 'name')
 generic_crud('classrooms_list', 'classrooms', 'CAST(name AS INTEGER), name')
 
 
+def _make_restore(table, label):
+    @login_required
+    def restore_item(item_id):
+        conn = get_db()
+        conn.execute(f"UPDATE {table} SET deleted_at = NULL WHERE id = ?", (item_id,))
+        conn.commit()
+        conn.close()
+        refs_cache.invalidate_prefix(f'ref_list_{table}')
+        return jsonify({"success": True})
+    restore_item.__name__ = f'restore_{label}'
+    bp.add_url_rule(f'/api/{label}/<int:item_id>/restore', f'restore_{label}', restore_item, methods=['POST'])
+
+
+_make_restore('subjects', 'subjects')
+_make_restore('teachers', 'teachers')
+_make_restore('classrooms_list', 'classrooms')
+
+
 @bp.route('/api/groups', methods=['GET'])
 def get_groups():
     """Список групп
@@ -1658,7 +1681,7 @@ def get_groups():
     if cached is not None:
         return jsonify(cached)
     conn = get_db()
-    items = conn.execute('SELECT * FROM groups_list ORDER BY course, name').fetchall()
+    items = conn.execute("SELECT * FROM groups_list WHERE deleted_at IS NULL ORDER BY course, name").fetchall()
     conn.close()
     result = [dict(i) for i in items]
     refs_cache.set('ref_list_groups_list', result)
@@ -1696,10 +1719,17 @@ def create_group():
     course = data.get('course', 1)
     is_distance = 1 if data.get('is_distance') else 0
     conn = get_db()
-    existing = conn.execute("SELECT id FROM groups_list WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
-    if existing:
+    active = conn.execute("SELECT id FROM groups_list WHERE LOWER(name) = LOWER(?) AND deleted_at IS NULL", (name,)).fetchone()
+    if active:
         conn.close()
         return jsonify({"error": "Группа с таким названием уже существует"}), 400
+    deleted = conn.execute("SELECT id, course, is_distance FROM groups_list WHERE LOWER(name) = LOWER(?) AND deleted_at IS NOT NULL", (name,)).fetchone()
+    if deleted:
+        conn.execute("UPDATE groups_list SET deleted_at = NULL, course = ?, is_distance = ? WHERE id = ?", (course, is_distance, deleted['id']))
+        conn.commit()
+        conn.close()
+        refs_cache.invalidate_prefix('ref_list_groups_list')
+        return jsonify({"id": deleted['id'], "name": name, "course": course, "is_distance": is_distance, "restored": True}), 200
     try:
         cursor = conn.execute(
             'INSERT INTO groups_list (name, course, is_distance) VALUES (?, ?, ?)',
@@ -1782,7 +1812,18 @@ def delete_group(item_id):
         description: success
     """
     conn = get_db()
-    conn.execute('DELETE FROM groups_list WHERE id = ?', (item_id,))
+    conn.execute("UPDATE groups_list SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL", (item_id,))
+    conn.commit()
+    conn.close()
+    refs_cache.invalidate_prefix('ref_list_groups_list')
+    return jsonify({"success": True, "warning": "Запись помечена как удалённая."})
+
+
+@bp.route('/api/groups/<int:item_id>/restore', methods=['POST'])
+@login_required
+def restore_group(item_id):
+    conn = get_db()
+    conn.execute("UPDATE groups_list SET deleted_at = NULL WHERE id = ?", (item_id,))
     conn.commit()
     conn.close()
     refs_cache.invalidate_prefix('ref_list_groups_list')

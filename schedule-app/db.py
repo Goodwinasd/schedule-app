@@ -29,14 +29,22 @@ class _TimedConnection(sqlite3.Connection):
                     params_str[:200]
                 )
             return result
-        except Exception:
+        except sqlite3.OperationalError:
             elapsed = (time.perf_counter() - start) * 1000
-            logger.error("QUERY FAIL (%.0fms): %s", elapsed, sql.strip()[:200])
+            if elapsed > SLOW_THRESHOLD_MS:
+                logger.warning("LOCKED (%.0fms): %s", elapsed, sql.strip()[:200])
+            raise
+        except sqlite3.IntegrityError:
+            raise
+        except Exception as e:
+            elapsed = (time.perf_counter() - start) * 1000
+            if 'OperationalError' not in type(e).__name__:
+                logger.error("QUERY FAIL (%.0fms): %s | %s", elapsed, sql.strip()[:200], str(e)[:200])
             raise
 
 
 def get_db():
-    conn = _TimedConnection(config.DB_PATH)
+    conn = _TimedConnection(config.DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode=WAL")
@@ -51,6 +59,7 @@ def run_alembic_upgrade():
     Используется в production (app.py) и в тестах (conftest.py)."""
     from alembic.config import Config
     from alembic.command import upgrade
+    from sqlalchemy.pool import NullPool
     base = os.path.dirname(os.path.abspath(__file__))
     ini_path = os.path.join(base, 'alembic.ini')
     if not os.path.exists(ini_path):
@@ -58,7 +67,11 @@ def run_alembic_upgrade():
     alembic_cfg = Config(ini_path)
     alembic_cfg.set_main_option('script_location', os.path.join(base, 'migrations'))
     alembic_cfg.set_main_option('sqlalchemy.url', f"sqlite:///{config.DB_PATH.replace(os.sep, '/')}")
+    alembic_cfg.set_main_option('sqlalchemy.poolclass', 'sqlalchemy.pool.NullPool')
     upgrade(alembic_cfg, 'head')
+    conn = get_db()
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    conn.close()
 
 
 def is_date_excluded(conn, date_str):

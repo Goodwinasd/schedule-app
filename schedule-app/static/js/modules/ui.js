@@ -455,8 +455,8 @@ export async function loadReferences() {
     [state.subjectsList, state.teachersList, state.groupsList, state.classroomsList] = await Promise.all([
         api('/api/subjects'), api('/api/teachers'), api('/api/groups'), api('/api/classrooms'),
     ]);
-    state.teachersWithSchedule = await api('/api/teachers-with-schedule');
-    state.classroomsWithSchedule = await api('/api/classrooms-with-schedule');
+    state.teachersWithSchedule = await api('/api/teachers');
+    state.classroomsWithSchedule = await api('/api/classrooms');
 }
 
 export function renderHomePage() {
@@ -476,8 +476,8 @@ export function renderHomePage() {
     }
     const dc = document.getElementById('distance-grid');
     if (dc) dc.innerHTML = dist.length ? `<div class="select-grid">${dist.map(g => makeCard('group', g.id, g.name, 'Расписание группы')).join('')}</div>` : '<div class="empty-grid">Нет заочных групп.</div>';
-    document.getElementById('teachers-grid').innerHTML = state.teachersWithSchedule.length ? state.teachersWithSchedule.map(t => makeCard('teacher', t.id, t.name, 'Расписание преподавателя')).join('') : '<div class="empty-grid">Нет преподавателей с расписанием.</div>';
-    document.getElementById('classrooms-grid').innerHTML = state.classroomsWithSchedule.length ? state.classroomsWithSchedule.map(c => makeCard('classroom', c.id, c.name, 'Занятость', 'Ауд. ')).join('') : '<div class="empty-grid">Нет аудиторий с занятиями.</div>';
+    document.getElementById('teachers-grid').innerHTML = state.teachersWithSchedule.length ? state.teachersWithSchedule.map(t => makeCard('teacher', t.id, t.name, 'Расписание преподавателя')).join('') : '<div class="empty-grid">Нет преподавателей.</div>';
+    document.getElementById('classrooms-grid').innerHTML = state.classroomsWithSchedule.length ? state.classroomsWithSchedule.map(c => makeCard('classroom', c.id, c.name, 'Занятость', 'Ауд. ')).join('') : '<div class="empty-grid">Нет аудиторий.</div>';
 }
 
 function makeCard(type, id, name, subtitle, prefix = '') {
@@ -582,8 +582,23 @@ export async function addRefItem(endpoint, inputId, containerId) {
 }
 
 export async function deleteRefItem(endpoint, id, containerId) {
-    if (!confirm('Удалить?')) return;
-    await api(`/api/${endpoint}/${id}`, { method: 'DELETE' });
+    if (!confirm('Удалить?\n\nВнимание: запись может использоваться в расписании.')) return;
+    const res = await api(`/api/${endpoint}/${id}`, { method: 'DELETE' });
+    if (res.error) {
+        alert(res.error);
+        return;
+    }
+    if (res.warning) alert(res.warning);
+    renderRefList(endpoint, containerId);
+}
+
+export async function restoreRefItem(endpoint, id, containerId) {
+    if (!confirm('Восстановить запись?')) return;
+    const res = await api(`/api/${endpoint}/${id}/restore`, { method: 'POST' });
+    if (res.error) {
+        alert(res.error);
+        return;
+    }
     renderRefList(endpoint, containerId);
 }
 
