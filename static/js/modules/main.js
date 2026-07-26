@@ -13,6 +13,7 @@ import {
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
     toggleAvailHeatmap, toggleAvailGroupByCourse, closeAvailability,
+    exportAvailExcel, exportAvailPDF,
     renderAvailTable, _clickLesson,
 } from './ui.js';
 import { confirmModal } from './modal.js';
@@ -36,6 +37,7 @@ Object.assign(window, {
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
     toggleAvailHeatmap, toggleAvailGroupByCourse, closeAvailability,
+    exportAvailExcel, exportAvailPDF,
     renderAvailTable, _clickLesson,
     switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
     addExcludedDate, deleteExcludedDate,

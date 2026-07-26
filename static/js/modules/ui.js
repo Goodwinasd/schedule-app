@@ -299,6 +299,14 @@ export function toggleAvailGroupByCourse() {
     renderAvailTable();
 }
 
+export function exportAvailExcel() {
+    showToast('Экспорт в Excel пока в разработке', 'info');
+}
+
+export function exportAvailPDF() {
+    showToast('Экспорт в PDF пока в разработке', 'info');
+}
+
 export function closeAvailability() {
     document.getElementById('availability-view').style.display = 'none';
     document.getElementById('home-view').style.display = '';
