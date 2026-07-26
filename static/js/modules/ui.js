@@ -66,7 +66,7 @@ function resetLessonModal() {
     state.currentLessonDate = null;
     document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
     const btn = document.getElementById('btn-save-lesson');
-    btn.textContent = 'Добавить'; btn.disabled = false; btn.onclick = () => addLesson();
+    btn.textContent = 'Добавить'; btn.disabled = false;
     document.getElementById('validation-warnings').style.display = 'none';
     document.getElementById('btn-delete-lesson').style.display = 'none';
     document.getElementById('btn-add-subgroup').style.display = 'none';
@@ -306,7 +306,7 @@ export function closeAvailability() {
     updateUI();
 }
 
-function _clickLesson(info, date, period) {
+export function _clickLesson(info, date, period) {
     if (!info || !info.teacher_id) return;
     const m = new Date(date + 'T00:00:00');
     const monday = getMonday(m);
@@ -322,7 +322,7 @@ function _clickLesson(info, date, period) {
     loadScheduleTable();
 }
 
-function renderAvailTable() {
+export function renderAvailTable() {
     if (!state.availData) return;
     const cont = document.getElementById('avail-table-container');
     const freeOnly = document.getElementById('avail-free-only').checked;
