@@ -12,7 +12,7 @@ import {
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
-    toggleAvailHeatmap, toggleAvailGroupByCourse, exportAvailExcel, exportAvailPDF, closeAvailability,
+    toggleAvailHeatmap, toggleAvailGroupByCourse, closeAvailability,
 } from './ui.js';
 import { confirmModal } from './modal.js';
 import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
@@ -34,7 +34,7 @@ Object.assign(window, {
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
-    toggleAvailHeatmap, toggleAvailGroupByCourse, exportAvailExcel, exportAvailPDF, closeAvailability,
+    toggleAvailHeatmap, toggleAvailGroupByCourse, closeAvailability,
     switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
