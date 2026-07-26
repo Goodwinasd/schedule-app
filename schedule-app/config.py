@@ -43,7 +43,29 @@ ADMIN_PASSWORD_HASH = generate_password_hash(PASSWORD)
 
 # ---- App settings ----
 
-PERMANENT_SESSION_LIFETIME = 3600
+# Чтение из БД с fallback на хардкод (если миграция не применена или таблица пуста)
+def _load_settings_from_db():
+    try:
+        _db_path = os.path.join(
+            os.environ.get('SCHEDULE_DATA_DIR', os.path.dirname(__file__)),
+            'schedule.db'
+        )
+        import sqlite3
+        conn = sqlite3.connect(_db_path)
+        rows = conn.execute('SELECT key, value FROM settings').fetchall()
+        conn.close()
+        return {r[0]: r[1] for r in rows}
+    except Exception:
+        return {}
+
+_settings_db = _load_settings_from_db()
+
+PERMANENT_SESSION_LIFETIME = int(_settings_db.get('session_lifetime', 3600))
+LOGIN_RATE_LIMIT = int(_settings_db.get('login_rate_limit', 5))
+LOGIN_RATE_WINDOW = int(_settings_db.get('login_rate_window', 300))
+BACKUP_RETENTION_DAYS = int(_settings_db.get('backup_retention_days', '30'))
+TRASH_RETENTION_DAYS = 30
+
 DEBUG = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
 HOST = os.environ.get('FLASK_HOST', '127.0.0.1')
 PORT = int(os.environ.get('FLASK_PORT', 5000))

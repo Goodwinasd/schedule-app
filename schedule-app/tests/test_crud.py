@@ -85,6 +85,75 @@ class TestTeachers:
                              headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
 
+    def test_create_with_phone(self, client, seed_refs, admin_csrf):
+        resp = client.post(self.ENDPOINT, json={'name': 'Петров П.П.', 'phone': '+7-123-456-78-90'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data['phone'] == '+7-123-456-78-90'
+        item_id = data['id']
+
+        resp = client.put(f'{self.ENDPOINT}/{item_id}', json={'name': 'Петров П.П.', 'phone': '+7-999-888-77-66'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+        items = client.get(self.ENDPOINT).get_json()
+        match = [i for i in items if i['id'] == item_id]
+        assert len(match) == 1
+        assert match[0]['phone'] == '+7-999-888-77-66'
+
+    def test_duplicate_phone_rejected(self, client, seed_refs, admin_csrf):
+        resp = client.post(self.ENDPOINT, json={'name': 'Сидоров С.С.', 'phone': '+7-111-222-33-44'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+
+        resp = client.post(self.ENDPOINT, json={'name': 'Петров П.П.', 'phone': '+7-111-222-33-44'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        assert resp.get_json()['error'] == 'Этот номер телефона уже используется другим преподавателем'
+
+    def test_duplicate_phone_update_self(self, client, seed_refs, admin_csrf):
+        resp = client.post(self.ENDPOINT, json={'name': 'Иванов И.И.', 'phone': '+7-555-666-77-88'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+        item_id = resp.get_json()['id']
+
+        resp = client.put(f'{self.ENDPOINT}/{item_id}', json={'name': 'Иванов И.И.', 'phone': '+7-555-666-77-88'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+    def test_multiple_empty_phone_allowed(self, client, seed_refs, admin_csrf):
+        resp = client.post(self.ENDPOINT, json={'name': 'Первый'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+
+        resp = client.post(self.ENDPOINT, json={'name': 'Второй'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+
+    def test_empty_string_phone_not_duplicate(self, client, seed_refs, admin_csrf):
+        resp = client.post(self.ENDPOINT, json={'name': 'Антонов А.А.', 'phone': ''},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+
+        resp = client.post(self.ENDPOINT, json={'name': 'Борисов Б.Б.', 'phone': ''},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+
+    def test_restore_teacher_returns_name(self, client, seed_refs, admin_csrf):
+        client.post(self.ENDPOINT, json={'name': 'Тестов Т.Т.', 'phone': '+7-000-000-00-00'},
+                    headers={'X-CSRF-Token': admin_csrf})
+        items = client.get(self.ENDPOINT).get_json()
+        target = [i for i in items if i['name'] == 'Тестов Т.Т.'][0]
+        client.delete(f'{self.ENDPOINT}/{target["id"]}',
+                      headers={'X-CSRF-Token': admin_csrf})
+        resp = client.post(f'{self.ENDPOINT}/{target["id"]}/restore',
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['item']['type'] == 'teachers'
+        assert data['item']['name'] == 'Тестов Т.Т.'
+
 
 class TestClassrooms:
     ENDPOINT = '/api/classrooms'
@@ -266,6 +335,41 @@ class TestLessons:
         client.delete('/api/lessons/1', headers={'X-CSRF-Token': admin_csrf})
         resp = client.post('/api/lessons/1/restore', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['item']['type'] == 'lesson'
+        assert data['item']['subject_name'] == 'Математика'
+
+    def test_restore_lesson_conflict(self, client, seed_lessons, admin_csrf):
+        client.delete('/api/lessons/2', headers={'X-CSRF-Token': admin_csrf})
+        client.post('/api/days/1/lessons', json={
+            'period': 2, 'subject_id': 1, 'teacher_id': 2, 'classroom_id': 1, 'group_id': 1
+        }, headers={'X-CSRF-Token': admin_csrf})
+        resp = client.post('/api/lessons/2/restore', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+
+    def test_restore_day_returns_details(self, client, seed_days, admin_csrf):
+        client.delete('/api/days/1', headers={'X-CSRF-Token': admin_csrf})
+        resp = client.post('/api/days/1/restore', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['item']['type'] == 'day'
+        assert data['item']['day_name'] == 'Понедельник'
+
+    def test_restore_day_conflict(self, client, seed_lessons, admin_csrf):
+        client.delete('/api/lessons/2', headers={'X-CSRF-Token': admin_csrf})
+        new_day = client.post('/api/days', json={'day_name': 'Понедельник', 'date': '2026-09-07', 'group_name': 'Группа-2'},
+                              headers={'X-CSRF-Token': admin_csrf}).get_json()
+        new_day_id = new_day['id']
+        client.post(f'/api/days/{new_day_id}/lessons', json={
+            'period': 2, 'subject_id': 1, 'teacher_id': 2, 'classroom_id': 1, 'group_id': 2
+        }, headers={'X-CSRF-Token': admin_csrf})
+        client.delete('/api/days/1', headers={'X-CSRF-Token': admin_csrf})
+        resp = client.post('/api/days/1/restore', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        items = client.get('/api/days').get_json()
+        assert not any(i['id'] == 1 for i in items)
+        items = client.get('/api/days').get_json()
+        assert not any(i['id'] == 1 for i in items)
 
 
 class TestWeekRoutes:
@@ -291,4 +395,56 @@ class TestWeekRoutes:
 
     def test_restore_week_no_monday(self, client, admin_csrf):
         resp = client.post('/api/week/restore', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 400
+
+
+class TestSettings:
+    ENDPOINT = '/api/settings'
+
+    def test_get_settings(self, client, admin_csrf):
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['session_lifetime'] == '3600'
+        assert data['login_rate_limit'] == '5'
+        assert data['login_rate_window'] == '300'
+        assert data['backup_retention_days'] == '30'
+
+    def test_get_settings_unauthorized(self, client):
+        resp = client.get(self.ENDPOINT)
+        assert resp.status_code == 401
+
+    def test_update_setting(self, client, admin_csrf):
+        resp = client.put(f'{self.ENDPOINT}/login_rate_limit',
+                          json={'value': '10'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.get_json()['login_rate_limit'] == '10'
+
+    def test_update_setting_invalid_key(self, client, admin_csrf):
+        resp = client.put(f'{self.ENDPOINT}/invalid_key',
+                          json={'value': '10'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 403
+
+    def test_update_backup_retention(self, client, admin_csrf):
+        resp = client.put(f'{self.ENDPOINT}/backup_retention_days',
+                          json={'value': '60'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.get_json()['backup_retention_days'] == '60'
+
+    def test_update_setting_invalid_value(self, client, admin_csrf):
+        resp = client.put(f'{self.ENDPOINT}/login_rate_limit',
+                          json={'value': '-1'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 400
+
+        resp = client.put(f'{self.ENDPOINT}/login_rate_limit',
+                          json={'value': 'abc'},
+                          headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400

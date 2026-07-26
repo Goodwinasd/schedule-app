@@ -13,12 +13,12 @@ import {
     showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson,
     deleteCurrentLesson, validateLesson,
     loadReferences, showAdminPanel, renderRefList,
-    addGroup, editGroup, addSubject, editSubject, advanceCourses,
-    addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup,
+    addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses,
+    addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, saveSetting,
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
-    switchAdminTab, restoreTrashItem, purgeTrash,
+    switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
 } from './ui.js';
 
 /* Привязка к window для onclick-вызовов из HTML */
@@ -29,14 +29,27 @@ Object.assign(window, {
     showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson,
     deleteCurrentLesson, validateLesson,
     loadReferences, showAdminPanel, renderRefList,
-    addGroup, editGroup, addSubject, editSubject, advanceCourses,
-    addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup,
+    addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses,
+    addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, saveSetting,
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
-    switchAdminTab, restoreTrashItem, purgeTrash,
+    switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
+});
+
+/** Делегирование событий для data-action атрибутов */
+document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    const params = el.dataset.params ? JSON.parse(el.dataset.params) : [];
+    const fn = window[action];
+    if (typeof fn === 'function') {
+        e.preventDefault();
+        fn(...params);
+    }
 });
 
 /** Инициализация */

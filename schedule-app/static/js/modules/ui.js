@@ -2,20 +2,13 @@ import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, getMonday, addDays, toISODate, getWeekNumber, formatChipRange, formatDateRange, shiftLabel, populateSelect, populateSelectByName } from './utils.js';
 import { api } from './api.js';
-
-function showToast(message, type) {
-    let container = document.getElementById('toast-container');
-    if (!container) { container = document.createElement('div'); container.id = 'toast-container'; document.body.appendChild(container); }
-    const t = document.createElement('div');
-    t.className = 'toast toast-' + type;
-    t.textContent = message;
-    t.onclick = () => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); };
-    container.appendChild(t);
-    setTimeout(() => { if (t.parentNode) { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); } }, 4000);
-}
-
-function alertError(msg) { showToast(msg, 'error'); }
-function alertSuccess(msg) { showToast(msg, 'success'); }
+import { openModal, confirmModal, _confirmState } from './modal.js';
+import { showToast } from './toast.js';
+import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, populateSubjectTeacherSelect } from './references.js';
+import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
+import { loadTrashTab, restoreTrashItem, purgeTrash } from './trash.js';
+import { loadSettingsTab, saveSetting } from './settings.js';
+import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
 
 /* ======================== Navigation ======================== */
 
@@ -61,15 +54,23 @@ export function showSchedule(type, id, name) {
     loadScheduleTable();
 }
 
-export function openModal(id) {
-    document.getElementById('modal-overlay').classList.add('active');
-    document.getElementById(id).style.display = '';
-}
-
 export function closeModals() {
     document.getElementById('modal-overlay').classList.remove('active');
     document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
-    resetLessonModal();
+    if (typeof resetLessonModal === 'function') resetLessonModal();
+    if (_confirmState.resolver) { const r = _confirmState.resolver; _confirmState.resolver = null; r(false); }
+}
+
+function resetLessonModal() {
+    state.currentEditLessonId = null;
+    state.currentLessonDate = null;
+    document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
+    const btn = document.getElementById('btn-save-lesson');
+    btn.textContent = 'Добавить'; btn.disabled = false; btn.onclick = () => addLesson();
+    document.getElementById('validation-warnings').style.display = 'none';
+    document.getElementById('btn-delete-lesson').style.display = 'none';
+    document.getElementById('btn-add-subgroup').style.display = 'none';
+    document.getElementById('lesson-teacher').disabled = false;
 }
 
 export function showLoginModal() {
@@ -79,412 +80,7 @@ export function showLoginModal() {
     p.focus();
 }
 
-/* ======================== Carousel ======================== */
-
-function getWeeksList() {
-    const now = new Date(), year = now.getFullYear();
-    const fm = getMonday(new Date(year, 0, 1));
-    const weeks = [];
-    for (let i = 0; i < 54; i++) {
-        const mon = addDays(fm, i * 7);
-        if (mon.getFullYear() > year) break;
-        if (mon.getFullYear() < year) continue;
-        weeks.push({ date: toISODate(mon), monday: mon, weekNumber: getWeekNumber(mon) });
-    }
-    return weeks;
-}
-
-export function renderCarousel() {
-    const cont = document.getElementById('week-carousel');
-    const weeks = getWeeksList();
-    const sel = toISODate(state.currentMonday);
-    const today = toISODate(getMonday(new Date()));
-    const idx = weeks.findIndex(w => w.date === sel);
-    let html = '<div class="carousel-nav">';
-    html += `<button class="carousel-arrow carousel-arrow-left${idx <= 0 ? ' disabled' : ''}" id="carousel-arrow-left" onclick="carouselSkip(-1)" title="← предыдущая неделя">«</button>`;
-    html += '<div class="carousel-strip" id="carousel-strip">';
-    for (const w of weeks) {
-        const cls = w.date === sel ? ' carousel-chip active' : w.date === today ? ' carousel-chip today' : ' carousel-chip';
-        html += `<div class="${cls}" data-date="${w.date}" onclick="selectWeekByDate('${w.date}')"><span class="chip-week">${w.weekNumber} неделя</span><span class="chip-range">${formatChipRange(w.monday)}</span></div>`;
-    }
-    html += '</div>';
-    html += `<button class="carousel-arrow carousel-arrow-right${idx >= weeks.length - 1 ? ' disabled' : ''}" id="carousel-arrow-right" onclick="carouselSkip(1)" title="следующая неделя →">»</button></div>`;
-    cont.innerHTML = html;
-}
-
-export function setActiveWeek() {
-    const strip = document.getElementById('carousel-strip');
-    if (!strip) return;
-    const sel = toISODate(state.currentMonday);
-    strip.querySelectorAll('.carousel-chip').forEach(c => c.classList.toggle('active', c.dataset.date === sel));
-    const active = strip.querySelector('.carousel-chip.active');
-    if (active) {
-        const sr = strip.getBoundingClientRect(), cr = active.getBoundingClientRect();
-        strip.scrollBy({ left: cr.left - sr.left - sr.width / 2 + cr.width / 2, behavior: 'smooth' });
-    }
-    const weeks = getWeeksList();
-    const idx = weeks.findIndex(w => w.date === sel);
-    ['carousel-arrow-left', 'carousel-arrow-right'].forEach((id, i) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('disabled', i === 0 ? idx <= 0 : idx >= weeks.length - 1);
-    });
-}
-
-export function selectWeekByDate(dateStr) {
-    state.currentMonday = new Date(dateStr + 'T00:00:00');
-    setActiveWeek();
-    loadScheduleTable();
-}
-
-export function carouselSkip(n) {
-    state.currentMonday = addDays(state.currentMonday, n * 7);
-    setActiveWeek();
-    loadScheduleTable();
-}
-
-export function showAddWeekModal() {
-    openModal('add-week-modal');
-    populateSelectByName('week-group', state.groupsList, '— выбрать группу —');
-    document.getElementById('week-start-date').value = toISODate(state.currentMonday || getMonday(new Date()));
-    updateWeekPreview();
-    document.addEventListener('DOMContentLoaded', () => {
-        const di = document.getElementById('week-start-date');
-        if (di) di.addEventListener('change', updateWeekPreview);
-    });
-}
-
-export function updateWeekPreview() {
-    const ds = document.getElementById('week-start-date').value;
-    if (!ds) return;
-    const monday = new Date(ds + 'T00:00:00');
-    document.getElementById('week-preview').innerHTML = DAY_ORDER.map((n, i) => {
-        const d = addDays(monday, i);
-        return `<div class="week-preview-day"><span>${n}</span><span>${formatShortDate(toISODate(d))}</span></div>`;
-    }).join('');
-}
-
-export async function addWeek() {
-    const gn = document.getElementById('week-group').value;
-    const ds = document.getElementById('week-start-date').value;
-    if (!ds) return alert('Выберите дату понедельника');
-    if (!gn) return alert('Выберите группу');
-    const monday = new Date(ds + 'T00:00:00');
-    const days = DAY_ORDER.map((n, i) => ({ day_name: n, date: toISODate(addDays(monday, i)), group_name: gn }));
-    const check = await api('/api/validate-week', { method: 'POST', body: JSON.stringify({ group_name: gn, dates: days.map(d => d.date) }) });
-    if (!check.ok) { alert(check.warnings.map(w => w.message).join('\n')); return; }
-    const res = await api('/api/days/batch', { method: 'POST', body: JSON.stringify({ days }) });
-    if (res.error) { alert(res.error); return; }
-    closeModals();
-    loadScheduleTable();
-}
-
-export async function restoreWeek() {
-    if (!state.currentMonday) return;
-    if (!confirm('Восстановить все удаленные дни и пары за эту неделю?')) return;
-    const m = toISODate(state.currentMonday);
-    const res = await api('/api/week/restore?monday=' + m, { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
-    alert('Восстановлено дней: ' + res.days_restored);
-    loadScheduleTable();
-}
-
-export async function deleteWeek() {
-    if (!state.currentMonday) return;
-    if (!confirm('Удалить все дни и пары за эту неделю?')) return;
-    const m = toISODate(state.currentMonday);
-    const res = await api('/api/week?monday=' + m, { method: 'DELETE' });
-    if (res.error) { alert(res.error); return; }
-    alert('Удалено дней: ' + res.days_deleted);
-    loadScheduleTable();
-}
-
-/* ======================== Schedule Table ======================== */
-
-export async function loadScheduleTable() {
-    const cont = document.getElementById('schedule-table-container');
-    cont.innerHTML = '<div class="loading">Загрузка...</div>';
-    const ms = toISODate(state.currentMonday);
-    let data;
-    if (state.currentScheduleType === 'group') data = await api(`/api/schedule-table?group=${encodeURIComponent(state.currentScheduleName)}&monday=${ms}`);
-    else if (state.currentScheduleType === 'teacher') data = await api(`/api/teacher-schedule-table?teacher_id=${state.currentScheduleId}&monday=${ms}`);
-    else if (state.currentScheduleType === 'classroom') data = await api(`/api/classroom-schedule-table?classroom_id=${state.currentScheduleId}&monday=${ms}`);
-    if (!data || !data.periods || !data.periods.length || data.week_exists === false) {
-        cont.innerHTML = '<div class="no-schedule"><span class="emoji">📅</span><p>Нет расписания на эту неделю</p></div>';
-        return;
-    }
-    cont.innerHTML = renderScheduleTable(data);
-}
-
-function checkConflictsForLesson(lesson, dayDate, period) {
-    if (!state.showConflicts) return null;
-    const conflicts = [];
-    for (const id of Object.keys(state.lessonsMap)) {
-        const other = state.lessonsMap[id];
-        if (other.id === lesson.id) continue;
-        if (other.period !== period) continue;
-        if (other.day_id === lesson.day_id) {
-            if (other.teacher_id && other.teacher_id === lesson.teacher_id) {
-                conflicts.push({ type: 'error', msg: 'Преподаватель занят в этот период' });
-            }
-            if (other.classroom_id && other.classroom_id === lesson.classroom_id) {
-                conflicts.push({ type: 'error', msg: 'Аудитория занята в этот период' });
-            }
-            if (other.group_id === lesson.group_id && (other.subgroup || null) === (lesson.subgroup || null)) {
-                conflicts.push({ type: 'warning', msg: 'Дублирование пары для группы' });
-            }
-        }
-    }
-    if (conflicts.length === 0) return null;
-    const hasError = conflicts.some(c => c.type === 'error');
-    return { cls: hasError ? 'cell-conflict-error' : 'cell-conflict-warning', tooltip: conflicts.map(c => c.msg).join('; ') };
-}
-
-function renderScheduleTable(data) {
-    const { days, periods } = data;
-    Object.keys(state.lessonsMap).forEach(k => delete state.lessonsMap[k]);
-    const canEdit = state.isAdmin && (state.currentScheduleType === 'group' || state.currentScheduleType === 'teacher');
-    let html = '<div class="schedule-table-wrap"><table class="schedule-table"><thead><tr><th class="col-time">Пара</th>';
-    for (const day of days) {
-        const d = new Date(day.date + 'T00:00:00');
-        const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
-        html += `<th class="col-day">${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
-    }
-    html += '</tr></thead><tbody>';
-    let lastShift = 0;
-    for (const p of periods) {
-        if (p.shift !== lastShift) { lastShift = p.shift; html += `<tr class="shift-row"><td colspan="${days.length + 1}">${shiftLabel(p.shift)}</td></tr>`; }
-        html += '<tr>';
-        html += `<td class="time-cell"><span class="period-num">${p.period}</span>${p.start} – ${p.end}</td>`;
-        for (const day of days) {
-            const lessons = p.lessons[day.date] || [];
-            const busy = lessons.length > 0;
-            if (state.currentScheduleType === 'classroom') {
-                html += busy ? `<td class="day-cell busy-cell">${lessons.map(l => `<div class="lesson-content"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${escapeHtml(l.teacher)}\n${escapeHtml(l.groups || '')}</div></div>`).join('')}</td>` : '<td class="day-cell empty-cell"></td>';
-            } else {
-                if (busy) {
-                    const inner = lessons.map(l => {
-                        state.lessonsMap[l.id] = l;
-                        const meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
-                        const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
-                        const conflict = checkConflictsForLesson(l, day.date, p.period);
-                        const cCls = conflict ? ' ' + conflict.cls : '';
-                        const tip = conflict ? ` title="${escapeHtml(conflict.tooltip)}"` : '';
-                        return `<div class="lesson-content${cCls}"${oc}${tip}><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
-                    }).join('');
-                    html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}">${inner}</td>`;
-                } else {
-                    const di = day.day_id;
-                    let oc = '';
-                    if (canEdit && (di || state.currentScheduleType === 'teacher')) {
-                        oc = state.currentScheduleType === 'teacher' ? ` onclick="showAddLessonModal(${di || 'null'}, ${p.period}, '${day.date}', null, ${state.currentScheduleId})"` : ` onclick="showAddLessonModal(${di}, ${p.period}, ${state.currentScheduleId})"`;
-                    }
-                    html += `<td class="day-cell empty-cell${canEdit && (di || state.currentScheduleType === 'teacher') ? ' addable-cell' : ''}"${oc}></td>`;
-                }
-            }
-        }
-        html += '</tr>';
-    }
-    return html + '</tbody></table></div>';
-}
-
-export function printSchedule() {
-    document.getElementById('print-title').textContent = state.currentScheduleName;
-    document.getElementById('print-subtitle').textContent = `Неделя ${getWeekNumber(state.currentMonday)} · ${formatDateRange(state.currentMonday)}`;
-    let style = document.getElementById('print-inline-style');
-    if (!style) { style = document.createElement('style'); style.id = 'print-inline-style'; document.head.appendChild(style); }
-    style.textContent = '@media print { body,td,th,.schedule-table,.schedule-table-wrap,main,#schedule-view,#schedule-table-container{background:white!important;color:black!important} td.day-cell{background:white!important;color:black!important} td.day-cell:not(.empty-cell){background:#f0f0f0!important} .lesson-content,.lesson-content .lesson-subject,.lesson-content .lesson-meta{color:black!important} .lesson-content .lesson-meta{color:#333!important} .lesson-subject{color:black!important} td.day-cell .lesson-content .lesson-subject{color:black!important;background:transparent!important} td.day-cell .lesson-content .lesson-meta{color:#333!important;background:transparent!important} td.day-cell .lesson-content{background:transparent!important;color:black!important} }';
-    window.print();
-}
-
-/* ======================== Export ======================== */
-
-export function exportSchedule(format) {
-    const monday = toISODate(state.currentMonday);
-    console.log('Export params:', { type: state.currentScheduleType, name: state.currentScheduleName, id: state.currentScheduleId, monday, format });
-    const url = `/api/export?type=${encodeURIComponent(state.currentScheduleType)}&name=${encodeURIComponent(state.currentScheduleName)}&id=${encodeURIComponent(state.currentScheduleId)}&monday=${monday}&format=${format}`;
-    fetch(url, { method: 'HEAD' }).then(res => {
-        if (!res.ok) { return res.json().then(b => alert(b.error || `Ошибка экспорта (${res.status})`)).catch(() => alert(`Ошибка экспорта (${res.status})`)); }
-        const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }).catch(() => alert('Ошибка сети при экспорте'));
-}
-
-/* ======================== Lessons ======================== */
-
-export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) {
-    state.currentLessonDayId = dayId;
-    state.currentLessonDate = dateStr || null;
-    state.currentLessonDayGroup = dayGroup || '';
-    state.currentEditLessonId = null;
-    openModal('add-lesson-modal');
-    document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
-    const sBtn = document.getElementById('btn-save-lesson');
-    sBtn.textContent = 'Добавить'; sBtn.disabled = false;
-    document.getElementById('validation-warnings').style.display = 'none';
-    document.getElementById('btn-delete-lesson').style.display = 'none';
-    document.getElementById('btn-add-subgroup').style.display = 'none';
-    const sel = document.getElementById('lesson-period');
-    sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${period && b.period === period ? 'selected' : ''}>${b.period}-я пара (${b.start} - ${b.end})</option>`).join('');
-    sel.onchange = () => validateLesson();
-    populateSelect('lesson-subject', state.subjectsList, '— выбрать —');
-    populateSelect('lesson-teacher', state.teachersList, '— выбрать —');
-    populateSelect('lesson-group', state.groupsList, '— выбрать —');
-    populateSelect('lesson-classroom', state.classroomsList, '— выбрать —');
-    const tf = document.getElementById('lesson-teacher');
-    if (state.currentScheduleType === 'teacher' && teacherId) { tf.value = teacherId; tf.disabled = true; document.getElementById('lesson-group').value = ''; }
-    else { tf.disabled = false; if (state.currentLessonDayGroup) document.getElementById('lesson-group').value = state.currentLessonDayGroup; }
-    document.getElementById('lesson-subject').onchange = function() {
-        const sid = parseInt(this.value);
-        if (!sid) return;
-        const subj = state.subjectsList.find(s => s.id === sid);
-        if (subj && subj.default_teacher_id) { const ts = document.getElementById('lesson-teacher'); if (!ts.disabled && !parseInt(ts.value)) ts.value = subj.default_teacher_id; }
-        validateLesson();
-    };
-    document.getElementById('lesson-group').onchange = () => document.getElementById('lesson-subgroup').value = '';
-}
-
-async function collectLessonData() {
-    return {
-        period: parseInt(document.getElementById('lesson-period').value),
-        subject_id: parseInt(document.getElementById('lesson-subject').value) || null,
-        teacher_id: parseInt(document.getElementById('lesson-teacher').value) || null,
-        classroom_id: parseInt(document.getElementById('lesson-classroom').value) || null,
-        group_id: parseInt(document.getElementById('lesson-group').value) || null,
-        subgroup: parseInt(document.getElementById('lesson-subgroup').value) || null,
-    };
-}
-
-export async function addLesson() {
-    const d = await collectLessonData();
-    let dayId = state.currentLessonDayId;
-    if (!dayId && state.currentLessonDate && d.group_id) {
-        const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-        const dt = new Date(state.currentLessonDate + 'T00:00:00');
-        const dn = dayNames[dt.getDay() === 0 ? 6 : dt.getDay() - 1];
-        const go = state.groupsList.find(g => g.id === d.group_id);
-        const dayRes = await api('/api/days', { method: 'POST', body: JSON.stringify({ day_name: dn, date: state.currentLessonDate, group_name: go ? go.name : '' }) });
-        if (dayRes.error) { alert(dayRes.error); return; }
-        dayId = dayRes.id;
-    }
-    if (!dayId) { alert('Не удалось определить день для пары'); return; }
-    const res = await api(`/api/days/${dayId}/lessons`, { method: 'POST', body: JSON.stringify(d) });
-    if (res.error) {
-        const el = document.getElementById('validation-warnings');
-        el.style.display = '';
-        el.innerHTML = '<div class="validation-warnings">' + (res.warnings || []).map(w => `<div class="validation-warning error"><span class="validation-warning-icon">!!</span><span>${escapeHtml(w)}</span></div>`).join('') + '</div>';
-        return;
-    }
-    closeModals();
-    loadScheduleTable();
-}
-
-export function editLesson(lesson) {
-    state.currentLessonDayId = lesson.day_id || null;
-    state.currentEditLessonId = lesson.id;
-    openModal('add-lesson-modal');
-    document.querySelector('#add-lesson-modal h2').textContent = 'Редактировать пара';
-    const sBtn = document.getElementById('btn-save-lesson');
-    sBtn.textContent = 'Сохранить'; sBtn.disabled = false;
-    document.getElementById('validation-warnings').style.display = 'none';
-    document.getElementById('btn-delete-lesson').style.display = '';
-    document.getElementById('btn-add-subgroup').style.display = '';
-    const sel = document.getElementById('lesson-period');
-    sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${b.period === lesson.period ? 'selected' : ''}>${b.period}-я пара (${b.start} - ${b.end})</option>`).join('');
-    populateSelect('lesson-subject', state.subjectsList, '— выбрать —');
-    populateSelect('lesson-teacher', state.teachersList, '— выбрать —');
-    populateSelect('lesson-group', state.groupsList, '— выбрать —');
-    populateSelect('lesson-classroom', state.classroomsList, '— выбрать —');
-    ['subject', 'teacher', 'classroom', 'group'].forEach(f => document.getElementById(`lesson-${f}`).value = lesson[`${f}_id`] || '');
-    document.getElementById('lesson-subgroup').value = lesson.subgroup || '';
-    document.getElementById('lesson-teacher').disabled = state.currentScheduleType === 'teacher';
-    document.getElementById('btn-save-lesson').onclick = () => saveLesson(lesson.id);
-}
-
-export async function saveLesson(lessonId) {
-    const d = await collectLessonData();
-    const res = await api(`/api/lessons/${lessonId}`, { method: 'PUT', body: JSON.stringify(d) });
-    if (res.error) {
-        const el = document.getElementById('validation-warnings');
-        el.style.display = '';
-        el.innerHTML = '<div class="validation-warnings">' + (res.warnings || []).map(w => `<div class="validation-warning error"><span class="validation-warning-icon">!!</span><span>${escapeHtml(w)}</span></div>`).join('') + '</div>';
-        return;
-    }
-    closeModals();
-    loadScheduleTable();
-}
-
-export function addSubgroupLesson() {
-    const d = document.getElementById('lesson-period');
-    closeModals();
-    setTimeout(() => showAddLessonModal(state.currentLessonDayId, parseInt(d.value), parseInt(document.getElementById('lesson-group').value) || null), 100);
-}
-
-export async function deleteCurrentLesson() {
-    if (!state.currentEditLessonId) return;
-    if (!confirm('Удалить пара?')) return;
-    const res = await api(`/api/lessons/${state.currentEditLessonId}`, { method: 'DELETE' });
-    if (res.error) { alert(res.error); return; }
-    closeModals();
-    loadScheduleTable();
-}
-
-function resetLessonModal() {
-    state.currentEditLessonId = null;
-    state.currentLessonDate = null;
-    document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
-    const btn = document.getElementById('btn-save-lesson');
-    btn.textContent = 'Добавить'; btn.disabled = false; btn.onclick = addLesson;
-    document.getElementById('validation-warnings').style.display = 'none';
-    document.getElementById('btn-delete-lesson').style.display = 'none';
-    document.getElementById('btn-add-subgroup').style.display = 'none';
-    document.getElementById('lesson-teacher').disabled = false;
-}
-
-function renderWarnings(el, warnings) {
-    el.style.display = '';
-    el.innerHTML = '<div class="validation-warnings">' + warnings.map(w => `<div class="validation-warning ${w.type === 'duplicate' ? 'warning' : 'error'}"><span class="validation-warning-icon">${w.type === 'duplicate' ? '!' : '!!'}</span><span>${escapeHtml(w.message)}</span></div>`).join('') + '</div>';
-}
-
-export function validateLesson() {
-    clearTimeout(state.validationTimeout);
-    state.validationTimeout = setTimeout(async () => {
-        const dayId = state.currentLessonDayId;
-        const d = await collectLessonData();
-        if (!dayId || !d.period) return;
-        const data = await api('/api/validate', { method: 'POST', body: JSON.stringify({ day_id: dayId, ...d, exclude_lesson_id: state.currentEditLessonId }) });
-        const el = document.getElementById('validation-warnings');
-        const btn = document.getElementById('btn-save-lesson');
-        if (data.warnings && data.warnings.length) {
-            renderWarnings(el, data.warnings);
-            const blocking = data.warnings.some(w => w.type !== 'duplicate');
-            if (btn) { btn.disabled = blocking; if (blocking) btn.textContent = 'Есть конфликт'; }
-        } else {
-            el.style.display = 'none'; el.innerHTML = '';
-            if (btn) { btn.disabled = false; btn.textContent = state.currentEditLessonId ? 'Сохранить' : 'Добавить'; }
-        }
-    }, 300);
-}
-
 /* ======================== Homepage & References ======================== */
-
-export async function loadReferences() {
-    const refs = await Promise.all([
-        api('/api/subjects'), api('/api/teachers'), api('/api/groups'), api('/api/classrooms'),
-    ]);
-    const labels = ['subjects', 'teachers', 'groups', 'classrooms'];
-    for (let i = 0; i < refs.length; i++) {
-        if (refs[i].error) { console.error('loadReferences failed:', labels[i], refs[i].error); return; }
-    }
-    state.subjectsList = refs[0];
-    state.teachersList = refs[1];
-    state.groupsList = refs[2];
-    state.classroomsList = refs[3];
-    const tws = await api('/api/teachers');
-    if (tws.error) { console.error('loadReferences teachers:', tws.error); }
-    else { state.teachersWithSchedule = tws; }
-    const cws = await api('/api/classrooms');
-    if (cws.error) { console.error('loadReferences classrooms:', cws.error); }
-    else { state.classroomsWithSchedule = cws; }
-}
 
 export function renderHomePage() {
     const reg = state.groupsList.filter(g => !g.is_distance);
@@ -532,54 +128,7 @@ export function switchAdminTab(tab) {
     const content = document.getElementById(`admin-tab-${tab}`);
     if (content) content.classList.add('active');
     if (tab === 'trash') loadTrashTab();
-    if (tab === 'health') loadHealthTab();
-}
-
-async function loadTrashTab() {
-    const data = await api('/api/trash');
-    if (data.error) { document.getElementById('trash-refs').innerHTML = '<div style="color:var(--danger)">Ошибка загрузки корзины</div>'; return; }
-    const refs = document.getElementById('trash-refs');
-    if (refs) refs.innerHTML = renderTrashSection('Справочники', [
-        ...(data.subjects || []).map(i => ({...i, type: 'subjects'})),
-        ...(data.teachers || []).map(i => ({...i, type: 'teachers'})),
-        ...(data.classrooms || []).map(i => ({...i, type: 'classrooms'})),
-        ...(data.groups || []).map(i => ({...i, type: 'groups'})),
-    ]);
-    const days = document.getElementById('trash-days');
-    if (days) days.innerHTML = renderTrashSection('Дни', (data.days || []).map(i => ({...i, type: 'days'})));
-    const lessons = document.getElementById('trash-lessons');
-    if (lessons) lessons.innerHTML = renderTrashSection('Пары', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
-}
-
-function renderTrashSection(title, items) {
-    if (!items.length) return `<div style="margin:8px 0;font-size:13px;color:var(--text-secondary)">${title}: пусто</div>`;
-    let html = `<div style="margin:8px 0"><strong>${title}</strong> (${items.length})</div>`;
-    for (const item of items) {
-        const name = item.name || item.day_name || `ID ${item.id}`;
-        const date = item.deleted_at ? item.deleted_at.slice(0, 10) : '';
-        const ep = item.type === 'days' ? 'days' : item.type === 'lessons' ? 'lessons' : item.type;
-        html += `<div class="trash-item"><span class="trash-label">${escapeHtml(name)}</span><span class="trash-date">${date}</span>`;
-        html += `<button class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${ep}',${item.id})">\u21BA</button>`;
-        html += '</div>';
-    }
-    return html;
-}
-
-export async function restoreTrashItem(endpoint, id) {
-    if (!confirm('Восстановить?')) return;
-    const url = endpoint === 'days' ? `/api/days/${id}/restore` : endpoint === 'lessons' ? `/api/lessons/${id}/restore` : `/api/${endpoint}/${id}/restore`;
-    const res = await api(url, { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
-    loadTrashTab();
-}
-
-export async function purgeTrash() {
-    if (!confirm('Удалить навсегда записи старше 30 дней?')) return;
-    if (!confirm('Это действие необратимо. Продолжить?')) return;
-    const res = await api('/api/db/purge-trash', { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
-    alert('Очищено: ' + Object.values(res.purged || {}).reduce((a, b) => a + b, 0) + ' записей');
-    loadTrashTab();
+    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); }
 }
 
 async function loadHealthTab() {
@@ -608,139 +157,6 @@ async function loadHealthTab() {
         html += '<div style="margin:8px 0;color:#2e7d32;font-size:13px">Сиротских пар нет</div>';
     }
     cont.innerHTML = html;
-}
-
-function populateSubjectTeacherSelect() {
-    const sel = document.getElementById('ref-subjects-teacher');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Без преподавателя</option>' + state.teachersList.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
-}
-
-export async function renderRefList(endpoint, containerId) {
-    const items = await api(`/api/${endpoint}`);
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    if (items.error) { container.innerHTML = '<div style="font-size:13px;color:var(--danger)">Ошибка загрузки</div>'; return; }
-    if (endpoint === 'subjects') state.subjectsList = items;
-    else if (endpoint === 'teachers') state.teachersList = items;
-    else if (endpoint === 'groups') state.groupsList = items;
-    else if (endpoint === 'classrooms') state.classroomsList = items;
-    container.innerHTML = items.length ? items.map(i => {
-        let extra = '';
-        if (endpoint === 'groups') extra = ` <span class="ref-item-tag">${i.course}к.</span>${i.is_distance ? ' <span class="ref-item-tag tag-distance">Заочн.</span>' : ''}`;
-        if (endpoint === 'subjects' && i.default_teacher_id) { const t = state.teachersList.find(t => t.id === i.default_teacher_id); if (t) extra += ` <span class="ref-item-tag">${escapeHtml(t.name)}</span>`; }
-        return `<div class="ref-item"><span class="ref-item-name">${escapeHtml(i.name)}${extra}</span><div class="ref-item-actions"><button class="btn btn-ghost btn-sm" onclick="${endpoint === 'subjects' ? `editSubject(${i.id})` : `editGroup(${i.id})`}">Изм</button><button class="btn btn-danger btn-sm" onclick="deleteRefItem('${endpoint}',${i.id},'${containerId}')">×</button></div></div>`;
-    }).join('') : '<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">Пусто</div>';
-}
-
-export async function addGroup() {
-    const inp = document.getElementById('ref-groups-input');
-    const name = inp.value.trim();
-    if (!name) return;
-    const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked }) });
-    if (res.error) { alert(res.error); return; }
-    inp.value = ''; document.getElementById('ref-groups-distance').checked = false;
-    renderRefList('groups', 'ref-groups');
-}
-
-export async function editGroup(id) {
-    const g = state.groupsList.find(g => g.id === id);
-    if (!g) return;
-    const nn = prompt('Название:', g.name);
-    if (nn === null || !nn.trim()) return;
-    const nc = prompt('Курс (1-4):', g.course);
-    if (nc === null) return;
-    const dist = confirm('Заочное отделение?');
-    const res = await api(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), course: parseInt(nc) || g.course, is_distance: dist }) });
-    if (res.error) { alert(res.error); return; }
-    renderRefList('groups', 'ref-groups');
-}
-
-export async function addSubject() {
-    const inp = document.getElementById('ref-subjects-input');
-    const sel = document.getElementById('ref-subjects-teacher');
-    const name = inp.value.trim();
-    if (!name) return;
-    const body = { name };
-    if (sel && sel.value) body.default_teacher_id = parseInt(sel.value);
-    const res = await api('/api/subjects', { method: 'POST', body: JSON.stringify(body) });
-    if (res.error) { alert(res.error); return; }
-    inp.value = ''; if (sel) sel.value = '';
-    renderRefList('subjects', 'ref-subjects');
-}
-
-export async function editSubject(id) {
-    const s = state.subjectsList.find(s => s.id === id);
-    if (!s) return;
-    const nn = prompt('Название предмета:', s.name);
-    if (nn === null || !nn.trim()) return;
-    const opts = ['Без преподавателя', ...state.teachersList.map((t, i) => `${i + 1}. ${t.name}`)];
-    const ts = prompt('Номер преподавателя (или 0 для без преподавателя):\n' + opts.map((o, i) => `  ${i} — ${o}`).join('\n'), s.default_teacher_id ? state.teachersList.findIndex(t => t.id === s.default_teacher_id) + 1 : 0);
-    if (ts === null) return;
-    const ti = parseInt(ts);
-    const body = { name: nn.trim() };
-    if (ti > 0 && ti <= state.teachersList.length) body.default_teacher_id = state.teachersList[ti - 1].id;
-    else body.default_teacher_id = null;
-    const res = await api(`/api/subjects/${id}`, { method: 'PUT', body: JSON.stringify(body) });
-    if (res.error) { alert(res.error); return; }
-    renderRefList('subjects', 'ref-subjects');
-}
-
-export async function advanceCourses() {
-    if (!confirm('Перевести все курсы на +1?\nГруппы 4-го курса будут Удалены.')) return;
-    const res = await api('/api/groups/advance-courses', { method: 'POST' });
-    if (res.success) { alert(`Готово! Удалено групп: ${res.deleted}`); renderRefList('groups', 'ref-groups'); }
-}
-
-export async function addRefItem(endpoint, inputId, containerId) {
-    const inp = document.getElementById(inputId);
-    const name = inp.value.trim();
-    if (!name) return;
-    const res = await api(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify({ name }) });
-    if (res.error) { alert(res.error); return; }
-    inp.value = '';
-    renderRefList(endpoint, containerId);
-}
-
-export async function deleteRefItem(endpoint, id, containerId) {
-    if (!confirm('Удалить?\n\nВнимание: запись может использоваться в расписании.')) return;
-    const res = await api(`/api/${endpoint}/${id}`, { method: 'DELETE' });
-    if (res.error) {
-        alert(res.error);
-        return;
-    }
-    if (res.warning) alert(res.warning);
-    renderRefList(endpoint, containerId);
-}
-
-export async function restoreRefItem(endpoint, id, containerId) {
-    if (!confirm('Восстановить запись?')) return;
-    const res = await api(`/api/${endpoint}/${id}/restore`, { method: 'POST' });
-    if (res.error) {
-        alert(res.error);
-        return;
-    }
-    renderRefList(endpoint, containerId);
-}
-
-export async function quickAdd(endpoint, selectId) {
-    const name = prompt('Введите название:');
-    if (!name || !name.trim()) return;
-    const res = await api(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
-    await loadReferences();
-    const lists = { subjects: state.subjectsList, teachers: state.teachersList, classrooms: state.classroomsList };
-    populateSelect(selectId, lists[endpoint] || [], '— выбрать —');
-    document.getElementById(selectId).value = res.id || '';
-}
-
-export async function quickAddGroup() {
-    const name = prompt('Номер группы:');
-    if (!name || !name.trim()) return;
-    const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name: name.trim(), course: 1, is_distance: false }) });
-    if (res.error) { alert(res.error); return; }
-    await loadReferences();
-    populateSelectByName('week-group', state.groupsList, '— выбрать группу —');
-    document.getElementById('week-group').value = name.trim();
 }
 
 /* ======================== Auth ======================== */
@@ -890,3 +306,10 @@ function renderAvailTable() {
     html += '</tbody></table>';
     cont.innerHTML = html || '<div style="padding:20px;color:var(--text-secondary)">Все заняты</div>';
 }
+
+export { openModal, confirmModal };
+export { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup };
+export { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson };
+export { loadTrashTab, restoreTrashItem, purgeTrash };
+export { loadSettingsTab, saveSetting };
+export { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek };

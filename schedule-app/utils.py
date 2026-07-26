@@ -23,11 +23,14 @@ LEFT JOIN classrooms_list c ON l.classroom_id = c.id
 LEFT JOIN groups_list gl ON l.group_id = gl.id'''
 
 
-def _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id=None, exclude_id=None, group_id=None, subgroup=None):
+def _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id=None, exclude_id=None, group_id=None, subgroup=None, skip_day_check=False):
     warnings = []
     blocking = False
 
-    day = conn.execute('SELECT * FROM schedule_days WHERE id = ? AND deleted_at IS NULL', (day_id,)).fetchone()
+    if skip_day_check:
+        day = conn.execute('SELECT * FROM schedule_days WHERE id = ?', (day_id,)).fetchone()
+    else:
+        day = conn.execute('SELECT * FROM schedule_days WHERE id = ? AND deleted_at IS NULL', (day_id,)).fetchone()
     if not day:
         return warnings, blocking
 

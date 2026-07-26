@@ -786,6 +786,14 @@ select.input:disabled {
     color: #ffcc00;
 }
 
+.ref-item-tag.tag-phone {
+    font-size: 12px;
+}
+
+#confirm-modal {
+    z-index: 202;
+}
+
 .ref-item-actions {
     display: flex;
     gap: 2px;

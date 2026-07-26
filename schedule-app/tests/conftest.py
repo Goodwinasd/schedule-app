@@ -76,9 +76,14 @@ def _clean_tables():
     try:
         conn = db_module.get_db()
         tables = ['lesson_history', 'lessons', 'schedule_days', 'groups_list',
-                  'classrooms_list', 'subjects', 'teachers', 'excluded_dates']
+                  'classrooms_list', 'subjects', 'teachers', 'excluded_dates',
+                  'settings']
         for t in tables:
             conn.execute(f'DELETE FROM {t}')
+        conn.execute("INSERT INTO settings (key, value) VALUES ('session_lifetime', '3600')")
+        conn.execute("INSERT INTO settings (key, value) VALUES ('login_rate_limit', '5')")
+        conn.execute("INSERT INTO settings (key, value) VALUES ('login_rate_window', '300')")
+        conn.execute("INSERT INTO settings (key, value) VALUES ('backup_retention_days', '30')")
         conn.commit()
         conn.close()
     except sqlite3.OperationalError:
