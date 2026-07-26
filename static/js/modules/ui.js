@@ -16,7 +16,7 @@ export function updateUI() {
     g('btn-login').style.display = state.isAdmin ? 'none' : '';
     g('btn-logout').style.display = state.isAdmin ? '' : 'none';
     g('btn-admin').style.display = state.isAdmin ? '' : 'none';
-    g('btn-avail').style.display = state.isAdmin ? '' : 'none';
+    g('btn-avail').style.display = '';
     g('admin-panel').style.display = (state.isAdmin && state.currentScheduleType) ? '' : 'none';
     g('print-panel').style.display = state.currentScheduleType ? '' : 'none';
     const cb = g('btn-toggle-conflicts');
