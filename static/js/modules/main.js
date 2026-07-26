@@ -8,19 +8,18 @@ import state from './state.js';
 import { api } from './api.js';
 import {
     goHome, showSchedule, showLoginModal, closeModals,
-    selectWeekByDate, carouselSkip, showAddWeekModal, addWeek, restoreWeek, deleteWeek,
-    loadScheduleTable, printSchedule, exportSchedule,
-    showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson,
-    deleteCurrentLesson, validateLesson,
-    loadReferences, showAdminPanel, renderRefList,
-    addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses,
-    addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, saveSetting,
+    showAdminPanel, switchAdminTab,
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
     toggleAvailHeatmap, toggleAvailGroupByCourse, exportAvailExcel, exportAvailPDF, closeAvailability,
-    switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
 } from './ui.js';
+import { confirmModal } from './modal.js';
+import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
+import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup } from './references.js';
+import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
+import { saveSetting } from './settings.js';
+import { restoreTrashItem, purgeTrash } from './trash.js';
 
 /* Привязка к window для onclick-вызовов из HTML */
 Object.assign(window, {

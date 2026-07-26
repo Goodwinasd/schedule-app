@@ -1,14 +1,13 @@
 import state from './state.js';
-import { DAY_ORDER } from './config.js';
-import { escapeHtml, getMonday, addDays, toISODate, getWeekNumber, formatChipRange, formatDateRange, shiftLabel, populateSelect, populateSelectByName } from './utils.js';
+import { escapeHtml, getMonday, addDays, toISODate, formatChipRange } from './utils.js';
 import { api } from './api.js';
-import { openModal, confirmModal, _confirmState } from './modal.js';
+import { openModal, _confirmState } from './modal.js';
 import { showToast } from './toast.js';
-import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, populateSubjectTeacherSelect } from './references.js';
-import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
-import { loadTrashTab, restoreTrashItem, purgeTrash } from './trash.js';
-import { loadSettingsTab, saveSetting } from './settings.js';
-import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek, getWeeksList } from './nav.js';
+import { loadReferences, renderRefList, populateSubjectTeacherSelect } from './references.js';
+import { loadScheduleTable, addLesson } from './schedule.js';
+import { loadTrashTab } from './trash.js';
+import { loadSettingsTab } from './settings.js';
+import { renderCarousel, getWeeksList } from './nav.js';
 
 /* ======================== Navigation ======================== */
 
@@ -401,9 +400,4 @@ function _availRow(row, busyMap, days, periods, freeOnly, isHeatmap) {
     return `<tr><td>${escapeHtml(row.name)}</td>${cells.join('')}<td class="avail-summary">${freeCount}</td></tr>`;
 }
 
-export { openModal, confirmModal };
-export { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup };
-export { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson };
-export { loadTrashTab, restoreTrashItem, purgeTrash };
-export { loadSettingsTab, saveSetting };
-export { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek };
+

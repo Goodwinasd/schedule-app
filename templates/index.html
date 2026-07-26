@@ -13,12 +13,12 @@
     <div id="app">
         <header>
             <div class="header-content">
-                <h1 id="header-title" data-action="goHome" onclick="goHome()">Расписание</h1>
+                <h1 id="header-title" data-action="goHome">Расписание</h1>
                 <div class="header-actions">
                     <button id="btn-avail" class="btn btn-ghost" data-action="showAvailability" style="display:none">📅 Свободные окна</button>
-                    <button id="btn-admin" class="btn btn-ghost" data-action="showAdminPanel" onclick="showAdminPanel()" style="display:none">⚙️ Администрирование</button>
-                    <button id="btn-login" class="btn btn-ghost" data-action="showLoginModal" onclick="showLoginModal()">🔒 Войти</button>
-                    <button id="btn-logout" class="btn btn-ghost" data-action="logout" onclick="logout()" style="display:none">🚪 Выйти</button>
+                    <button id="btn-admin" class="btn btn-ghost" data-action="showAdminPanel" style="display:none">⚙️ Администрирование</button>
+                    <button id="btn-login" class="btn btn-ghost" data-action="showLoginModal">🔒 Войти</button>
+                    <button id="btn-logout" class="btn btn-ghost" data-action="logout" style="display:none">🚪 Выйти</button>
                 </div>
             </div>
         </header>
@@ -45,21 +45,21 @@
                 <div id="week-carousel" class="week-carousel"></div>
                 <div id="schedule-table-container"></div>
                 <div id="admin-panel" class="admin-panel" style="display:none">
-                    <button class="btn btn-primary btn-add-day" data-action="showAddWeekModal" onclick="showAddWeekModal()">
+                    <button class="btn btn-primary btn-add-day" data-action="showAddWeekModal">
                         ➕ Добавить неделю
                     </button>
-                    <button class="btn btn-ghost btn-restore-week" data-action="restoreWeek" onclick="restoreWeek()" style="margin-left:8px">
+                    <button class="btn btn-ghost btn-restore-week" data-action="restoreWeek" style="margin-left:8px">
                         🔄 Восстановить неделю
                     </button>
-                    <button class="btn btn-danger btn-restore-week" data-action="deleteWeek" onclick="deleteWeek()" style="margin-left:8px">
+                    <button class="btn btn-danger btn-restore-week" data-action="deleteWeek" style="margin-left:8px">
                         🗑️ Удалить неделю
                     </button>
                 </div>
                 <div id="print-panel" class="print-panel">
-                    <button class="btn btn-ghost btn-print" data-action="printSchedule" onclick="printSchedule()">🖨 Печать</button>
-                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["xlsx"]' onclick="exportSchedule('xlsx')">📊 Excel</button>
-                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["docx"]' onclick="exportSchedule('docx')">📝 Word</button>
-                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["pdf"]' onclick="exportSchedule('pdf')">📄 PDF</button>
+                    <button class="btn btn-ghost btn-print" data-action="printSchedule">🖨 Печать</button>
+                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["xlsx"]'>📊 Excel</button>
+                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["docx"]'>📝 Word</button>
+                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["pdf"]'>📄 PDF</button>
                 </div>
             </div>
             <div id="availability-view" style="display:none">
@@ -77,17 +77,17 @@
                     <label class="checkbox-label" style="margin-left:8px">
                         <input type="checkbox" id="avail-show-all-periods" onchange="renderAvailTable()"> 7-8 пара
                     </label>
-                    <button class="btn btn-ghost btn-sm" id="btn-avail-group-course" style="margin-left:8px" data-action="toggleAvailGroupByCourse" onclick="toggleAvailGroupByCourse()">📊 По курсам</button>
-                    <button class="btn btn-ghost btn-sm" id="btn-avail-heatmap" style="margin-left:4px" data-action="toggleAvailHeatmap" onclick="toggleAvailHeatmap()">🔥 Тепловая карта</button>
-                    <button class="btn btn-ghost btn-sm" style="margin-left:8px" data-action="exportAvailExcel" onclick="exportAvailExcel()">📊 Экспорт Excel</button>
-                    <button class="btn btn-ghost btn-sm" style="margin-left:4px" data-action="exportAvailPDF" onclick="exportAvailPDF()">📄 Экспорт PDF</button>
-                    <button class="btn btn-ghost btn-sm" style="margin-left:8px" data-action="closeAvailability" onclick="closeAvailability()">✕ Закрыть</button>
+                    <button class="btn btn-ghost btn-sm" id="btn-avail-group-course" style="margin-left:8px" data-action="toggleAvailGroupByCourse">📊 По курсам</button>
+                    <button class="btn btn-ghost btn-sm" id="btn-avail-heatmap" style="margin-left:4px" data-action="toggleAvailHeatmap">🔥 Тепловая карта</button>
+                    <button class="btn btn-ghost btn-sm" style="margin-left:8px" data-action="exportAvailExcel">📊 Экспорт Excel</button>
+                    <button class="btn btn-ghost btn-sm" style="margin-left:4px" data-action="exportAvailPDF">📄 Экспорт PDF</button>
+                    <button class="btn btn-ghost btn-sm" style="margin-left:8px" data-action="closeAvailability">✕ Закрыть</button>
                 </div>
                 <div id="avail-table-container"></div>
             </div>
         </main>
     </div>
-    <div id="modal-overlay" class="modal-overlay" data-action="closeModals" onclick="closeModals()"></div>
+    <div id="modal-overlay" class="modal-overlay" data-action="closeModals"></div>
     <div id="confirm-modal" class="modal" style="display:none">
         <div class="modal-content">
             <h2>Подтверждение</h2>
@@ -103,8 +103,8 @@
             <h2>Вход</h2>
             <input type="password" id="login-password" placeholder="Пароль" class="input">
             <div class="modal-actions">
-                <button class="btn btn-ghost" data-action="closeModals" onclick="closeModals()">❌ Отмена</button>
-                <button class="btn btn-primary" data-action="login" onclick="login()">🔒 Войти</button>
+                <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
+                <button class="btn btn-primary" data-action="login">🔒 Войти</button>
             </div>
         </div>
     </div>
@@ -114,14 +114,14 @@
             <label class="field-label">Группа</label>
             <div class="field-row">
                 <select id="week-group" class="input"></select>
-                <button class="btn btn-ghost btn-sm" data-action="quickAddGroup" onclick="quickAddGroup()">+</button>
+                <button class="btn btn-ghost btn-sm" data-action="quickAddGroup">+</button>
             </div>
             <label class="field-label">Понедельник (дата)</label>
             <input type="date" id="week-start-date" class="input">
             <div class="week-preview" id="week-preview"></div>
             <div class="modal-actions">
-                <button class="btn btn-ghost" data-action="closeModals" onclick="closeModals()">❌ Отмена</button>
-                <button class="btn btn-primary" data-action="addWeek" onclick="addWeek()">Добавить 6 дней</button>
+                <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
+                <button class="btn btn-primary" data-action="addWeek">Добавить 6 дней</button>
             </div>
         </div>
     </div>
@@ -133,22 +133,22 @@
             <label class="field-label">Предмет</label>
             <div class="field-row">
                 <select id="lesson-subject" class="input" onchange="validateLesson()"></select>
-                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["subjects", "lesson-subject"]' onclick="quickAdd('subjects', 'lesson-subject')">+</button>
+                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["subjects", "lesson-subject"]'>+</button>
             </div>
             <label class="field-label">Преподаватель</label>
             <div class="field-row">
                 <select id="lesson-teacher" class="input" onchange="validateLesson()"></select>
-                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["teachers", "lesson-teacher"]' onclick="quickAdd('teachers', 'lesson-teacher')">+</button>
+                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["teachers", "lesson-teacher"]'>+</button>
             </div>
             <label class="field-label">Аудитория</label>
             <div class="field-row">
                 <select id="lesson-classroom" class="input" onchange="validateLesson()"></select>
-                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["classrooms", "lesson-classroom"]' onclick="quickAdd('classrooms', 'lesson-classroom')">+</button>
+                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["classrooms", "lesson-classroom"]'>+</button>
             </div>
             <label class="field-label">Группа</label>
             <div class="field-row">
                 <select id="lesson-group" class="input"></select>
-                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["groups", "lesson-group"]' onclick="quickAdd('groups', 'lesson-group')">+</button>
+                <button class="btn btn-ghost btn-sm" data-action="quickAdd" data-params='["groups", "lesson-group"]'>+</button>
             </div>
             <label class="field-label">Подгруппа</label>
             <select id="lesson-subgroup" class="input">
@@ -157,11 +157,11 @@
                 <option value="2">Подгруппа 2</option>
             </select>
             <div class="modal-actions">
-                <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" data-action="deleteCurrentLesson" onclick="deleteCurrentLesson()">Удалить</button>
-                <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" data-action="addSubgroupLesson" onclick="addSubgroupLesson()">+ Подгруппа</button>
+                <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" data-action="deleteCurrentLesson">Удалить</button>
+                <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" data-action="addSubgroupLesson">+ Подгруппа</button>
                 <div style="flex:1"></div>
-                <button class="btn btn-ghost" data-action="closeModals" onclick="closeModals()">❌ Отмена</button>
-                <button class="btn btn-primary" id="btn-save-lesson" data-action="addLesson" onclick="addLesson()">Добавить</button>
+                <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
+                <button class="btn btn-primary" id="btn-save-lesson" data-action="addLesson">Добавить</button>
             </div>
         </div>
     </div>
@@ -169,12 +169,12 @@
         <div class="modal-content modal-wide">
             <div class="ref-header">
                 <h2>⚙️ Администрирование</h2>
-                <button class="ref-done" data-action="closeModals" onclick="closeModals()">✅ Готово</button>
+                <button class="ref-done" data-action="closeModals">✅ Готово</button>
             </div>
             <div class="admin-tabs">
-                <button class="admin-tab active" data-tab="refs" data-action="switchAdminTab" data-params='["refs"]' onclick="switchAdminTab('refs')">Справочники</button>
-                <button class="admin-tab" data-tab="trash" data-action="switchAdminTab" data-params='["trash"]' onclick="switchAdminTab('trash')">Корзина</button>
-                <button class="admin-tab" data-tab="system" data-action="switchAdminTab" data-params='["system"]' onclick="switchAdminTab('system')">Система</button>
+                <button class="admin-tab active" data-tab="refs" data-action="switchAdminTab" data-params='["refs"]'>Справочники</button>
+                <button class="admin-tab" data-tab="trash" data-action="switchAdminTab" data-params='["trash"]'>Корзина</button>
+                <button class="admin-tab" data-tab="system" data-action="switchAdminTab" data-params='["system"]'>Система</button>
             </div>
             <div id="admin-tab-refs" class="admin-tab-content active">
                 <div class="ref-grid">
@@ -184,7 +184,7 @@
                     <div class="field-row">
                         <input type="text" id="ref-subjects-input" placeholder="Новый предмет" class="input">
                         <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">Преподаватель</option></select>
-                        <button class="btn btn-primary btn-sm" data-action="addSubject" onclick="addSubject()">Добавить</button>
+                        <button class="btn btn-primary btn-sm" data-action="addSubject">Добавить</button>
                     </div>
                 </div>
                 <div class="ref-section">
@@ -193,7 +193,7 @@
                     <div class="field-row">
                         <input type="text" id="ref-teachers-input" placeholder="ФИО преподавателя" class="input">
                         <input type="text" id="ref-teachers-phone" placeholder="Телефон" class="input" style="max-width:140px">
-                        <button class="btn btn-primary btn-sm" data-action="addRefItem" data-params='["teachers", "ref-teachers-input", "ref-teachers"]' onclick="addRefItem('teachers', 'ref-teachers-input', 'ref-teachers')">Добавить</button>
+                        <button class="btn btn-primary btn-sm" data-action="addRefItem" data-params='["teachers", "ref-teachers-input", "ref-teachers"]'>Добавить</button>
                     </div>
                 </div>
                 <div class="ref-section">
@@ -208,16 +208,16 @@
                             <option value="4">4 курс</option>
                         </select>
                         <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> Заочн.</label>
-                        <button class="btn btn-primary btn-sm" data-action="addGroup" onclick="addGroup()">Добавить</button>
+                        <button class="btn btn-primary btn-sm" data-action="addGroup">Добавить</button>
                     </div>
-                    <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" data-action="advanceCourses" onclick="advanceCourses()">Перевести курсы →</button>
+                    <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" data-action="advanceCourses">Перевести курсы →</button>
                 </div>
                 <div class="ref-section">
                     <h3>Аудитории</h3>
                     <div class="ref-list" id="ref-classrooms"></div>
                     <div class="field-row">
                         <input type="text" id="ref-classrooms-input" placeholder="Номер аудитории" class="input">
-                        <button class="btn btn-primary btn-sm" data-action="addRefItem" data-params='["classrooms", "ref-classrooms-input", "ref-classrooms"]' onclick="addRefItem('classrooms', 'ref-classrooms-input', 'ref-classrooms')">Добавить</button>
+                        <button class="btn btn-primary btn-sm" data-action="addRefItem" data-params='["classrooms", "ref-classrooms-input", "ref-classrooms"]'>Добавить</button>
                     </div>
                 </div>
                 </div>
