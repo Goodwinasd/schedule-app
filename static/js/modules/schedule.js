@@ -61,11 +61,6 @@ function renderScheduleTable(data) {
             html += `<tr class="shift-row"><td colspan="${days.length + 1}" style="background:#fff8e1;color:#e65100;font-size:12px;padding:8px;text-align:center">🚩 ${day.date} — ${exc.join('; ')}</td></tr>`;
         }
     }
-        const d = new Date(day.date + 'T00:00:00');
-        const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
-        html += `<th class="col-day">${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
-    }
-    html += '</tr></thead><tbody>';
     let lastShift = 0;
     for (const p of periods) {
         if (p.shift !== lastShift) { lastShift = p.shift; html += `<tr class="shift-row"><td colspan="${days.length + 1}">${shiftLabel(p.shift)}</td></tr>`; }
