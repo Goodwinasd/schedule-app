@@ -1084,16 +1084,46 @@ main {
     flex-wrap: wrap;
 }
 
-.avail-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.avail-toolbar {
+    display: inline-flex;
     flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
 }
 
-.avail-actions .btn {
-    max-width: 160px;
+.avail-toolbar .btn {
+    width: auto;
+    margin: 0;
+    padding: 6px 14px;
+    height: 36px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
     white-space: nowrap;
+}
+
+.avail-toolbar .btn-ghost {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.avail-toolbar .btn-ghost:hover {
+    background: var(--surface-hover);
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.avail-toolbar .btn:last-child {
+    color: var(--danger);
+    border-color: rgba(255, 69, 58, 0.3);
+}
+
+.avail-toolbar .btn:last-child:hover {
+    background: rgba(255, 69, 58, 0.08);
+    border-color: var(--danger);
+    color: var(--danger);
 }
 
 .avail-day-tabs {
