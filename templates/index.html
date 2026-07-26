@@ -66,20 +66,24 @@
                 <div id="avail-carousel" class="week-carousel"></div>
                 <div class="avail-controls">
                     <div class="avail-day-tabs" id="avail-day-tabs"></div>
-                    <div class="avail-mode-toggle">
-                        <button class="btn btn-ghost btn-sm active" id="avail-mode-teacher" data-action="setAvailMode" data-params='["teacher"]'>Преподаватели</button>
-                        <button class="btn btn-ghost btn-sm" id="avail-mode-classroom" data-action="setAvailMode" data-params='["classroom"]'>Аудитории</button>
+                    <div class="avail-filter-group">
+                        <div class="avail-mode-toggle">
+                            <button class="btn btn-ghost btn-sm active" id="avail-mode-teacher" data-action="setAvailMode" data-params='["teacher"]'>Преподаватели</button>
+                            <button class="btn btn-ghost btn-sm" id="avail-mode-classroom" data-action="setAvailMode" data-params='["classroom"]'>Аудитории</button>
+                        </div>
+                        <select id="avail-group-filter" class="input" style="max-width:160px" onchange="loadAvailability()"><option value="">Все группы</option></select>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="avail-free-only" onchange="renderAvailTable()"> Только свободные
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="avail-show-all-periods" onchange="renderAvailTable()"> 7-8 пара
+                        </label>
                     </div>
-                    <select id="avail-group-filter" class="input" style="max-width:160px" onchange="loadAvailability()"><option value="">Все группы</option></select>
-                    <label class="checkbox-label" style="margin-left:8px">
-                        <input type="checkbox" id="avail-free-only" onchange="renderAvailTable()"> Только свободные
-                    </label>
-                    <label class="checkbox-label" style="margin-left:8px">
-                        <input type="checkbox" id="avail-show-all-periods" onchange="renderAvailTable()"> 7-8 пара
-                    </label>
-                    <button class="btn btn-ghost btn-sm" id="btn-avail-group-course" style="margin-left:8px" data-action="toggleAvailGroupByCourse">📊 По курсам</button>
-                    <button class="btn btn-ghost btn-sm" id="btn-avail-heatmap" style="margin-left:4px" data-action="toggleAvailHeatmap">🔥 Тепловая карта</button>
-                    <button class="btn btn-ghost btn-sm" style="margin-left:8px" data-action="closeAvailability">✕ Закрыть</button>
+                    <div class="avail-action-group">
+                        <button class="btn btn-ghost btn-sm" id="btn-avail-group-course" data-action="toggleAvailGroupByCourse">📊 По курсам</button>
+                        <button class="btn btn-ghost btn-sm" id="btn-avail-heatmap" data-action="toggleAvailHeatmap">🔥 Тепловая карта</button>
+                        <button class="btn btn-ghost btn-sm" data-action="closeAvailability">✕ Закрыть</button>
+                    </div>
                 </div>
                 <div id="avail-table-container"></div>
             </div>
@@ -89,7 +93,7 @@
     <div id="confirm-modal" class="modal" style="display:none">
         <div class="modal-content">
             <h2>Подтверждение</h2>
-            <p id="confirm-modal-message" style="font-size:14px;text-align:center;margin:4px 0"></p>
+            <p id="confirm-modal-message" class="modal-confirm-msg"></p>
             <div class="modal-actions">
                 <button class="btn btn-ghost" id="confirm-modal-cancel">Отмена</button>
                 <button class="btn btn-primary" id="confirm-modal-ok">Подтвердить</button>
