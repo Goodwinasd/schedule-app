@@ -63,24 +63,26 @@
                 </div>
             </div>
             <div id="availability-view" style="display:none">
+                <div class="avail-head">
+                    <div class="avail-mode-toggle">
+                        <button class="btn btn-ghost btn-sm active" id="avail-mode-teacher" data-action="setAvailMode" data-params='["teacher"]'>Преподаватели</button>
+                        <button class="btn btn-ghost btn-sm" id="avail-mode-classroom" data-action="setAvailMode" data-params='["classroom"]'>Аудитории</button>
+                    </div>
+                    <select id="avail-group-filter" class="input" style="max-width:160px" onchange="loadAvailability()"><option value="">Все группы</option></select>
+                </div>
                 <div id="avail-carousel" class="week-carousel"></div>
+                <div class="avail-day-tabs" id="avail-day-tabs"></div>
                 <div class="avail-controls">
-                    <div class="avail-day-tabs" id="avail-day-tabs"></div>
-                    <div class="avail-filter-group">
-                        <div class="avail-mode-toggle">
-                            <button class="btn btn-ghost btn-sm active" id="avail-mode-teacher" data-action="setAvailMode" data-params='["teacher"]'>Преподаватели</button>
-                            <button class="btn btn-ghost btn-sm" id="avail-mode-classroom" data-action="setAvailMode" data-params='["classroom"]'>Аудитории</button>
-                        </div>
-                        <select id="avail-group-filter" class="input" style="max-width:160px" onchange="loadAvailability()"><option value="">Все группы</option></select>
+                    <div class="avail-filters">
                         <label class="checkbox-label">
                             <input type="checkbox" id="avail-free-only" onchange="renderAvailTable()"> Только свободные
                         </label>
                         <label class="checkbox-label">
                             <input type="checkbox" id="avail-show-all-periods" onchange="renderAvailTable()"> 7-8 пара
                         </label>
-                    </div>
-                    <div class="avail-action-group">
                         <button class="btn btn-ghost btn-sm" id="btn-avail-group-course" data-action="toggleAvailGroupByCourse">📊 По курсам</button>
+                    </div>
+                    <div class="avail-actions">
                         <button class="btn btn-ghost btn-sm" id="btn-avail-heatmap" data-action="toggleAvailHeatmap">🔥 Тепловая карта</button>
                         <button class="btn btn-ghost btn-sm" data-action="closeAvailability">✕ Закрыть</button>
                     </div>

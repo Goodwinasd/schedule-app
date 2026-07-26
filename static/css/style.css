@@ -1056,31 +1056,51 @@ main {
 
 /* ---- Availability ---- */
 
+.avail-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    flex-wrap: wrap;
+}
+
 .avail-controls {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(91, 140, 122, 0.04);
+    margin-bottom: 12px;
+    flex-wrap: wrap;
 }
 
-.avail-filter-group {
+.avail-filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.avail-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
 }
 
-.avail-action-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+.avail-actions .btn {
+    max-width: 160px;
+    white-space: nowrap;
 }
 
 .avail-day-tabs {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+    margin-bottom: 4px;
 }
 
 .avail-day-tab {
