@@ -27,8 +27,40 @@ function renderScheduleTable(data) {
     const { days, periods } = data;
     Object.keys(state.lessonsMap).forEach(k => delete state.lessonsMap[k]);
     const canEdit = state.isAdmin && (state.currentScheduleType === 'group' || state.currentScheduleType === 'teacher');
+
+    // Build excluded dates lookup
+    const excludedByDate = {};
+    if (data._excluded) {
+        for (const ex of data._excluded) {
+            const start = new Date(ex.start_date + 'T00:00:00');
+            const end = new Date(ex.end_date + 'T00:00:00');
+            for (const day of days) {
+                const d = new Date(day.date + 'T00:00:00');
+                if (d >= start && d <= end) {
+                    if (!excludedByDate[day.date]) excludedByDate[day.date] = [];
+                    excludedByDate[day.date].push(ex.reason || 'Праздничный день');
+                }
+            }
+        }
+    }
+
     let html = '<div class="schedule-table-wrap"><table class="schedule-table"><thead><tr><th class="col-time">Пара</th>';
     for (const day of days) {
+        const d = new Date(day.date + 'T00:00:00');
+        const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
+        const exc = excludedByDate[day.date];
+        const excCls = exc ? ' style="background:#fff3e0"' : '';
+        html += `<th class="col-day"${excCls}>${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    // Excluded date banners
+    for (const day of days) {
+        const exc = excludedByDate[day.date];
+        if (exc) {
+            html += `<tr class="shift-row"><td colspan="${days.length + 1}" style="background:#fff8e1;color:#e65100;font-size:12px;padding:8px;text-align:center">🚩 ${day.date} — ${exc.join('; ')}</td></tr>`;
+        }
+    }
         const d = new Date(day.date + 'T00:00:00');
         const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
         html += `<th class="col-day">${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
@@ -40,6 +72,11 @@ function renderScheduleTable(data) {
         html += '<tr>';
         html += `<td class="time-cell"><span class="period-num">${p.period}</span>${p.start} – ${p.end}</td>`;
         for (const day of days) {
+            const isExcluded = excludedByDate[day.date];
+            if (isExcluded) {
+                html += `<td class="day-cell" style="background:#fff8e1;text-align:center;font-size:11px;color:#e65100">🚩 отменено</td>`;
+                continue;
+            }
             const lessons = p.lessons[day.date] || [];
             const busy = lessons.length > 0;
             if (state.currentScheduleType === 'classroom') {
@@ -82,6 +119,11 @@ export async function loadScheduleTable() {
     if (!data || !data.periods || !data.periods.length || data.week_exists === false) {
         cont.innerHTML = '<div class="no-schedule"><span class="emoji">📅</span><p>Нет расписания на эту неделю</p></div>';
         return;
+    }
+    // Check excluded dates for this week
+    const excluded = await api('/api/excluded-dates');
+    if (excluded && !excluded.error && excluded.length) {
+        data._excluded = excluded;
     }
     cont.innerHTML = renderScheduleTable(data);
 }

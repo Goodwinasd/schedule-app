@@ -2233,6 +2233,84 @@ def availability():
 
 
 
+@bp.route('/api/excluded-dates', methods=['GET'])
+def get_excluded_dates():
+    """Список всех исключённых дат
+    ---
+    responses:
+      200:
+        description: Массив объектов {id, start_date, end_date, reason, created_at}
+    """
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM excluded_dates ORDER BY start_date DESC').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@bp.route('/api/excluded-dates', methods=['POST'])
+@login_required
+def create_excluded_date():
+    """Создать исключение даты
+    ---
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            start_date:
+              type: string
+            end_date:
+              type: string
+            reason:
+              type: string
+    responses:
+      201:
+        description: Созданная запись
+      400:
+        description: start_date и end_date обязательны
+    """
+    data = request.get_json()
+    start_date = (data.get('start_date') or '').strip()
+    end_date = (data.get('end_date') or '').strip()
+    if not start_date or not end_date:
+        return jsonify({"error": "start_date and end_date required"}), 400
+    reason = (data.get('reason', '') or '').strip()
+    conn = get_db()
+    cursor = conn.execute(
+        'INSERT INTO excluded_dates (start_date, end_date, reason) VALUES (?, ?, ?)',
+        (start_date, end_date, reason)
+    )
+    conn.commit()
+    item_id = cursor.lastrowid
+    conn.close()
+    refs_cache.invalidate_prefix('excluded_dates')
+    return jsonify({"id": item_id, "start_date": start_date, "end_date": end_date, "reason": reason}), 201
+
+
+@bp.route('/api/excluded-dates/<int:item_id>', methods=['DELETE'])
+@login_required
+def delete_excluded_date(item_id):
+    """Удалить исключение даты
+    ---
+    responses:
+      200:
+        description: success
+      404:
+        description: Not found
+    """
+    conn = get_db()
+    cur = conn.execute('DELETE FROM excluded_dates WHERE id = ?', (item_id,))
+    conn.commit()
+    deleted = cur.rowcount
+    conn.close()
+    if not deleted:
+        return jsonify({"error": "Not found"}), 404
+    refs_cache.invalidate_prefix('excluded_dates')
+    return jsonify({"success": True})
+
+
 @bp.route('/api/db/health')
 @login_required
 def db_health():

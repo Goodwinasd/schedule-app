@@ -19,7 +19,7 @@ import { confirmModal } from './modal.js';
 import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
 import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup } from './references.js';
 import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
-import { saveSetting } from './settings.js';
+import { saveSetting, addExcludedDate, deleteExcludedDate } from './settings.js';
 import { restoreTrashItem, purgeTrash } from './trash.js';
 
 /* Привязка к window для onclick-вызовов из HTML */
@@ -38,6 +38,7 @@ Object.assign(window, {
     toggleAvailHeatmap, toggleAvailGroupByCourse, closeAvailability,
     renderAvailTable, _clickLesson,
     switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
+    addExcludedDate, deleteExcludedDate,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
 });

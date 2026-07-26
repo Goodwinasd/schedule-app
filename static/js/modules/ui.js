@@ -6,7 +6,7 @@ import { showToast } from './toast.js';
 import { loadReferences, renderRefList, populateSubjectTeacherSelect } from './references.js';
 import { loadScheduleTable, addLesson } from './schedule.js';
 import { loadTrashTab } from './trash.js';
-import { loadSettingsTab } from './settings.js';
+import { loadSettingsTab, loadExcludedDates } from './settings.js';
 import { renderCarousel, getWeeksList } from './nav.js';
 
 /* ======================== Navigation ======================== */
@@ -128,7 +128,7 @@ export function switchAdminTab(tab) {
     const content = document.getElementById(`admin-tab-${tab}`);
     if (content) content.classList.add('active');
     if (tab === 'trash') loadTrashTab();
-    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); }
+    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
 }
 
 async function loadHealthTab() {
