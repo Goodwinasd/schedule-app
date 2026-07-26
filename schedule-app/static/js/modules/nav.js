@@ -5,7 +5,7 @@ import { api } from './api.js';
 import { openModal, confirmModal } from './modal.js';
 import { loadScheduleTable } from './schedule.js';
 
-function getWeeksList() {
+export function getWeeksList() {
     const now = new Date(), year = now.getFullYear();
     const fm = getMonday(new Date(year, 0, 1));
     const weeks = [];

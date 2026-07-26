@@ -8,7 +8,7 @@ import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSub
 import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
 import { loadTrashTab, restoreTrashItem, purgeTrash } from './trash.js';
 import { loadSettingsTab, saveSetting } from './settings.js';
-import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
+import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek, getWeeksList } from './nav.js';
 
 /* ======================== Navigation ======================== */
 
