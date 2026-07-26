@@ -32,14 +32,15 @@ export function toggleConflicts() {
 }
 window._onUnauthorized = updateUI;
 
-export function goHome() {
+export async function goHome() {
     state.currentScheduleType = '';
     state.currentScheduleId = state.currentScheduleName = null;
     state.currentMonday = null;
     ['home-view', 'schedule-view', 'availability-view'].forEach(v => document.getElementById(v).style.display = v === 'home-view' ? '' : 'none');
     document.getElementById('header-title').textContent = 'Расписание';
     updateUI();
-    loadHomePage();
+    await loadReferences();
+    renderHomePage();
 }
 
 export function showSchedule(type, id, name) {
