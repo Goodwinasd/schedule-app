@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { loadReferences, renderHomePage } from './crud.js';
 import { loadScheduleTable } from './schedule.js';
 import { loadAvailability } from './availability.js';
+import { openModal, closeModals } from './ui.js';
 
 export function updateUI() {
     const inSchedule = state.currentScheduleType || document.getElementById('availability-view').style.display !== 'none';
@@ -41,25 +42,6 @@ export function showSchedule(type, id, name) {
     updateUI();
     renderCarousel();
     loadScheduleTable();
-}
-
-export function openModal(id) {
-    document.getElementById('modal-overlay').classList.add('active');
-    document.getElementById(id).style.display = '';
-}
-
-export function closeModals() {
-    document.getElementById('modal-overlay').classList.remove('active');
-    document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
-    const { resetLessonModal } = require_lesson_modal();
-    if (resetLessonModal) resetLessonModal();
-}
-
-function require_lesson_modal() {
-    try {
-        const m = window._lessonModal;
-        return m || {};
-    } catch { return {}; }
 }
 
 export function showLoginModal() {
@@ -188,7 +170,7 @@ export async function addWeek() {
 
 export async function restoreWeek() {
     if (!state.currentMonday) return;
-    if (!confirm('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0432\u0441\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u043d\u044b\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
+    if (!await window.confirmModal('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0432\u0441\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u043d\u044b\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
     const monday = toISODate(state.currentMonday);
     const res = await api('/api/week/restore?monday=' + monday, { method: 'POST' });
     if (res.error) { alert(res.error); return; }
@@ -198,7 +180,7 @@ export async function restoreWeek() {
 
 export async function deleteWeek() {
     if (!state.currentMonday) return;
-    if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
+    if (!await window.confirmModal('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
     const monday = toISODate(state.currentMonday);
     const res = await api('/api/week?monday=' + monday, { method: 'DELETE' });
     if (res.error) { alert(res.error); return; }

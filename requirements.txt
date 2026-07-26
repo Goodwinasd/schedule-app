@@ -6,3 +6,5 @@ openpyxl>=3.1
 python-docx>=1.1
 reportlab>=4.0
 flasgger>=0.9.7
+alembic>=1.18
+apscheduler>=3.10

@@ -2,17 +2,22 @@
 
 import os
 import shutil
+import logging
 from datetime import datetime, timedelta
 
 from flask import Flask
 from flask_cors import CORS
 from flasgger import Swagger
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import (
-    SECRET_KEY, PERMANENT_SESSION_LIFETIME, BACKUPS_DIR, DB_PATH, DATA_DIR, DEBUG, HOST, PORT
+    SECRET_KEY, PERMANENT_SESSION_LIFETIME, BACKUPS_DIR, DB_PATH, DATA_DIR, DEBUG, HOST, PORT,
+    TRASH_RETENTION_DAYS,
 )
-from db import get_db, init_db
+from db import get_db, run_alembic_upgrade
 from routes import bp
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -25,27 +30,65 @@ Swagger(app)
 
 def _cleanup_old_deleted():
     conn = get_db()
-    conn.execute("DELETE FROM lessons WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')")
-    conn.execute("DELETE FROM schedule_days WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')")
+    retention = f'-{TRASH_RETENTION_DAYS} days'
+    conn.execute("DELETE FROM lessons WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', ?)", (retention,))
+    conn.execute("DELETE FROM schedule_days WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', ?)", (retention,))
     conn.commit()
     conn.close()
+
+
+def _get_retention_days():
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key = 'backup_retention_days'").fetchone()
+        conn.close()
+        if row:
+            return int(row['value'])
+    except Exception:
+        pass
+    return 30
+
+
+def _maybe_create_backup():
+    if not os.path.exists(DB_PATH):
+        return
+    today = datetime.now().strftime('%Y-%m-%d')
+    existing = [f for f in os.listdir(BACKUPS_DIR)
+                if f.startswith(f'schedule_backup_{today}') and f.endswith('.db')]
+    if existing:
+        return
+    ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+    shutil.copy2(DB_PATH, os.path.join(BACKUPS_DIR, f'schedule_backup_{ts}.db'))
+    logger.info("Backup created: schedule_backup_%s.db", ts)
+
+
+def _cleanup_old_backups():
+    cutoff = (datetime.now() - timedelta(days=_get_retention_days())).strftime('%Y-%m-%d')
+    for f in os.listdir(BACKUPS_DIR):
+        if f.startswith('schedule_backup_') and f.endswith('.db'):
+            date_part = f.replace('schedule_backup_', '').split('_')[0]
+            if date_part < cutoff:
+                path = os.path.join(BACKUPS_DIR, f)
+                os.remove(path)
+                logger.info("Removed old backup: %s", f)
+
+
+def _run_backup_tasks():
+    os.makedirs(BACKUPS_DIR, exist_ok=True)
+    _maybe_create_backup()
+    _cleanup_old_backups()
 
 
 if __name__ == '__main__':
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(BACKUPS_DIR, exist_ok=True)
-    today = datetime.now().strftime('%Y-%m-%d')
-    existing = [f for f in os.listdir(BACKUPS_DIR)
-                if f.startswith(f'schedule_backup_{today}') and f.endswith('.db')]
-    if not existing and os.path.exists(DB_PATH):
-        ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
-        shutil.copy2(DB_PATH, os.path.join(BACKUPS_DIR, f'schedule_backup_{ts}.db'))
-    cutoff = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-    for f in os.listdir(BACKUPS_DIR):
-        if f.startswith('schedule_backup_') and f.endswith('.db'):
-            date_part = f.replace('schedule_backup_', '').split('_')[0]
-            if date_part < cutoff:
-                os.remove(os.path.join(BACKUPS_DIR, f))
-    init_db()
+
+    _run_backup_tasks()
+
+    scheduler = BackgroundScheduler(daemon=True)
+    scheduler.add_job(_run_backup_tasks, 'interval', hours=6, id='backup_job')
+    scheduler.start()
+
+    run_alembic_upgrade()
     _cleanup_old_deleted()
     app.run(debug=DEBUG, host=HOST, port=PORT)

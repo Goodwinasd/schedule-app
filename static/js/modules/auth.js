@@ -34,4 +34,4 @@ export async function logout() {
     updateUI();
 }
 
-import { closeModals } from './navigation.js';
+import { closeModals } from './ui.js';

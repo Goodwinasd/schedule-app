@@ -23,5 +23,8 @@ const state = {
     availMonday: null,
     availSelectedDay: null,
     availData: null,
+    availHeatmap: false,
+    availGroupByCourse: false,
+    showConflicts: false,
 };
 export default state;
