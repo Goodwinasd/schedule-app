@@ -3,6 +3,7 @@ import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getWeekNumber, getMonday, addDays, formatDateRange, formatChipRange, shiftLabel, populateSelect } from './utils.js';
 import { api } from './api.js';
 import { openModal, confirmModal } from './modal.js';
+import { showToast } from './toast.js';
 
 function checkConflictsForLesson(lesson, dayDate, period) {
     if (!state.showConflicts) return null;
@@ -88,19 +89,18 @@ export async function loadScheduleTable() {
 export function printSchedule() {
     document.getElementById('print-title').textContent = state.currentScheduleName;
     document.getElementById('print-subtitle').textContent = `Неделя ${getWeekNumber(state.currentMonday)} · ${formatDateRange(state.currentMonday)}`;
-    let style = document.getElementById('print-inline-style');
-    if (!style) { style = document.createElement('style'); style.id = 'print-inline-style'; document.head.appendChild(style); }
-    style.textContent = '@media print { body,td,th,.schedule-table,.schedule-table-wrap,main,#schedule-view,#schedule-table-container{background:white!important;color:black!important} td.day-cell{background:white!important;color:black!important} td.day-cell:not(.empty-cell){background:#f0f0f0!important} .lesson-content,.lesson-content .lesson-subject,.lesson-content .lesson-meta{color:black!important} .lesson-content .lesson-meta{color:#333!important} .lesson-subject{color:black!important} td.day-cell .lesson-content .lesson-subject{color:black!important;background:transparent!important} td.day-cell .lesson-content .lesson-meta{color:#333!important;background:transparent!important} td.day-cell .lesson-content{background:transparent!important;color:black!important} }';
     window.print();
 }
 
 export function exportSchedule(format) {
+    if (!state.currentScheduleType || !state.currentMonday) {
+        showToast('Сначала откройте расписание', 'info');
+        return;
+    }
     const monday = toISODate(state.currentMonday);
     const url = `/api/export?type=${encodeURIComponent(state.currentScheduleType)}&name=${encodeURIComponent(state.currentScheduleName)}&id=${encodeURIComponent(state.currentScheduleId)}&monday=${monday}&format=${format}`;
-    fetch(url, { method: 'HEAD' }).then(res => {
-        if (!res.ok) { return res.json().then(b => alert(b.error || `Ошибка экспорта (${res.status})`)).catch(() => alert(`Ошибка экспорта (${res.status})`)); }
-        const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }).catch(() => alert('Ошибка сети при экспорте'));
+    const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => document.body.removeChild(a), 1000);
 }
 
 export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) {
