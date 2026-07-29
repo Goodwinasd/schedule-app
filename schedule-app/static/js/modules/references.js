@@ -31,9 +31,10 @@ export function populateSubjectTeacherSelect() {
 }
 
 export async function renderRefList(endpoint, containerId) {
-    const items = await api(`/api/${endpoint}`);
     const container = document.getElementById(containerId);
     if (!container) return;
+    container.innerHTML = '<div class="t-skeleton t-skeleton-block"></div><div class="t-skeleton t-skeleton-block" style="width:80%"></div><div class="t-skeleton t-skeleton-block" style="width:60%"></div>';
+    const items = await api(`/api/${endpoint}`);
     if (items.error) { container.innerHTML = '<div style="font-size:13px;color:var(--danger)">Ошибка загрузки</div>'; return; }
     if (endpoint === 'subjects') state.subjectsList = items;
     else if (endpoint === 'teachers') state.teachersList = items;

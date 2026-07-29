@@ -1426,6 +1426,32 @@ main {
     color: #f57f17 !important;
 }
 
+/* ---- Skeleton Loaders ---- */
+@keyframes t-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.t-skeleton {
+    background-color: #e2e8f0;
+    border-radius: 4px;
+    animation: t-pulse 1.5s ease-in-out infinite;
+    will-change: opacity;
+    display: inline-block;
+    width: 100%;
+    height: 1em;
+}
+
+.t-skeleton-block {
+    height: 40px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .t-skeleton { animation: none !important; }
+}
+
 /* ---- Tab Content Animation ---- */
 .tab-content {
     opacity: 1;
