@@ -2235,6 +2235,27 @@ def availability():
                 td['courses'] = courses
             teachers_out.append(td)
 
+        teacher_stats = {}
+        for t in all_teachers:
+            busy = teacher_busy.get(t['id'], {})
+            total = len(busy)
+            free = len(periods) * len(week_dates) - total
+            teacher_stats[t['id']] = {'name': t['name'], 'total': total, 'free': free, 'load_pct': round(total / max(len(periods) * len(week_dates), 1) * 100, 1)}
+
+        classroom_stats = {}
+        for c in all_classrooms:
+            busy = classroom_busy.get(c['id'], {})
+            total = len(busy)
+            free = len(periods) * len(week_dates) - total
+            classroom_stats[c['id']] = {'name': c['name'], 'total': total, 'free': free, 'load_pct': round(total / max(len(periods) * len(week_dates), 1) * 100, 1)}
+
+        group_lesson_count = {}
+        for l in lessons:
+            gid = l['group_id']
+            gname = l['group_name']
+            if gid and gname:
+                group_lesson_count.setdefault(gid, {'name': gname, 'lessons': 0})['lessons'] += 1
+
         return jsonify({
             'days': week_dates,
             'periods': periods,
@@ -2244,6 +2265,9 @@ def availability():
             'all_courses': sorted(all_courses_set),
             'teacher_busy': {str(k): {f"{dk[0]}_{dk[1]}": v for dk, v in dv.items()} for k, dv in teacher_busy.items()},
             'classroom_busy': {str(k): {f"{dk[0]}_{dk[1]}": v for dk, v in dv.items()} for k, dv in classroom_busy.items()},
+            'teacher_stats': teacher_stats,
+            'classroom_stats': classroom_stats,
+            'group_lesson_count': {str(k): v for k, v in group_lesson_count.items()},
         })
     finally:
         conn.close()

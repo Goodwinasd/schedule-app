@@ -313,6 +313,51 @@ export async function loadAvailability() {
     _populateAvailGroups();
     renderAvailDayTabs();
     renderAvailTable();
+    renderAnalytics();
+}
+
+function renderAnalytics() {
+    const cont = document.getElementById('avail-analytics');
+    if (!cont || !state.availData) return;
+    const d = state.availData;
+
+    let html = '<div class="analytics-section"><h3 class="analytics-title">📊 Аналитика нагрузки</h3><div class="analytics-grid">';
+
+    // Teacher stats — top 5
+    const teachers = Object.values(d.teacher_stats || {}).sort((a, b) => b.total - a.total).slice(0, 5);
+    if (teachers.length) {
+        html += '<div class="analytics-card"><div class="analytics-card-header">👨‍🏫 Преподаватели</div><div class="analytics-card-body">';
+        html += '<table class="analytics-table"><tr><th>Преподаватель</th><th>Пар</th><th>Своб.</th><th>Загрузка</th></tr>';
+        for (const t of teachers) {
+            html += `<tr><td>${escapeHtml(t.name)}</td><td>${t.total}</td><td>${t.free}</td><td><div class="load-bar"><div class="load-bar-fill" style="width:${Math.min(t.load_pct, 100)}%"></div><span>${t.load_pct}%</span></div></td></tr>`;
+        }
+        html += '</table></div></div>';
+    }
+
+    // Classroom stats — top 5
+    const rooms = Object.values(d.classroom_stats || {}).sort((a, b) => b.total - a.total).slice(0, 5);
+    if (rooms.length) {
+        html += '<div class="analytics-card"><div class="analytics-card-header">🏫 Аудитории (топ)</div><div class="analytics-card-body">';
+        html += '<table class="analytics-table"><tr><th>Аудитория</th><th>Пар</th><th>Своб.</th><th>Загрузка</th></tr>';
+        for (const r of rooms) {
+            html += `<tr><td>${escapeHtml(r.name)}</td><td>${r.total}</td><td>${r.free}</td><td><div class="load-bar"><div class="load-bar-fill" style="width:${Math.min(r.load_pct, 100)}%"></div><span>${r.load_pct}%</span></div></td></tr>`;
+        }
+        html += '</table></div></div>';
+    }
+
+    // Group lesson count
+    const groups = Object.values(d.group_lesson_count || {}).sort((a, b) => b.lessons - a.lessons);
+    if (groups.length) {
+        html += '<div class="analytics-card"><div class="analytics-card-header">📚 Группы</div><div class="analytics-card-body">';
+        html += '<table class="analytics-table"><tr><th>Группа</th><th>Пар</th></tr>';
+        for (const g of groups) {
+            html += `<tr><td>${escapeHtml(g.name)}</td><td>${g.lessons}</td></tr>`;
+        }
+        html += '</table></div></div>';
+    }
+
+    html += '</div></div>';
+    cont.innerHTML = html;
 }
 
 function _populateAvailGroups() {
