@@ -6,18 +6,18 @@
 }
 
 :root {
-    --bg: #F4F6F5;
+    --bg: #F7F8FA;
     --surface: #FFFFFF;
-    --surface-hover: #E8EDEA;
-    --text: #1D2A24;
-    --text-secondary: #6B7F74;
+    --surface-hover: #F0F0F5;
+    --text: #1D1D1F;
+    --text-secondary: #86868B;
     --accent: #5B8C7A;
     --accent-hover: #4A7A68;
-    --border: #DCE3DF;
+    --border: #E5E5EA;
     --danger: #ff453a;
     --danger-hover: #d63a31;
-    --radius: 12px;
-    --radius-sm: 8px;
+    --radius: 16px;
+    --radius-sm: 10px;
     --busy: rgba(255, 69, 58, 0.15);
     --busy-border: rgba(255, 69, 58, 0.4);
 }
@@ -26,7 +26,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
-    line-height: 1.5;
+    line-height: 1.6;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
 }
@@ -111,6 +111,7 @@ main {
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border);
+    border-radius: 12px;
 }
 
 .btn-ghost:hover {
@@ -138,14 +139,14 @@ main {
 .input {
     width: 100%;
     padding: 12px 16px;
-    background: var(--surface);
-    border-radius: 10px;
+    background: #F0F0F5;
+    border: none;
+    border-radius: 12px;
     color: var(--text);
     font-size: 14px;
     font-family: inherit;
     outline: none;
-    box-shadow: inset 0 0 0 0 transparent;
-    transition: box-shadow 0.2s;
+    transition: box-shadow 0.2s, background 0.2s;
 }
 
 .input:focus {
@@ -192,15 +193,16 @@ main {
 
 .select-card {
     background: var(--surface);
-    border-radius: 16px;
+    border-radius: var(--radius);
     padding: 20px 24px;
     cursor: pointer;
     transition: all 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
 .select-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(91, 140, 122, 0.08);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
 }
 
 .select-card-title {
@@ -294,13 +296,14 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 8px 16px;
+    padding: 10px 18px;
     border-radius: 16px;
     background: var(--surface);
     cursor: pointer;
     transition: all 0.2s ease;
     min-width: 72px;
     user-select: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .carousel-chip:hover {
@@ -336,8 +339,8 @@ main {
     overflow-x: auto;
     border-radius: var(--radius);
     background: var(--surface);
-    box-shadow: 0 0 0 1px #DCE3DF;
-    padding: 20px 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    padding: 24px 24px;
 }
 
 .schedule-table {
@@ -349,8 +352,9 @@ main {
 
 .schedule-table th,
 .schedule-table td {
-    padding: 0;
-    border: 1px solid #DCE3DF;
+    padding: 14px 16px;
+    border: none;
+    border-bottom: 1px solid var(--border);
     vertical-align: top;
 }
 
@@ -521,7 +525,7 @@ main {
     font-size: 14px;
     background: var(--surface);
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(91, 140, 122, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .btn-print:hover {
@@ -586,12 +590,13 @@ main {
 
 .modal-content {
     background: var(--surface);
-    border-radius: 20px;
-    padding: 20px 24px;
+    border-radius: var(--radius);
+    padding: 24px 28px;
     display: flex;
     flex-direction: column;
     gap: 16px;
     animation: modalIn 0.2s ease;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 }
 
 @keyframes modalIn {
@@ -733,7 +738,7 @@ main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: var(--bg);
     border-radius: var(--radius-sm);
     font-size: 13px;
@@ -1069,10 +1074,10 @@ main {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 8px 16px;
+    padding: 12px 20px;
     background: var(--surface);
     border-radius: var(--radius);
-    box-shadow: 0 2px 8px rgba(91, 140, 122, 0.04);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
     margin-bottom: 12px;
     flex-wrap: wrap;
 }
@@ -1104,8 +1109,8 @@ main {
 }
 
 .avail-toolbar .btn-ghost {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: #F0F0F5;
+    border: none;
     color: var(--text-secondary);
 }
 
@@ -1134,14 +1139,14 @@ main {
 }
 
 .avail-day-tab {
-    padding: 6px 12px;
+    padding: 8px 14px;
     border-radius: 12px;
     background: var(--surface);
     color: var(--text-secondary);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s;
-    box-shadow: 0 2px 8px rgba(91, 140, 122, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .avail-day-tab:hover {
