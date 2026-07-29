@@ -72,3 +72,33 @@ document.addEventListener('input', (e) => {
         e.target.classList.remove('is-error');
     }
 });
+
+/* ---- Tooltips ---- */
+document.addEventListener('mouseenter', (e) => {
+    const el = e.target.closest('[data-tooltip]');
+    if (!el) return;
+    const text = el.dataset.tooltip;
+    if (!text) return;
+    let tip = document.getElementById('_tooltip_el');
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.id = '_tooltip_el';
+        tip.className = 't-tooltip';
+        document.body.appendChild(tip);
+    }
+    tip.textContent = text;
+    const rect = el.getBoundingClientRect();
+    tip.style.left = Math.min(rect.left + rect.width / 2 - tip.offsetWidth / 2, window.innerWidth - tip.offsetWidth - 8) + 'px';
+    tip.style.top = (rect.bottom + 6) + 'px';
+    requestAnimationFrame(() => tip.classList.add('is-visible'));
+}, true);
+
+document.addEventListener('mouseleave', (e) => {
+    const el = e.target.closest('[data-tooltip]');
+    if (!el) return;
+    const tip = document.getElementById('_tooltip_el');
+    if (tip) {
+        tip.classList.remove('is-visible');
+        setTimeout(() => { if (tip && !tip.classList.contains('is-visible')) tip.remove(); }, 150);
+    }
+}, true);

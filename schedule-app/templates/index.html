@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Расписание</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=24">
+    <link rel="stylesheet" href="/static/css/style.css?v=26">
 </head>
 <body>
     <div id="app">
@@ -176,14 +176,14 @@
             <div class="ref-header">
                 <h2>⚙️ Администрирование</h2>
                 <div class="ref-header-actions">
-                    <button class="btn-analytics" data-action="openDashboard">📊 Аналитика и окна</button>
-                    <button class="ref-done" data-action="closeModals"><span class="t-success-check" id="checkmark-anim" data-state="out" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 13l4 4L19 7"/></svg></span> Готово</button>
+                    <button class="btn-analytics" data-action="openDashboard" data-tooltip="Аналитика нагрузки и свободные окна">📊 Аналитика и окна</button>
+                    <button class="ref-done" data-action="closeModals" data-tooltip="Закрыть панель администратора"><span class="t-success-check" id="checkmark-anim" data-state="out" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 13l4 4L19 7"/></svg></span> Готово</button>
                 </div>
             </div>
             <div class="admin-tabs" id="admin-tabs">
-                <button class="admin-tab active" draggable="true" data-tab="refs" data-action="switchAdminTab" data-params='["refs"]'><span class="tab-grip">⠿</span> Справочники</button>
-                <button class="admin-tab" draggable="true" data-tab="trash" data-action="switchAdminTab" data-params='["trash"]'><span class="tab-grip">⠿</span> Корзина</button>
-                <button class="admin-tab" draggable="true" data-tab="system" data-action="switchAdminTab" data-params='["system"]'><span class="tab-grip">⠿</span> Система</button>
+                <button class="admin-tab active" draggable="true" data-tab="refs" data-tooltip="Управление справочниками" data-action="switchAdminTab" data-params='["refs"]'><span class="tab-grip">⠿</span> Справочники</button>
+                <button class="admin-tab" draggable="true" data-tab="trash" data-tooltip="Восстановление удалённых записей" data-action="switchAdminTab" data-params='["trash"]'><span class="tab-grip">⠿</span> Корзина</button>
+                <button class="admin-tab" draggable="true" data-tab="system" data-tooltip="Настройки и диагностика БД" data-action="switchAdminTab" data-params='["system"]'><span class="tab-grip">⠿</span> Система</button>
             </div>
             <div id="admin-tab-refs" class="admin-tab-content active">
                 <div class="ref-grid">
