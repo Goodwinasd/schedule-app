@@ -690,6 +690,28 @@ main {
     margin-left: auto;
 }
 
+.btn-analytics {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(91, 140, 122, 0.1);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-analytics:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
 .ref-done {
     display: inline-flex;
     align-items: center;
