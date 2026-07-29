@@ -59,6 +59,8 @@ export function closeModals() {
     document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
     if (typeof resetLessonModal === 'function') resetLessonModal();
     if (_confirmState.resolver) { const r = _confirmState.resolver; _confirmState.resolver = null; r(false); }
+    const cm = document.getElementById('checkmark-anim');
+    if (cm) cm.setAttribute('data-state', 'out');
 }
 
 function resetLessonModal() {
@@ -119,6 +121,8 @@ export function showAdminPanel() {
     if (first) first.classList.add('active');
     const firstContent = document.getElementById('admin-tab-' + (first ? first.dataset.tab : 'refs'));
     if (firstContent) firstContent.classList.add('active');
+    const cm = document.getElementById('checkmark-anim');
+    if (cm) requestAnimationFrame(() => cm.setAttribute('data-state', 'in'));
 }
 
 function _restoreAdminTabOrder() {

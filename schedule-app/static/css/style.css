@@ -1596,6 +1596,45 @@ main {
     .t-resize { transition: none !important; }
 }
 
+/* ---- Success Check Animation ---- */
+:root {
+    --check-dur: 400ms;
+    --check-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-success-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.t-success-check svg {
+    display: block;
+}
+
+.t-success-check svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 20;
+    stroke-dashoffset: 20;
+    transition: stroke-dashoffset var(--check-dur) var(--check-ease);
+}
+
+.t-success-check[data-state="in"] svg path {
+    stroke-dashoffset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .t-success-check[data-state="in"] svg path {
+        stroke-dashoffset: 0;
+        transition: none;
+    }
+}
+
 /* ---- App Loader ---- */
 #app-loader-overlay {
     position: fixed;
