@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Расписание</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=27">
+    <link rel="stylesheet" href="/static/css/style.css?v=28">
 </head>
 <body>
     <div id="app">
@@ -185,7 +185,7 @@
                 <button class="admin-tab" draggable="true" data-tab="trash" data-tooltip="Восстановление удалённых записей" data-action="switchAdminTab" data-params='["trash"]'><span class="tab-grip">⠿</span> Корзина</button>
                 <button class="admin-tab" draggable="true" data-tab="system" data-tooltip="Настройки и диагностика БД" data-action="switchAdminTab" data-params='["system"]'><span class="tab-grip">⠿</span> Система</button>
             </div>
-            <div id="admin-tab-refs" class="admin-tab-content active">
+            <div id="admin-tab-refs" class="admin-tab-content tab-content active">
                 <div class="ref-grid">
                 <div class="ref-section">
                     <h3>Предметы</h3>
@@ -231,14 +231,14 @@
                 </div>
                 </div>
             </div>
-            <div id="admin-tab-trash" class="admin-tab-content">
+            <div id="admin-tab-trash" class="admin-tab-content tab-content">
                 <h3>Корзина</h3>
                 <div id="trash-content"></div>
                 <div style="margin-top:12px">
                     <button class="btn btn-danger" data-action="purgeTrash" data-params="[]">Очистить корзину (старше 30 дней)</button>
                 </div>
             </div>
-            <div id="admin-tab-system" class="admin-tab-content">
+            <div id="admin-tab-system" class="admin-tab-content tab-content">
                 <h3>Диагностика БД</h3>
                 <div id="db-health-content"></div>
                 <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">

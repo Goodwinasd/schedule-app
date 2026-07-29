@@ -198,26 +198,28 @@ function _onTabDrop(e) {
 
 export function switchAdminTab(tab) {
     const adminContent = document.querySelector('#references-modal .modal-content.t-modal');
-    let oldHeight;
-    if (adminContent) {
-        oldHeight = adminContent.offsetHeight;
-        adminContent.style.height = oldHeight + 'px';
-    }
-    document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-    const tabBtn = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
-    if (tabBtn) tabBtn.classList.add('active');
-    const content = document.getElementById(`admin-tab-${tab}`);
-    if (content) content.classList.add('active');
-    if (tab === 'trash') loadTrashTab();
-    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
-    if (adminContent) {
-        requestAnimationFrame(() => {
-            const newHeight = adminContent.scrollHeight;
-            adminContent.style.height = newHeight + 'px';
-        });
-        setTimeout(() => { adminContent.style.height = ''; }, 250);
-    }
+    const current = document.querySelector('.admin-tab-content.tab-content.active');
+    if (current) current.classList.add('is-animating-out');
+    setTimeout(() => {
+        document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active', 'is-animating-out'));
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        const tabBtn = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
+        if (tabBtn) tabBtn.classList.add('active');
+        const content = document.getElementById(`admin-tab-${tab}`);
+        if (content) {
+            content.classList.add('active', 'is-animating-in');
+            void content.offsetWidth;
+            content.classList.remove('is-animating-in');
+        }
+        if (tab === 'trash') loadTrashTab();
+        if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
+        if (adminContent) {
+            requestAnimationFrame(() => {
+                adminContent.style.height = adminContent.scrollHeight + 'px';
+            });
+            setTimeout(() => { adminContent.style.height = ''; }, 250);
+        }
+    }, 150);
 }
 
 export function openDashboard() {

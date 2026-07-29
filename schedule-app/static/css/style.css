@@ -1426,6 +1426,27 @@ main {
     color: #f57f17 !important;
 }
 
+/* ---- Tab Content Animation ---- */
+.tab-content {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+        opacity var(--duration-fast) var(--ease-smooth-out),
+        transform var(--duration-fast) var(--ease-smooth-out);
+    will-change: opacity, transform;
+}
+.tab-content.is-animating-out {
+    opacity: 0;
+    transform: translateY(var(--distance-small));
+}
+.tab-content.is-animating-in {
+    opacity: 0;
+    transform: translateY(calc(var(--distance-small) * -1));
+}
+@media (prefers-reduced-motion: reduce) {
+    .tab-content { transition: none !important; transform: none !important; }
+}
+
 /* ---- Admin tabs ---- */
 .admin-tabs {
     display: flex;
