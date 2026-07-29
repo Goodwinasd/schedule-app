@@ -69,6 +69,13 @@ export function carouselSkip(n) {
 export function showAddWeekModal() {
     openModal('add-week-modal');
     populateSelectByName('week-group', state.groupsList, '— выбрать группу —');
+    const sel = document.getElementById('week-group');
+    if (state.currentScheduleType === 'group' && state.currentScheduleName) {
+        sel.value = state.currentScheduleName;
+        sel.disabled = true;
+    } else {
+        sel.disabled = false;
+    }
     document.getElementById('week-start-date').value = toISODate(state.currentMonday || getMonday(new Date()));
     updateWeekPreview();
     document.addEventListener('DOMContentLoaded', () => {
