@@ -1688,6 +1688,28 @@ main {
     .t-modal { transition: none !important; transform: none !important; opacity: 1 !important; }
 }
 
+/* ---- Error Shake Animation ---- */
+@keyframes t-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(calc(var(--distance-small) * -1)); }
+    40% { transform: translateX(var(--distance-base)); }
+    60% { transform: translateX(calc(var(--distance-base) * -1)); }
+    80% { transform: translateX(var(--distance-small)); }
+}
+
+.is-shaking {
+    animation: t-shake calc(var(--duration-micro) * 5) var(--ease-in-out) forwards;
+}
+
+.is-error {
+    border-color: #ef4444 !important;
+    outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .is-shaking { animation: none !important; }
+}
+
 /* ---- App Loader ---- */
 #app-loader-overlay {
     position: fixed;

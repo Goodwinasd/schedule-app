@@ -1,7 +1,7 @@
 import state from './state.js';
 import { api } from './api.js';
 import { escapeHtml, populateSelect, populateSelectByName } from './utils.js';
-import { confirmModal, showKimiAlert, showKimiPrompt } from './modal.js';
+import { confirmModal, showKimiAlert, showKimiPrompt, triggerErrorShake } from './modal.js';
 import { showToast } from './toast.js';
 
 export async function loadReferences() {
@@ -52,7 +52,7 @@ export async function renderRefList(endpoint, containerId) {
 export async function addGroup() {
     const inp = document.getElementById('ref-groups-input');
     const name = inp.value.trim();
-    if (!name) return;
+    if (!name) { triggerErrorShake(inp); return; }
     const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked }) });
     if (res.error) { await showKimiAlert(res.error); return; }
     inp.value = ''; document.getElementById('ref-groups-distance').checked = false;
@@ -76,7 +76,7 @@ export async function addSubject() {
     const inp = document.getElementById('ref-subjects-input');
     const sel = document.getElementById('ref-subjects-teacher');
     const name = inp.value.trim();
-    if (!name) return;
+    if (!name) { triggerErrorShake(inp); return; }
     const body = { name };
     if (sel && sel.value) body.default_teacher_id = parseInt(sel.value);
     const res = await api('/api/subjects', { method: 'POST', body: JSON.stringify(body) });
@@ -133,7 +133,7 @@ export async function advanceCourses() {
 export async function addRefItem(endpoint, inputId, containerId) {
     const inp = document.getElementById(inputId);
     const name = inp.value.trim();
-    if (!name) return;
+    if (!name) { triggerErrorShake(inp); return; }
     const body = { name };
     if (endpoint === 'teachers') { const phone = document.getElementById('ref-teachers-phone'); if (phone) body.phone = phone.value.trim(); }
     const res = await api(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify(body) });

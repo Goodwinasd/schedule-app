@@ -56,3 +56,19 @@ export function showKimiPrompt(message, defaultValue) {
         document.getElementById('kimi-prompt-cancel').onclick = () => { modal.remove(); overlay.classList.remove('active'); resolve(null); };
     });
 }
+
+export function triggerErrorShake(inputElement) {
+    if (!inputElement) return;
+    inputElement.classList.remove('is-shaking');
+    void inputElement.offsetWidth;
+    inputElement.classList.add('is-error', 'is-shaking');
+    setTimeout(() => {
+        inputElement.classList.remove('is-shaking');
+    }, 400);
+}
+
+document.addEventListener('input', (e) => {
+    if (e.target.classList && e.target.classList.contains('is-error')) {
+        e.target.classList.remove('is-error');
+    }
+});
