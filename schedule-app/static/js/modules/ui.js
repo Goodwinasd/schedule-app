@@ -312,8 +312,8 @@ export async function loadAvailability() {
     }
     _populateAvailGroups();
     renderAvailDayTabs();
-    renderAvailTable();
     renderAnalytics();
+    renderAvailTable();
 }
 
 function renderAnalytics() {
