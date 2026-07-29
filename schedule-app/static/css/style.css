@@ -1710,6 +1710,46 @@ main {
     .is-shaking { animation: none !important; }
 }
 
+/* ---- Global Toast ---- */
+.t-toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 12px 20px;
+    background-color: #0f172a;
+    color: #f8fafc;
+    border-radius: 6px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    transform: translateY(var(--distance-base)) scale(var(--scale-small));
+    transition:
+        opacity var(--duration-fast) var(--ease-smooth-out),
+        transform var(--duration-fast) var(--ease-smooth-out);
+    will-change: opacity, transform;
+    pointer-events: none;
+    max-width: 360px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+.t-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+.t-toast.is-hiding {
+    opacity: 0;
+    transform: translateY(var(--distance-micro)) scale(var(--scale-small));
+    transition:
+        opacity var(--duration-quick) var(--ease-smooth-out),
+        transform var(--duration-quick) var(--ease-smooth-out);
+}
+.t-toast.error { background: #dc2626; }
+.t-toast.success { background: #0f172a; }
+@media (prefers-reduced-motion: reduce) {
+    .t-toast { transition: none !important; transform: none !important; }
+}
+
 /* ---- Tooltips ---- */
 .t-tooltip {
     position: fixed;

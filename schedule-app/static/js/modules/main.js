@@ -74,4 +74,20 @@ async function init() {
     renderHomePage();
 }
 
+window.showToast = function(message, type) {
+    const existing = document.querySelector('.t-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 't-toast' + (type ? ' ' + type : '');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    void toast.offsetWidth;
+    toast.classList.add('is-visible');
+    setTimeout(() => {
+        toast.classList.remove('is-visible');
+        toast.classList.add('is-hiding');
+        setTimeout(() => toast.remove(), 150);
+    }, 3000);
+};
+
 init();
