@@ -7,6 +7,9 @@
 
 :root {
     --bg: #F7F8FA;
+    --resize-dur: 300ms;
+    --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
     --surface: #FFFFFF;
     --surface-hover: #F0F0F5;
     --text: #1D1D1F;
@@ -1579,6 +1582,18 @@ main {
     font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
+}
+
+/* ---- Resize Utility ---- */
+.t-resize {
+    transition:
+        width  var(--resize-dur) var(--resize-ease),
+        height var(--resize-dur) var(--resize-ease);
+    will-change: width, height;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .t-resize { transition: none !important; }
 }
 
 /* ---- App Loader ---- */
