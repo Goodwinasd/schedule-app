@@ -55,8 +55,19 @@ export function showSchedule(type, id, name) {
 }
 
 export function closeModals() {
-    document.getElementById('modal-overlay').classList.remove('active');
-    document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+    const adminContent = document.querySelector('#references-modal .modal-content.t-modal');
+    if (adminContent) {
+        adminContent.classList.remove('is-open');
+        adminContent.classList.add('is-closing');
+        setTimeout(() => {
+            adminContent.classList.remove('is-closing');
+            document.getElementById('modal-overlay').classList.remove('active');
+            document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        }, 150);
+    } else {
+        document.getElementById('modal-overlay').classList.remove('active');
+        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+    }
     if (typeof resetLessonModal === 'function') resetLessonModal();
     if (_confirmState.resolver) { const r = _confirmState.resolver; _confirmState.resolver = null; r(false); }
     const cm = document.getElementById('checkmark-anim');
@@ -112,6 +123,12 @@ function makeCard(type, id, name, subtitle, prefix = '') {
 
 export function showAdminPanel() {
     openModal('references-modal');
+    const adminContent = document.querySelector('#references-modal .modal-content.t-modal');
+    if (adminContent) {
+        adminContent.classList.remove('is-closing');
+        void adminContent.offsetWidth;
+        adminContent.classList.add('is-open');
+    }
     ['subjects', 'teachers', 'groups', 'classrooms'].forEach(e => renderRefList(e, `ref-${e}`));
     populateSubjectTeacherSelect();
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));

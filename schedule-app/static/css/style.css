@@ -1664,6 +1664,30 @@ main {
     }
 }
 
+/* ---- Modal Scale Animation ---- */
+.t-modal {
+    opacity: 0;
+    transform: scale(var(--scale-large));
+    transition:
+        opacity var(--duration-fast) var(--ease-smooth-out),
+        transform var(--duration-fast) var(--ease-smooth-out);
+    will-change: opacity, transform;
+}
+.t-modal.is-open {
+    opacity: 1;
+    transform: scale(1);
+}
+.t-modal.is-closing {
+    opacity: 0;
+    transform: scale(var(--scale-large));
+    transition:
+        opacity var(--duration-quick) var(--ease-smooth-out),
+        transform var(--duration-quick) var(--ease-smooth-out);
+}
+@media (prefers-reduced-motion: reduce) {
+    .t-modal { transition: none !important; transform: none !important; opacity: 1 !important; }
+}
+
 /* ---- App Loader ---- */
 #app-loader-overlay {
     position: fixed;
