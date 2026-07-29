@@ -80,11 +80,3 @@ def is_date_excluded(conn, date_str):
         (date_str, date_str)
     ).fetchone()
     return row is not None
-
-
-def is_date_excluded(conn, date_str):
-    row = conn.execute(
-        "SELECT 1 FROM excluded_dates WHERE start_date <= ? AND end_date >= ? LIMIT 1",
-        (date_str, date_str)
-    ).fetchone()
-    return row is not None

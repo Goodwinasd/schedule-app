@@ -1659,18 +1659,30 @@ def get_trash():
     conn = get_db()
     retention_param = f'-{TRASH_RETENTION_DAYS} days'
     deleted_days = conn.execute('''
-        SELECT d.id, d.day_name, d.date, d.group_name, d.deleted_at
+        SELECT d.id, d.day_name, d.date, d.group_name, d.deleted_at,
+               'День' AS type_label
         FROM schedule_days d
         WHERE d.deleted_at IS NOT NULL AND d.deleted_at >= datetime('now', ?)
         ORDER BY d.deleted_at DESC
     ''', (retention_param,)).fetchall()
     deleted_lessons = conn.execute(
-        LESSON_SELECT_WITH_DAY + ' WHERE l.deleted_at IS NOT NULL AND l.deleted_at >= datetime(\'now\', ?) ORDER BY l.deleted_at DESC',
+        "SELECT l.id, l.period, l.deleted_at, sd.day_name, sd.date, sd.group_name,"
+        " s.name AS subject_name, t.name AS teacher_name, c.name AS classroom_name,"
+        " CASE WHEN l.subgroup IS NOT NULL THEN gl.name || ' (' || l.subgroup || ')' ELSE gl.name END AS groups,"
+        " 'Урок' AS type_label"
+        " FROM lessons l"
+        " JOIN schedule_days sd ON l.day_id = sd.id"
+        " LEFT JOIN teachers t ON l.teacher_id = t.id"
+        " LEFT JOIN subjects s ON l.subject_id = s.id"
+        " LEFT JOIN classrooms_list c ON l.classroom_id = c.id"
+        " LEFT JOIN groups_list gl ON l.group_id = gl.id"
+        " WHERE l.deleted_at IS NOT NULL AND l.deleted_at >= datetime('now', ?) ORDER BY l.deleted_at DESC",
         (retention_param,)
     ).fetchall()
     deleted_refs = {}
+    type_labels = {'subjects': 'Предмет', 'teachers': 'Преподаватель', 'classrooms': 'Аудитория', 'groups': 'Группа'}
     for table, label in [('subjects', 'subjects'), ('teachers', 'teachers'), ('classrooms_list', 'classrooms'), ('groups_list', 'groups')]:
-        rows = conn.execute(f"SELECT id, name, deleted_at FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at >= datetime('now', ?) ORDER BY deleted_at DESC", (retention_param,)).fetchall()
+        rows = conn.execute(f"SELECT id, name, deleted_at, '{type_labels[label]}' AS type_label FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at >= datetime('now', ?) ORDER BY deleted_at DESC", (retention_param,)).fetchall()
         deleted_refs[label] = [dict(r) for r in rows]
     conn.close()
     return jsonify({
@@ -2128,6 +2140,11 @@ def availability():
         type: string
         required: true
         description: Дата понедельника (YYYY-MM-DD)
+      - in: query
+        name: group_id
+        type: integer
+        required: false
+        description: Фильтр по группе
     responses:
       200:
         description: Объект с days, periods, teachers, classrooms, teacher_busy, classroom_busy
@@ -2135,6 +2152,7 @@ def availability():
         description: monday обязателен
     """
     monday = request.args.get('monday', '')
+    group_id_filter = request.args.get('group_id', type=int)
     if not monday:
         return jsonify({"error": "monday required"}), 400
 
@@ -2144,11 +2162,11 @@ def availability():
 
     conn = get_db()
     try:
-        lessons = conn.execute(f'''
+        query = f'''
             SELECT l.period, sd.date, sd.day_name,
                    t.name AS teacher_name, l.teacher_id,
                    c.name AS classroom_name, l.classroom_id,
-                   g.name AS group_name, l.group_id,
+                   g.name AS group_name, l.group_id, g.course,
                    s.name AS subject_name, l.subject_id
             FROM lessons l
             JOIN schedule_days sd ON l.day_id = sd.id
@@ -2159,30 +2177,52 @@ def availability():
             WHERE sd.date IN ({placeholders})
               AND l.subject_id IS NOT NULL
               AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
-        ''', date_list).fetchall()
+        '''
+        params = date_list[:]
+        if group_id_filter:
+            query += ' AND l.group_id = ?'
+            params.append(group_id_filter)
+        lessons = conn.execute(query, params).fetchall()
 
         all_teachers = conn.execute('SELECT id, name FROM teachers WHERE deleted_at IS NULL ORDER BY name').fetchall()
         all_classrooms = conn.execute('SELECT id, name FROM classrooms_list WHERE deleted_at IS NULL ORDER BY CAST(name AS INTEGER), name').fetchall()
+        all_groups = conn.execute('SELECT id, name, course FROM groups_list WHERE deleted_at IS NULL ORDER BY course, name').fetchall()
 
         teacher_busy = {}
         classroom_busy = {}
+        teacher_courses = {}
+        all_courses_set = set()
+
         for l in lessons:
             key = (l['date'], l['period'])
             t_id = l['teacher_id']
             c_id = l['classroom_id']
-            info = {'group': l['group_name'], 'subject': l['subject_name'], 'teacher': l['teacher_name'], 'classroom': l['classroom_name']}
+            course = l['course']
+            info = {'group': l['group_name'], 'subject': l['subject_name'], 'teacher': l['teacher_name'], 'classroom': l['classroom_name'], 'teacher_id': t_id, 'classroom_id': c_id}
             if t_id and l['teacher_name']:
                 teacher_busy.setdefault(t_id, {})[key] = info
+                teacher_courses.setdefault(t_id, set()).add(course)
+                all_courses_set.add(course)
             if c_id and l['classroom_name']:
                 classroom_busy.setdefault(c_id, {})[key] = info
 
         periods = [{'period': b['period'], 'start': b['start'], 'end': b['end']} for b in BELL_SCHEDULE]
 
+        teachers_out = []
+        for t in all_teachers:
+            td = {'id': t['id'], 'name': t['name']}
+            courses = sorted(teacher_courses.get(t['id'], []))
+            if courses:
+                td['courses'] = courses
+            teachers_out.append(td)
+
         return jsonify({
             'days': week_dates,
             'periods': periods,
-            'teachers': [{'id': t['id'], 'name': t['name']} for t in all_teachers],
+            'teachers': teachers_out,
             'classrooms': [{'id': c['id'], 'name': c['name']} for c in all_classrooms],
+            'groups': [{'id': g['id'], 'name': g['name'], 'course': g['course']} for g in all_groups],
+            'all_courses': sorted(all_courses_set),
             'teacher_busy': {str(k): {f"{dk[0]}_{dk[1]}": v for dk, v in dv.items()} for k, dv in teacher_busy.items()},
             'classroom_busy': {str(k): {f"{dk[0]}_{dk[1]}": v for dk, v in dv.items()} for k, dv in classroom_busy.items()},
         })
@@ -2191,6 +2231,84 @@ def availability():
 
 
 
+
+
+@bp.route('/api/excluded-dates', methods=['GET'])
+def get_excluded_dates():
+    """Список всех исключённых дат
+    ---
+    responses:
+      200:
+        description: Массив объектов {id, start_date, end_date, reason, created_at}
+    """
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM excluded_dates ORDER BY start_date DESC').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@bp.route('/api/excluded-dates', methods=['POST'])
+@login_required
+def create_excluded_date():
+    """Создать исключение даты
+    ---
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            start_date:
+              type: string
+            end_date:
+              type: string
+            reason:
+              type: string
+    responses:
+      201:
+        description: Созданная запись
+      400:
+        description: start_date и end_date обязательны
+    """
+    data = request.get_json()
+    start_date = (data.get('start_date') or '').strip()
+    end_date = (data.get('end_date') or '').strip()
+    if not start_date or not end_date:
+        return jsonify({"error": "start_date and end_date required"}), 400
+    reason = (data.get('reason', '') or '').strip()
+    conn = get_db()
+    cursor = conn.execute(
+        'INSERT INTO excluded_dates (start_date, end_date, reason) VALUES (?, ?, ?)',
+        (start_date, end_date, reason)
+    )
+    conn.commit()
+    item_id = cursor.lastrowid
+    conn.close()
+    refs_cache.invalidate_prefix('excluded_dates')
+    return jsonify({"id": item_id, "start_date": start_date, "end_date": end_date, "reason": reason}), 201
+
+
+@bp.route('/api/excluded-dates/<int:item_id>', methods=['DELETE'])
+@login_required
+def delete_excluded_date(item_id):
+    """Удалить исключение даты
+    ---
+    responses:
+      200:
+        description: success
+      404:
+        description: Not found
+    """
+    conn = get_db()
+    cur = conn.execute('DELETE FROM excluded_dates WHERE id = ?', (item_id,))
+    conn.commit()
+    deleted = cur.rowcount
+    conn.close()
+    if not deleted:
+        return jsonify({"error": "Not found"}), 404
+    refs_cache.invalidate_prefix('excluded_dates')
+    return jsonify({"success": True})
 
 
 @bp.route('/api/db/health')

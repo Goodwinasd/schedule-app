@@ -1,0 +1,252 @@
+{
+  ".opencode/opencode.json": {
+    "mtime": 1785036231.3001008,
+    "ast_hash": "1efe24ecf938911d4f23e4b1c6ec91f7",
+    "semantic_hash": "1efe24ecf938911d4f23e4b1c6ec91f7"
+  },
+  ".opencode/plugins/graphify.js": {
+    "mtime": 1785036214.181205,
+    "ast_hash": "b33d000860642c6f4907a877e0387a21",
+    "semantic_hash": "b33d000860642c6f4907a877e0387a21"
+  },
+  "schedule-app/app.py": {
+    "mtime": 1785042584.3046198,
+    "ast_hash": "caf53acea0a5c797a496a37b930366b6",
+    "semantic_hash": "caf53acea0a5c797a496a37b930366b6"
+  },
+  "schedule-app/cache.py": {
+    "mtime": 1784899937.8609946,
+    "ast_hash": "d4fd78206223a48ebd25ecb9bb6cc1b9",
+    "semantic_hash": "d4fd78206223a48ebd25ecb9bb6cc1b9"
+  },
+  "schedule-app/config.py": {
+    "mtime": 1785042535.3411484,
+    "ast_hash": "8dea71ab24a1de2ac59f00cf77748260",
+    "semantic_hash": "8dea71ab24a1de2ac59f00cf77748260"
+  },
+  "schedule-app/db.py": {
+    "mtime": 1784978613.3892639,
+    "ast_hash": "d3edeebc7740864be26f64998f1ff853",
+    "semantic_hash": "d3edeebc7740864be26f64998f1ff853"
+  },
+  "schedule-app/migrations/env.py": {
+    "mtime": 1784964073.62542,
+    "ast_hash": "4862824f4ca224a1a7ffcddf461b1bbe",
+    "semantic_hash": "4862824f4ca224a1a7ffcddf461b1bbe"
+  },
+  "schedule-app/migrations/versions/2a9e8f7d6c5b_add_unique_index_on_teachers_phone.py": {
+    "mtime": 1784986025.2389033,
+    "ast_hash": "4990503727a7f683613cac31ef1dee42",
+    "semantic_hash": "4990503727a7f683613cac31ef1dee42"
+  },
+  "schedule-app/migrations/versions/32541b42023a_initial.py": {
+    "mtime": 1784950395.5645356,
+    "ast_hash": "a6a85b3240fee50989e7e539f63b3c9d",
+    "semantic_hash": "a6a85b3240fee50989e7e539f63b3c9d"
+  },
+  "schedule-app/migrations/versions/3b8e4f1a2c7d_add_settings_table.py": {
+    "mtime": 1785002536.0915692,
+    "ast_hash": "1f8180ded12c6a59169c61cb4dce3afc",
+    "semantic_hash": "1f8180ded12c6a59169c61cb4dce3afc"
+  },
+  "schedule-app/migrations/versions/4c5d6e7f8a9b_add_backup_retention_setting.py": {
+    "mtime": 1785003239.6057284,
+    "ast_hash": "c6bbfe2a92ffa98f2bd8bab27918d110",
+    "semantic_hash": "c6bbfe2a92ffa98f2bd8bab27918d110"
+  },
+  "schedule-app/migrations/versions/92ef138d4cfb_add_indexes_on_deleted_at_for_reference_.py": {
+    "mtime": 1784974738.5948663,
+    "ast_hash": "7f16e0bb908b1807f5ff8885d5b44e63",
+    "semantic_hash": "7f16e0bb908b1807f5ff8885d5b44e63"
+  },
+  "schedule-app/migrations/versions/c46c7442d88a_add_deleted_at_to_references.py": {
+    "mtime": 1784964090.1399183,
+    "ast_hash": "6b16b0afae0128dbe5afbad13fdc606d",
+    "semantic_hash": "6b16b0afae0128dbe5afbad13fdc606d"
+  },
+  "schedule-app/migrations/versions/fdb6c2208bbf_add_phone_to_teachers.py": {
+    "mtime": 1784984004.7572377,
+    "ast_hash": "922b86b5bf0cab678d7896fb63fad2f9",
+    "semantic_hash": "922b86b5bf0cab678d7896fb63fad2f9"
+  },
+  "schedule-app/routes.py": {
+    "mtime": 1785053763.6546943,
+    "ast_hash": "f959c95743a0da3710fbdafa7d066176",
+    "semantic_hash": "f959c95743a0da3710fbdafa7d066176"
+  },
+  "schedule-app/static/js/modules/api.js": {
+    "mtime": 1784899544.2477863,
+    "ast_hash": "2663cf4b5038f96daf16d995cf38c8a3",
+    "semantic_hash": "2663cf4b5038f96daf16d995cf38c8a3"
+  },
+  "schedule-app/static/js/modules/auth.js": {
+    "mtime": 1785005726.3240976,
+    "ast_hash": "a42e20f291351efe0849eaf4231ade08",
+    "semantic_hash": "a42e20f291351efe0849eaf4231ade08"
+  },
+  "schedule-app/static/js/modules/config.js": {
+    "mtime": 1784899526.287756,
+    "ast_hash": "2888dcff2d65438041b3882d23b21097",
+    "semantic_hash": "2888dcff2d65438041b3882d23b21097"
+  },
+  "schedule-app/static/js/modules/main.js": {
+    "mtime": 1785054074.1713195,
+    "ast_hash": "353169cd61013a9a88f7bc7150a325f2",
+    "semantic_hash": "353169cd61013a9a88f7bc7150a325f2"
+  },
+  "schedule-app/static/js/modules/modal.js": {
+    "mtime": 1785044795.4721515,
+    "ast_hash": "a861417afae8e78731253c6ca6af4d97",
+    "semantic_hash": "a861417afae8e78731253c6ca6af4d97"
+  },
+  "schedule-app/static/js/modules/nav.js": {
+    "mtime": 1785047545.1072962,
+    "ast_hash": "a1dbe0b471def43c716419109d3332f5",
+    "semantic_hash": "a1dbe0b471def43c716419109d3332f5"
+  },
+  "schedule-app/static/js/modules/navigation.js": {
+    "mtime": 1785042498.2101595,
+    "ast_hash": "c514801c3cfe1aea21b7c596d6aa7cee",
+    "semantic_hash": "c514801c3cfe1aea21b7c596d6aa7cee"
+  },
+  "schedule-app/static/js/modules/references.js": {
+    "mtime": 1785045344.4779067,
+    "ast_hash": "c47caecc1f445bb1d2131f0210bf9a18",
+    "semantic_hash": "c47caecc1f445bb1d2131f0210bf9a18"
+  },
+  "schedule-app/static/js/modules/schedule.js": {
+    "mtime": 1785045650.158592,
+    "ast_hash": "adeedde47a5bbcf4847cb0146d1f3dc1",
+    "semantic_hash": "adeedde47a5bbcf4847cb0146d1f3dc1"
+  },
+  "schedule-app/static/js/modules/settings.js": {
+    "mtime": 1785046809.0183904,
+    "ast_hash": "9f839f542b954886c373098dc3f46c89",
+    "semantic_hash": "9f839f542b954886c373098dc3f46c89"
+  },
+  "schedule-app/static/js/modules/state.js": {
+    "mtime": 1785057373.75904,
+    "ast_hash": "a8b29c1e861526ab06290fc86bea51f8",
+    "semantic_hash": "a8b29c1e861526ab06290fc86bea51f8"
+  },
+  "schedule-app/static/js/modules/toast.js": {
+    "mtime": 1785044800.9446201,
+    "ast_hash": "867d01bafd46b87336b3412b9f2ef842",
+    "semantic_hash": "867d01bafd46b87336b3412b9f2ef842"
+  },
+  "schedule-app/static/js/modules/trash.js": {
+    "mtime": 1785049915.213313,
+    "ast_hash": "eafb806d8e38abc71410e91a13440c7b",
+    "semantic_hash": "eafb806d8e38abc71410e91a13440c7b"
+  },
+  "schedule-app/static/js/modules/ui.js": {
+    "mtime": 1785060191.3377125,
+    "ast_hash": "da8b3618e82f80814d1d6460be46f4ad",
+    "semantic_hash": "da8b3618e82f80814d1d6460be46f4ad"
+  },
+  "schedule-app/static/js/modules/utils.js": {
+    "mtime": 1784899552.678159,
+    "ast_hash": "0bb82936fd367f222e66a0e7aeba3716",
+    "semantic_hash": "0bb82936fd367f222e66a0e7aeba3716"
+  },
+  "schedule-app/tests/__init__.py": {
+    "mtime": 1784889152.4876318,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "schedule-app/tests/conftest.py": {
+    "mtime": 1785003270.7194748,
+    "ast_hash": "6bd4a228e75438361ae3603997db0b2e",
+    "semantic_hash": "6bd4a228e75438361ae3603997db0b2e"
+  },
+  "schedule-app/tests/integration/__init__.py": {
+    "mtime": 1784890395.868749,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "schedule-app/tests/integration/conftest.py": {
+    "mtime": 1784951836.218195,
+    "ast_hash": "ee11473453d5444ac8f31bd27489d298",
+    "semantic_hash": "ee11473453d5444ac8f31bd27489d298"
+  },
+  "schedule-app/tests/integration/test_conflicts.py": {
+    "mtime": 1784890547.5183058,
+    "ast_hash": "ad915b00ac46b19c878b89fa858dd266",
+    "semantic_hash": "ad915b00ac46b19c878b89fa858dd266"
+  },
+  "schedule-app/tests/integration/test_export_integration.py": {
+    "mtime": 1784891480.3730888,
+    "ast_hash": "153a296f85ef4f5eb5ebd0916ffcac9f",
+    "semantic_hash": "153a296f85ef4f5eb5ebd0916ffcac9f"
+  },
+  "schedule-app/tests/integration/test_schedule_flow.py": {
+    "mtime": 1784890534.9377685,
+    "ast_hash": "aa6aaa50b1d189e47d51ee2470bc1de2",
+    "semantic_hash": "aa6aaa50b1d189e47d51ee2470bc1de2"
+  },
+  "schedule-app/tests/test_auth.py": {
+    "mtime": 1784889168.6796117,
+    "ast_hash": "b5a7ae296e4033cb89bf4bdf28cb47aa",
+    "semantic_hash": "b5a7ae296e4033cb89bf4bdf28cb47aa"
+  },
+  "schedule-app/tests/test_crud.py": {
+    "mtime": 1785038263.9078865,
+    "ast_hash": "7c22bbfb4132c6b5d1f110fafb694be1",
+    "semantic_hash": "7c22bbfb4132c6b5d1f110fafb694be1"
+  },
+  "schedule-app/tests/test_schedule.py": {
+    "mtime": 1784965922.1379461,
+    "ast_hash": "2be71cd24846ad9445bc4d9e62b554fa",
+    "semantic_hash": "2be71cd24846ad9445bc4d9e62b554fa"
+  },
+  "schedule-app/tests/test_validation.py": {
+    "mtime": 1784889308.0913935,
+    "ast_hash": "fbbea2a71f4092a5bdf29e7ed0381975",
+    "semantic_hash": "fbbea2a71f4092a5bdf29e7ed0381975"
+  },
+  "schedule-app/utils.py": {
+    "mtime": 1785041150.0431721,
+    "ast_hash": "839b17da745ed161caf695982de3fa70",
+    "semantic_hash": "839b17da745ed161caf695982de3fa70"
+  },
+  "scripts/full_test.py": {
+    "mtime": 1785048610.627248,
+    "ast_hash": "61ad75872dd233eeef6bb4e1dabe305e",
+    "semantic_hash": "61ad75872dd233eeef6bb4e1dabe305e"
+  },
+  "scripts/populate_and_check.py": {
+    "mtime": 1785048396.5694346,
+    "ast_hash": "852e951701fa8d3ab0223237a3dd9f3a",
+    "semantic_hash": "852e951701fa8d3ab0223237a3dd9f3a"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1784949739.0746617,
+    "ast_hash": "c50fcafa0c0bb32d916933d563712ce5",
+    "semantic_hash": "c50fcafa0c0bb32d916933d563712ce5"
+  },
+  "schedule-app/DOCKER.md": {
+    "mtime": 1784946287.1973498,
+    "ast_hash": "a6f5941d459603a25faf83d282d3c2aa",
+    "semantic_hash": "a6f5941d459603a25faf83d282d3c2aa"
+  },
+  "schedule-app/docker-compose.yml": {
+    "mtime": 1784946249.113273,
+    "ast_hash": "43dd49210fc414bd78f96c87cc11eb8f",
+    "semantic_hash": "43dd49210fc414bd78f96c87cc11eb8f"
+  },
+  "schedule-app/requirements-dev.txt": {
+    "mtime": 1784889152.887283,
+    "ast_hash": "6c34732cb7efa313d4481837ddbf76ae",
+    "semantic_hash": "6c34732cb7efa313d4481837ddbf76ae"
+  },
+  "schedule-app/requirements.txt": {
+    "mtime": 1785003282.800812,
+    "ast_hash": "e8d321f6f685aaee770111f1908eb229",
+    "semantic_hash": "e8d321f6f685aaee770111f1908eb229"
+  },
+  "schedule-app/templates/index.html": {
+    "mtime": 1785057387.8638659,
+    "ast_hash": "ddab18886626e05d5f8b64e31c84b916",
+    "semantic_hash": "ddab18886626e05d5f8b64e31c84b916"
+  }
+}

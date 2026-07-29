@@ -3,36 +3,55 @@ import { escapeHtml } from './utils.js';
 import { confirmModal } from './modal.js';
 import { showToast } from './toast.js';
 
-/* ======================== Trash ======================== */
-
 export async function loadTrashTab() {
     const data = await api('/api/trash');
-    if (data.error) { document.getElementById('trash-refs').innerHTML = '<div style="color:var(--danger)">Ошибка загрузки корзины</div>'; return; }
-    const refs = document.getElementById('trash-refs');
-    if (refs) refs.innerHTML = renderTrashSection('Справочники', [
+    const cont = document.getElementById('trash-content');
+    if (!cont) return;
+    if (data.error) { cont.innerHTML = '<div style="color:var(--danger)">Ошибка загрузки корзины</div>'; return; }
+
+    const items = [
         ...(data.subjects || []).map(i => ({...i, type: 'subjects'})),
         ...(data.teachers || []).map(i => ({...i, type: 'teachers'})),
         ...(data.classrooms || []).map(i => ({...i, type: 'classrooms'})),
         ...(data.groups || []).map(i => ({...i, type: 'groups'})),
-    ]);
-    const days = document.getElementById('trash-days');
-    if (days) days.innerHTML = renderTrashSection('Дни', (data.days || []).map(i => ({...i, type: 'days'})));
-    const lessons = document.getElementById('trash-lessons');
-    if (lessons) lessons.innerHTML = renderTrashSection('Пары', (data.lessons || []).map(i => ({...i, type: 'lessons'})));
-}
+        ...(data.days || []).map(i => ({...i, type: 'days'})),
+        ...(data.lessons || []).map(i => ({...i, type: 'lessons'})),
+    ];
 
-function renderTrashSection(title, items) {
-    if (!items.length) return `<div style="margin:8px 0;font-size:13px;color:var(--text-secondary)">${title}: пусто</div>`;
-    let html = `<div style="margin:8px 0"><strong>${title}</strong> (${items.length})</div>`;
-    for (const item of items) {
-        const name = item.name || item.day_name || `ID ${item.id}`;
-        const date = item.deleted_at ? item.deleted_at.slice(0, 10) : '';
-        const ep = item.type === 'days' ? 'days' : item.type === 'lessons' ? 'lessons' : item.type;
-        html += `<div class="trash-item"><span class="trash-label">${escapeHtml(name)}</span><span class="trash-date">${date}</span>`;
-        html += `<button class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${ep}',${item.id})">\u21BA</button>`;
-        html += '</div>';
+    if (!items.length) {
+        cont.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary)">Корзина пуста</div>';
+        return;
     }
-    return html;
+
+    let html = '<div class="trash-grid">';
+    for (const item of items) {
+        const typeLabel = item.type_label || 'Запись';
+        const name = item.name || item.day_name || `ID ${item.id}`;
+        const ep = item.type === 'days' ? 'days' : item.type === 'lessons' ? 'lessons' : item.type;
+        const date = item.deleted_at ? item.deleted_at.slice(0, 10) : '';
+
+        let meta = '';
+        if (item.type === 'lesson' && item.subject_name) {
+            meta = `${item.subject_name} — ${item.day_name || ''} ${item.period ? item.period + '-я пара' : ''}`;
+            if (item.teacher_name) meta += ` · ${item.teacher_name}`;
+            if (item.classroom_name) meta += ` · ${item.classroom_name}`;
+            if (item.groups) meta += ` · ${item.groups}`;
+        } else if (item.type === 'day' && item.date) {
+            meta = `${item.date} · ${item.group_name || ''}`;
+        }
+
+        html += `<div class="trash-card" data-type="${ep}">
+            <div class="trash-card-type">${typeLabel}</div>
+            <div class="trash-card-name">${escapeHtml(name)}</div>`;
+        if (meta) html += `<div class="trash-card-meta">${escapeHtml(meta)}</div>`;
+        html += `<div class="trash-card-date">${date}</div>
+            <div class="trash-card-actions">
+                <button class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${ep}',${item.id})">↺ Восстановить</button>
+            </div>
+        </div>`;
+    }
+    html += '</div>';
+    cont.innerHTML = html;
 }
 
 export async function restoreTrashItem(endpoint, id) {

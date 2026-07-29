@@ -3,6 +3,7 @@ import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getWeekNumber, getMonday, addDays, formatDateRange, formatChipRange, shiftLabel, populateSelect } from './utils.js';
 import { api } from './api.js';
 import { openModal, confirmModal } from './modal.js';
+import { showToast } from './toast.js';
 
 function checkConflictsForLesson(lesson, dayDate, period) {
     if (!state.showConflicts) return null;
@@ -26,19 +27,51 @@ function renderScheduleTable(data) {
     const { days, periods } = data;
     Object.keys(state.lessonsMap).forEach(k => delete state.lessonsMap[k]);
     const canEdit = state.isAdmin && (state.currentScheduleType === 'group' || state.currentScheduleType === 'teacher');
+
+    // Build excluded dates lookup
+    const excludedByDate = {};
+    if (data._excluded) {
+        for (const ex of data._excluded) {
+            const start = new Date(ex.start_date + 'T00:00:00');
+            const end = new Date(ex.end_date + 'T00:00:00');
+            for (const day of days) {
+                const d = new Date(day.date + 'T00:00:00');
+                if (d >= start && d <= end) {
+                    if (!excludedByDate[day.date]) excludedByDate[day.date] = [];
+                    excludedByDate[day.date].push(ex.reason || 'Праздничный день');
+                }
+            }
+        }
+    }
+
     let html = '<div class="schedule-table-wrap"><table class="schedule-table"><thead><tr><th class="col-time">Пара</th>';
     for (const day of days) {
         const d = new Date(day.date + 'T00:00:00');
         const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
-        html += `<th class="col-day">${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
+        const exc = excludedByDate[day.date];
+        const excCls = exc ? ' style="background:#fff3e0"' : '';
+        html += `<th class="col-day"${excCls}>${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
     }
     html += '</tr></thead><tbody>';
+
+    // Excluded date banners
+    for (const day of days) {
+        const exc = excludedByDate[day.date];
+        if (exc) {
+            html += `<tr class="shift-row"><td colspan="${days.length + 1}" style="background:#fff8e1;color:#e65100;font-size:12px;padding:8px;text-align:center">🚩 ${day.date} — ${exc.join('; ')}</td></tr>`;
+        }
+    }
     let lastShift = 0;
     for (const p of periods) {
         if (p.shift !== lastShift) { lastShift = p.shift; html += `<tr class="shift-row"><td colspan="${days.length + 1}">${shiftLabel(p.shift)}</td></tr>`; }
         html += '<tr>';
         html += `<td class="time-cell"><span class="period-num">${p.period}</span>${p.start} – ${p.end}</td>`;
         for (const day of days) {
+            const isExcluded = excludedByDate[day.date];
+            if (isExcluded) {
+                html += `<td class="day-cell" style="background:#fff8e1;text-align:center;font-size:11px;color:#e65100">🚩 отменено</td>`;
+                continue;
+            }
             const lessons = p.lessons[day.date] || [];
             const busy = lessons.length > 0;
             if (state.currentScheduleType === 'classroom') {
@@ -82,25 +115,29 @@ export async function loadScheduleTable() {
         cont.innerHTML = '<div class="no-schedule"><span class="emoji">📅</span><p>Нет расписания на эту неделю</p></div>';
         return;
     }
+    // Check excluded dates for this week
+    const excluded = await api('/api/excluded-dates');
+    if (excluded && !excluded.error && excluded.length) {
+        data._excluded = excluded;
+    }
     cont.innerHTML = renderScheduleTable(data);
 }
 
 export function printSchedule() {
     document.getElementById('print-title').textContent = state.currentScheduleName;
     document.getElementById('print-subtitle').textContent = `Неделя ${getWeekNumber(state.currentMonday)} · ${formatDateRange(state.currentMonday)}`;
-    let style = document.getElementById('print-inline-style');
-    if (!style) { style = document.createElement('style'); style.id = 'print-inline-style'; document.head.appendChild(style); }
-    style.textContent = '@media print { body,td,th,.schedule-table,.schedule-table-wrap,main,#schedule-view,#schedule-table-container{background:white!important;color:black!important} td.day-cell{background:white!important;color:black!important} td.day-cell:not(.empty-cell){background:#f0f0f0!important} .lesson-content,.lesson-content .lesson-subject,.lesson-content .lesson-meta{color:black!important} .lesson-content .lesson-meta{color:#333!important} .lesson-subject{color:black!important} td.day-cell .lesson-content .lesson-subject{color:black!important;background:transparent!important} td.day-cell .lesson-content .lesson-meta{color:#333!important;background:transparent!important} td.day-cell .lesson-content{background:transparent!important;color:black!important} }';
     window.print();
 }
 
 export function exportSchedule(format) {
+    if (!state.currentScheduleType || !state.currentMonday) {
+        showToast('Сначала откройте расписание', 'info');
+        return;
+    }
     const monday = toISODate(state.currentMonday);
     const url = `/api/export?type=${encodeURIComponent(state.currentScheduleType)}&name=${encodeURIComponent(state.currentScheduleName)}&id=${encodeURIComponent(state.currentScheduleId)}&monday=${monday}&format=${format}`;
-    fetch(url, { method: 'HEAD' }).then(res => {
-        if (!res.ok) { return res.json().then(b => alert(b.error || `Ошибка экспорта (${res.status})`)).catch(() => alert(`Ошибка экспорта (${res.status})`)); }
-        const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }).catch(() => alert('Ошибка сети при экспорте'));
+    const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => document.body.removeChild(a), 1000);
 }
 
 export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) {

@@ -1,0 +1,6 @@
+C:\Users\goodwinasd\Documents\Default Project\.github\workflows\ci.yml
+C:\Users\goodwinasd\Documents\Default Project\schedule-app\DOCKER.md
+C:\Users\goodwinasd\Documents\Default Project\schedule-app\docker-compose.yml
+C:\Users\goodwinasd\Documents\Default Project\schedule-app\requirements-dev.txt
+C:\Users\goodwinasd\Documents\Default Project\schedule-app\requirements.txt
+C:\Users\goodwinasd\Documents\Default Project\schedule-app\templates\index.html

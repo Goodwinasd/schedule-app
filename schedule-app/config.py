@@ -95,6 +95,4 @@ SHIFT_LABELS = {1: '1 смена', 2: '2 смена', 3: '3 смена'}
 
 # ---- Rate limiting ----
 
-LOGIN_RATE_LIMIT = 5
-LOGIN_RATE_WINDOW = 300
 LOGIN_CLEANUP_INTERVAL = 300

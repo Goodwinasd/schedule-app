@@ -1,14 +1,13 @@
 import state from './state.js';
-import { DAY_ORDER } from './config.js';
-import { escapeHtml, getMonday, addDays, toISODate, getWeekNumber, formatChipRange, formatDateRange, shiftLabel, populateSelect, populateSelectByName } from './utils.js';
+import { escapeHtml, getMonday, addDays, toISODate, formatChipRange } from './utils.js';
 import { api } from './api.js';
-import { openModal, confirmModal, _confirmState } from './modal.js';
+import { openModal, _confirmState } from './modal.js';
 import { showToast } from './toast.js';
-import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, populateSubjectTeacherSelect } from './references.js';
-import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
-import { loadTrashTab, restoreTrashItem, purgeTrash } from './trash.js';
-import { loadSettingsTab, saveSetting } from './settings.js';
-import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek, getWeeksList } from './nav.js';
+import { loadReferences, renderRefList, populateSubjectTeacherSelect } from './references.js';
+import { loadScheduleTable, addLesson } from './schedule.js';
+import { loadTrashTab } from './trash.js';
+import { loadSettingsTab, loadExcludedDates } from './settings.js';
+import { renderCarousel, getWeeksList } from './nav.js';
 
 /* ======================== Navigation ======================== */
 
@@ -17,7 +16,7 @@ export function updateUI() {
     g('btn-login').style.display = state.isAdmin ? 'none' : '';
     g('btn-logout').style.display = state.isAdmin ? '' : 'none';
     g('btn-admin').style.display = state.isAdmin ? '' : 'none';
-    g('btn-avail').style.display = state.isAdmin ? '' : 'none';
+    g('btn-avail').style.display = '';
     g('admin-panel').style.display = (state.isAdmin && state.currentScheduleType) ? '' : 'none';
     g('print-panel').style.display = state.currentScheduleType ? '' : 'none';
     const cb = g('btn-toggle-conflicts');
@@ -32,14 +31,15 @@ export function toggleConflicts() {
 }
 window._onUnauthorized = updateUI;
 
-export function goHome() {
+export async function goHome() {
     state.currentScheduleType = '';
     state.currentScheduleId = state.currentScheduleName = null;
     state.currentMonday = null;
     ['home-view', 'schedule-view', 'availability-view'].forEach(v => document.getElementById(v).style.display = v === 'home-view' ? '' : 'none');
     document.getElementById('header-title').textContent = 'Расписание';
     updateUI();
-    loadHomePage();
+    await loadReferences();
+    renderHomePage();
 }
 
 export function showSchedule(type, id, name) {
@@ -66,7 +66,7 @@ function resetLessonModal() {
     state.currentLessonDate = null;
     document.querySelector('#add-lesson-modal h2').textContent = 'Новый пара';
     const btn = document.getElementById('btn-save-lesson');
-    btn.textContent = 'Добавить'; btn.disabled = false; btn.onclick = () => addLesson();
+    btn.textContent = 'Добавить'; btn.disabled = false;
     document.getElementById('validation-warnings').style.display = 'none';
     document.getElementById('btn-delete-lesson').style.display = 'none';
     document.getElementById('btn-add-subgroup').style.display = 'none';
@@ -128,7 +128,7 @@ export function switchAdminTab(tab) {
     const content = document.getElementById(`admin-tab-${tab}`);
     if (content) content.classList.add('active');
     if (tab === 'trash') loadTrashTab();
-    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); }
+    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
 }
 
 async function loadHealthTab() {
@@ -175,15 +175,18 @@ export async function logout() {
 
 /* ======================== Availability ======================== */
 
-export function showAvailability() {
+export async function showAvailability() {
+    state.availMonday = getMonday(new Date());
+    state.availGroupById = null;
+    state.availHeatmap = false;
+    state.availGroupByCourse = false;
+    renderAvailCarousel();
+    await loadAvailability();
     document.getElementById('home-view').style.display = 'none';
     document.getElementById('schedule-view').style.display = 'none';
     document.getElementById('availability-view').style.display = '';
     document.getElementById('header-title').textContent = '← Свободные окна';
-    state.availMonday = getMonday(new Date());
     updateUI();
-    renderAvailCarousel();
-    loadAvailability();
 }
 
 function renderAvailCarousel() {
@@ -193,14 +196,14 @@ function renderAvailCarousel() {
     const today = toISODate(getMonday(new Date()));
     const idx = weeks.findIndex(w => w.date === sel);
     let html = '<div class="carousel-nav">';
-    html += `<button class="carousel-arrow carousel-arrow-left${idx <= 0 ? ' disabled' : ''}" id="avail-arrow-left" onclick="availCarouselSkip(-1)" title="← предыдущая неделя">«</button>`;
+    html += `<button class="carousel-arrow carousel-arrow-left${idx <= 0 ? ' disabled' : ''}" id="avail-arrow-left" data-action="availCarouselSkip" data-params="[-1]" title="← предыдущая неделя">«</button>`;
     html += '<div class="carousel-strip" id="avail-carousel-strip">';
     for (const w of weeks) {
         const cls = w.date === sel ? ' carousel-chip active' : w.date === today ? ' carousel-chip today' : ' carousel-chip';
-        html += `<div class="${cls}" data-date="${w.date}" onclick="selectAvailWeek('${w.date}')"><span class="chip-week">${w.weekNumber} неделя</span><span class="chip-range">${formatChipRange(w.monday)}</span></div>`;
+        html += `<div class="${cls}" data-date="${w.date}" data-action="selectAvailWeek" data-params='["${w.date}"]'><span class="chip-week">${w.weekNumber} неделя</span><span class="chip-range">${formatChipRange(w.monday)}</span></div>`;
     }
     html += '</div>';
-    html += `<button class="carousel-arrow carousel-arrow-right${idx >= weeks.length - 1 ? ' disabled' : ''}" id="avail-arrow-right" onclick="availCarouselSkip(1)" title="следующая неделя →">»</button></div>`;
+    html += `<button class="carousel-arrow carousel-arrow-right${idx >= weeks.length - 1 ? ' disabled' : ''}" id="avail-arrow-right" data-action="availCarouselSkip" data-params="[1]" title="следующая неделя →">»</button></div>`;
     cont.innerHTML = html;
 }
 
@@ -216,39 +219,55 @@ function availSetActiveWeek() {
     }
 }
 
-export function selectAvailWeek(dateStr) {
+export async function selectAvailWeek(dateStr) {
     state.availMonday = new Date(dateStr + 'T00:00:00');
     state.availSelectedDay = null;
     availSetActiveWeek();
-    loadAvailability();
+    await loadAvailability();
 }
 
-export function availCarouselSkip(n) {
+export async function availCarouselSkip(n) {
     state.availMonday = addDays(state.availMonday, n * 7);
     state.availSelectedDay = null;
     availSetActiveWeek();
-    loadAvailability();
+    await loadAvailability();
+}
+
+function _availUrl() {
+    let url = `/api/availability?monday=${toISODate(state.availMonday)}`;
+    const gid = document.getElementById('avail-group-filter');
+    if (gid && gid.value) url += `&group_id=${gid.value}`;
+   	return url;
 }
 
 export async function loadAvailability() {
-    state.availData = await api(`/api/availability?monday=${toISODate(state.availMonday)}`);
+    state.availData = await api(_availUrl());
     if (state.availData.error) {
-        const cont = document.getElementById('avail-table-container');
-        if (cont) cont.innerHTML = '<div style="padding:20px;color:var(--danger)">Ошибка загрузки данных доступности</div>';
+        showToast('Ошибка загрузки данных доступности', 'error');
         return;
     }
+    _populateAvailGroups();
     renderAvailDayTabs();
     renderAvailTable();
+}
+
+function _populateAvailGroups() {
+    const sel = document.getElementById('avail-group-filter');
+    if (!sel || !state.availData.groups) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Все группы</option>' + state.availData.groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+    sel.value = cur;
 }
 
 function renderAvailDayTabs() {
     const cont = document.getElementById('avail-day-tabs');
     if (!state.availData) return;
-    let html = `<div class="avail-day-tab ${!state.availSelectedDay ? 'active' : ''}" onclick="selectAvailDay(null)">Вся неделя</div>`;
+    const todayStr = toISODate(new Date());
+    let html = `<div class="avail-day-tab ${!state.availSelectedDay ? 'active' : ''}" data-action="selectAvailDay" data-params="[null]">Вся неделя</div>`;
     for (const d of state.availData.days) {
         const a = state.availSelectedDay === d.date ? ' active' : '';
-        const short = d.day_name;
-        html += `<div class="avail-day-tab${a}" onclick="selectAvailDay('${d.date}')">${short}</div>`;
+        const t = d.date === todayStr ? ' today' : '';
+        html += `<div class="avail-day-tab${a}${t}" data-action="selectAvailDay" data-params='["${d.date}"]'>${d.day_name}</div>`;
     }
     cont.innerHTML = html;
 }
@@ -266,17 +285,65 @@ export function setAvailMode(mode) {
     renderAvailTable();
 }
 
-function renderAvailTable() {
+export function toggleAvailHeatmap() {
+    if (!state.availData) { showToast('Сначала откройте раздел доступности', 'info'); return; }
+    state.availHeatmap = !state.availHeatmap;
+    document.getElementById('btn-avail-heatmap').classList.toggle('active', state.availHeatmap);
+    renderAvailTable();
+}
+
+export function toggleAvailGroupByCourse() {
+    if (!state.availData) { showToast('Сначала откройте раздел доступности', 'info'); return; }
+    state.availGroupByCourse = !state.availGroupByCourse;
+    document.getElementById('btn-avail-group-course').classList.toggle('active', state.availGroupByCourse);
+    renderAvailTable();
+}
+
+export function exportAvailExcel() {
+    showToast('Экспорт в Excel пока в разработке', 'info');
+}
+
+export function exportAvailPDF() {
+    showToast('Экспорт в PDF пока в разработке', 'info');
+}
+
+export function closeAvailability() {
+    document.getElementById('availability-view').style.display = 'none';
+    document.getElementById('home-view').style.display = '';
+    document.getElementById('header-title').textContent = 'Расписание';
+    updateUI();
+}
+
+export function _clickLesson(info, date, period) {
+    if (!info || !info.teacher_id) return;
+    const m = new Date(date + 'T00:00:00');
+    const monday = getMonday(m);
+    state.currentScheduleType = 'teacher';
+    state.currentScheduleId = info.teacher_id;
+    state.currentScheduleName = info.teacher;
+    state.currentMonday = monday;
+    document.getElementById('availability-view').style.display = 'none';
+    document.getElementById('schedule-view').style.display = '';
+    document.getElementById('header-title').textContent = '\u2190 ' + info.teacher;
+    updateUI();
+    renderCarousel();
+    loadScheduleTable();
+}
+
+export function renderAvailTable() {
     if (!state.availData) return;
     const cont = document.getElementById('avail-table-container');
     const freeOnly = document.getElementById('avail-free-only').checked;
     const showAll = document.getElementById('avail-show-all-periods').checked;
+    const isHeatmap = state.availHeatmap;
+    const groupByCourse = state.availGroupByCourse && state.availMode === 'teacher';
     const days = state.availSelectedDay ? state.availData.days.filter(d => d.date === state.availSelectedDay) : state.availData.days;
     const periods = showAll ? state.availData.periods : state.availData.periods.filter(p => p.period <= 6);
     const rows = state.availMode === 'teacher' ? state.availData.teachers : state.availData.classrooms;
     const busyMap = state.availMode === 'teacher' ? state.availData.teacher_busy : state.availData.classroom_busy;
-    let html = '<table class="avail-table"><thead><tr><th>' + (state.availMode === 'teacher' ? 'Преподаватель' : 'Аудитория') + '</th>';
     const todayStr = toISODate(new Date());
+
+    let html = '<table class="avail-table"><thead><tr><th>' + (state.availMode === 'teacher' ? 'Преподаватель' : 'Аудитория') + '</th>';
     for (const d of days) {
         const isToday = d.date === todayStr;
         for (let pi = 0; pi < periods.length; pi++) {
@@ -285,31 +352,52 @@ function renderAvailTable() {
         }
     }
     html += '<th>Своб. пар</th></tr></thead><tbody>';
-    for (const row of rows) {
-        const rb = busyMap[String(row.id)] || {};
-        let freeCount = 0;
-        const cells = [];
-        for (let di = 0; di < days.length; di++) {
-            const d = days[di];
-            for (let pi = 0; pi < periods.length; pi++) {
-                const p = periods[pi];
-                const key = `${d.date}_${p.period}`;
-                const info = rb[key];
-                if (info) {
-                    cells.push(`<td class="avail-cell-busy${pi === 0 ? ' day-sep-left' : ''}"><div class="avail-busy-inner"><div class="busy-time">${p.start} – ${p.end}</div><div class="busy-subject">${escapeHtml(info.subject)}</div>${info.teacher ? '<div class="busy-teacher">' + escapeHtml(info.teacher) + '</div>' : ''}${info.classroom ? '<div class="busy-classroom">ауд. ' + escapeHtml(info.classroom) + '</div>' : ''}</div></td>`);
-                } else { freeCount++; cells.push(`<td class="avail-cell-free${pi === 0 ? ' day-sep-left' : ''} day-${di % 2}">свободен</td>`); }
-            }
+
+    if (groupByCourse && state.availData.all_courses) {
+        for (const course of state.availData.all_courses) {
+            const courseRows = rows.filter(r => r.courses && r.courses.includes(course));
+            if (!courseRows.length) continue;
+            html += `<tr class="avail-course-header"><td colspan="${days.length * periods.length + 2}">${course} курс</td></tr>`;
+            for (const row of courseRows) html += _availRow(row, busyMap, days, periods, freeOnly, isHeatmap);
         }
-        if (freeOnly && !freeCount) continue;
-        html += `<tr><td>${escapeHtml(row.name)}</td>${cells.join('')}<td class="avail-summary">${freeCount}</td></tr>`;
+    } else {
+        for (const row of rows) html += _availRow(row, busyMap, days, periods, freeOnly, isHeatmap);
     }
+
     html += '</tbody></table>';
+    if (isHeatmap) html += '<div class="avail-legend" style="margin-top:8px;font-size:12px"><span style="background:#4CAF50;color:#fff;padding:2px 8px;border-radius:4px;margin-right:4px">свободно</span> <span style="background:#F44336;color:#fff;padding:2px 8px;border-radius:4px;margin-right:4px">занято</span></div>';
     cont.innerHTML = html || '<div style="padding:20px;color:var(--text-secondary)">Все заняты</div>';
 }
 
-export { openModal, confirmModal };
-export { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup };
-export { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson };
-export { loadTrashTab, restoreTrashItem, purgeTrash };
-export { loadSettingsTab, saveSetting };
-export { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek };
+function _availRow(row, busyMap, days, periods, freeOnly, isHeatmap) {
+    const rb = busyMap[String(row.id)] || {};
+    let freeCount = 0;
+    const cells = [];
+    for (let di = 0; di < days.length; di++) {
+        const d = days[di];
+        for (let pi = 0; pi < periods.length; pi++) {
+            const p = periods[pi];
+            const key = `${d.date}_${p.period}`;
+            const info = rb[key];
+            if (info) {
+                const nav = state.availMode === 'teacher' && info.teacher_id ? ` onclick="_clickLesson(${JSON.stringify(info).replace(/"/g, '&quot;')}, '${d.date}', ${p.period})"` : '';
+                if (isHeatmap) {
+                    cells.push(`<td class="avail-cell-busy${pi === 0 ? ' day-sep-left' : ''}"${nav} title="${escapeHtml(info.subject)} · ${escapeHtml(info.group)}" style="background:#F44336;color:#fff;cursor:${nav ? 'pointer' : ''};padding:2px;font-size:11px;text-align:center">${escapeHtml(info.subject)}</td>`);
+                } else {
+                    cells.push(`<td class="avail-cell-busy${pi === 0 ? ' day-sep-left' : ''}"${nav} style="cursor:${nav ? 'pointer' : ''}"><div class="avail-busy-inner"><div class="busy-time">${p.start} – ${p.end}</div><div class="busy-subject">${escapeHtml(info.subject)}</div>${info.teacher ? '<div class="busy-teacher">' + escapeHtml(info.teacher) + '</div>' : ''}${info.classroom ? '<div class="busy-classroom">ауд. ' + escapeHtml(info.classroom) + '</div>' : ''}</div></td>`);
+                }
+            } else {
+                freeCount++;
+                if (isHeatmap) {
+                    cells.push(`<td class="avail-cell-free${pi === 0 ? ' day-sep-left' : ''} day-${di % 2}" style="background:#4CAF50;color:#fff;font-size:11px;text-align:center">свободно</td>`);
+                } else {
+                    cells.push(`<td class="avail-cell-free${pi === 0 ? ' day-sep-left' : ''} day-${di % 2}">свободен</td>`);
+                }
+            }
+        }
+    }
+    if (freeOnly && !freeCount) return '';
+    return `<tr><td>${escapeHtml(row.name)}</td>${cells.join('')}<td class="avail-summary">${freeCount}</td></tr>`;
+}
+
+
