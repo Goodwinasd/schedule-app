@@ -17,7 +17,6 @@ export function updateUI() {
     g('btn-login').style.display = state.isAdmin ? 'none' : '';
     g('btn-logout').style.display = state.isAdmin ? '' : 'none';
     g('btn-admin').style.display = state.isAdmin ? '' : 'none';
-    g('btn-avail').style.display = '';
     g('admin-panel').style.display = (state.isAdmin && state.currentScheduleType) ? '' : 'none';
     g('print-panel').style.display = state.currentScheduleType ? '' : 'none';
     const cb = g('btn-toggle-conflicts');
@@ -124,10 +123,15 @@ export function showAdminPanel() {
 export function switchAdminTab(tab) {
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-tab-panel').forEach(p => p.classList.remove('active'));
     const tabBtn = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
     if (tabBtn) tabBtn.classList.add('active');
     const content = document.getElementById(`admin-tab-${tab}`);
-    if (content) content.classList.add('active');
+    if (content) { content.classList.add('active'); return; }
+    if (tab === 'availability') {
+        closeModals();
+        showAvailability();
+    }
     if (tab === 'trash') loadTrashTab();
     if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
 }

@@ -80,8 +80,8 @@ class TestClassroomsWithSchedule:
 
 
 class TestAvailability:
-    def test_availability(self, client, seed_lessons):
-        resp = client.get('/api/availability?monday=2026-09-07')
+    def test_availability(self, client, seed_lessons, admin_csrf):
+        resp = client.get('/api/availability?monday=2026-09-07', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         data = resp.get_json()
         assert len(data['days']) == 6
@@ -91,42 +91,44 @@ class TestAvailability:
         assert '1' in data['teacher_busy']
         assert '1' in data['classroom_busy']
 
-    def test_availability_no_monday(self, client):
-        resp = client.get('/api/availability')
+    def test_availability_no_monday(self, client, admin_csrf):
+        resp = client.get('/api/availability', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
 
-    def test_availability_empty_week(self, client, seed_refs):
-        resp = client.get('/api/availability?monday=2026-09-21')
+    def test_availability_empty_week(self, client, seed_refs, admin_csrf):
+        resp = client.get('/api/availability?monday=2026-09-21', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['teacher_busy'] == {}
         assert data['classroom_busy'] == {}
 
     def test_availability_excludes_deleted_teacher(self, client, seed_lessons, admin_csrf):
-        resp = client.get('/api/availability?monday=2026-09-07')
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
         data = resp.get_json()
         teacher_ids = [t['id'] for t in data['teachers']]
         assert 1 in teacher_ids, 'Teacher 1 should be visible before deletion'
 
-        resp = client.delete('/api/teachers/1', headers={'X-CSRF-Token': admin_csrf})
+        resp = client.delete('/api/teachers/1', headers=h)
         assert resp.status_code == 200
 
-        resp = client.get('/api/availability?monday=2026-09-07')
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
         data = resp.get_json()
         teacher_ids = [t['id'] for t in data['teachers']]
         assert 1 not in teacher_ids, 'Teacher 1 should be excluded after deletion'
         assert '1' not in data['teacher_busy'], 'Busy data for teacher 1 should be excluded'
 
     def test_availability_excludes_deleted_classroom(self, client, seed_lessons, admin_csrf):
-        resp = client.get('/api/availability?monday=2026-09-07')
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
         data = resp.get_json()
         classroom_ids = [c['id'] for c in data['classrooms']]
         assert 1 in classroom_ids, 'Classroom 1 should be visible before deletion'
 
-        resp = client.delete('/api/classrooms/1', headers={'X-CSRF-Token': admin_csrf})
+        resp = client.delete('/api/classrooms/1', headers=h)
         assert resp.status_code == 200
 
-        resp = client.get('/api/availability?monday=2026-09-07')
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
         data = resp.get_json()
         classroom_ids = [c['id'] for c in data['classrooms']]
         assert 1 not in classroom_ids, 'Classroom 1 should be excluded after deletion'

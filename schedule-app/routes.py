@@ -2149,6 +2149,7 @@ def export_schedule():
 
 
 @bp.route('/api/availability')
+@login_required
 def availability():
     """Свободные окна преподавателей и аудиторий
     ---
