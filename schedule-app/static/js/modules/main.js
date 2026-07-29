@@ -16,7 +16,7 @@ import {
     exportAvailExcel, exportAvailPDF,
     renderAvailTable, _clickLesson,
 } from './ui.js';
-import { confirmModal } from './modal.js';
+import { confirmModal, showKimiAlert } from './modal.js';
 import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
 import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup } from './references.js';
 import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
@@ -41,6 +41,7 @@ Object.assign(window, {
     renderAvailTable, _clickLesson,
     switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
     addExcludedDate, deleteExcludedDate,
+    _showKimiAlert: showKimiAlert,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
 });

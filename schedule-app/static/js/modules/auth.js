@@ -23,7 +23,7 @@ export async function login() {
         closeModals();
         updateUI();
     } else {
-        alert('Неверный пароль');
+        window._showKimiAlert && window._showKimiAlert('Неверный пароль');
     }
 }
 

@@ -147,8 +147,8 @@ export function updateWeekPreview() {
 export async function addWeek() {
     const groupName = document.getElementById('week-group').value;
     const dateStr = document.getElementById('week-start-date').value;
-    if (!dateStr) return alert('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0430\u0442\u0443 \u043f\u043e\u043d\u0435\u0434\u0435\u043b\u044c\u043d\u0438\u043a\u0430');
-    if (!groupName) return alert('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0433\u0440\u0443\u043f\u043f\u0443');
+    if (!dateStr) { window._showKimiAlert && window._showKimiAlert('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0430\u0442\u0443 \u043f\u043e\u043d\u0435\u0434\u0435\u043b\u044c\u043d\u0438\u043a\u0430'); return; }
+    if (!groupName) { window._showKimiAlert && window._showKimiAlert('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0433\u0440\u0443\u043f\u043f\u0443'); return; }
     const { DAY_ORDER } = require('./config.js');
     const monday = new Date(dateStr + 'T00:00:00');
     const days = DAY_ORDER.map((name, i) => ({
@@ -159,11 +159,11 @@ export async function addWeek() {
         method: 'POST', body: JSON.stringify({ group_name: groupName, dates }),
     });
     if (!check.ok) {
-        alert(check.warnings.map(w => w.message).join('\n'));
+        window._showKimiAlert && window._showKimiAlert(check.warnings.map(w => w.message).join('\n'));
         return;
     }
     const res = await api('/api/days/batch', { method: 'POST', body: JSON.stringify({ days }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { window._showKimiAlert && window._showKimiAlert(res.error); return; }
     closeModals();
     loadScheduleTable();
 }
@@ -173,8 +173,8 @@ export async function restoreWeek() {
     if (!await window.confirmModal('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0432\u0441\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u043d\u044b\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
     const monday = toISODate(state.currentMonday);
     const res = await api('/api/week/restore?monday=' + monday, { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
-    alert('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e \u0434\u043d\u0435\u0439: ' + res.days_restored);
+    if (res.error) { window._showKimiAlert && window._showKimiAlert(res.error); return; }
+    window._showKimiAlert && window._showKimiAlert('\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e \u0434\u043d\u0435\u0439: ' + res.days_restored);
     loadScheduleTable();
 }
 
@@ -183,8 +183,8 @@ export async function deleteWeek() {
     if (!await window.confirmModal('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u0435 \u0434\u043d\u0438 \u0438 \u0443\u0440\u043e\u043a\u0438 \u0437\u0430 \u044d\u0442\u0443 \u043d\u0435\u0434\u0435\u043b\u044e?')) return;
     const monday = toISODate(state.currentMonday);
     const res = await api('/api/week?monday=' + monday, { method: 'DELETE' });
-    if (res.error) { alert(res.error); return; }
-    alert('\u0423\u0434\u0430\u043b\u0435\u043d\u043e \u0434\u043d\u0435\u0439: ' + res.days_deleted);
+    if (res.error) { window._showKimiAlert && window._showKimiAlert(res.error); return; }
+    window._showKimiAlert && window._showKimiAlert('\u0423\u0434\u0430\u043b\u0435\u043d\u043e \u0434\u043d\u0435\u0439: ' + res.days_deleted);
     loadScheduleTable();
 }
 
