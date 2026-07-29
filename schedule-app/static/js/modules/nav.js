@@ -123,7 +123,11 @@ export async function deleteWeek() {
     if (!state.currentMonday) return;
     if (!await confirmModal('Удалить все дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
-    const res = await api('/api/week?monday=' + m, { method: 'DELETE' });
+    let url = '/api/week?monday=' + m;
+    if (state.currentScheduleType === 'group' && state.currentScheduleName) {
+        url += '&group=' + encodeURIComponent(state.currentScheduleName);
+    }
+    const res = await api(url, { method: 'DELETE' });
     if (res.error) { await showKimiAlert(res.error); return; }
     await showKimiAlert('Удалено дней: ' + res.days_deleted);
     loadScheduleTable();
