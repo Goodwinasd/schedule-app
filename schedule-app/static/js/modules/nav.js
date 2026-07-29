@@ -109,15 +109,25 @@ export async function addWeek() {
     loadScheduleTable();
 }
 
+function _weekTargetParams() {
+    if (!state.currentScheduleType || !state.currentScheduleId) return '';
+    if (state.currentScheduleType === 'group') {
+        return '&target_type=group&target_id=' + encodeURIComponent(state.currentScheduleName);
+    } else if (state.currentScheduleType === 'teacher') {
+        return '&target_type=teacher&target_id=' + state.currentScheduleId;
+    } else if (state.currentScheduleType === 'classroom') {
+        return '&target_type=classroom&target_id=' + state.currentScheduleId;
+    }
+    return '';
+}
+
 export async function restoreWeek() {
     if (!state.currentMonday) return;
     if (!await confirmModal('Восстановить все удаленные дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
-    let url = '/api/week/restore?monday=' + m;
-    if (state.currentScheduleType === 'group' && state.currentScheduleName) {
-        url += '&group=' + encodeURIComponent(state.currentScheduleName);
-    }
-    const res = await api(url, { method: 'POST' });
+    const params = _weekTargetParams();
+    if (!params) { await showKimiAlert('Сначала откройте расписание'); return; }
+    const res = await api('/api/week/restore?monday=' + m + params, { method: 'POST' });
     if (res.error) { await showKimiAlert(res.error); return; }
     await showKimiAlert('Восстановлено дней: ' + res.days_restored);
     loadScheduleTable();
@@ -127,11 +137,9 @@ export async function deleteWeek() {
     if (!state.currentMonday) return;
     if (!await confirmModal('Удалить все дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
-    let url = '/api/week?monday=' + m;
-    if (state.currentScheduleType === 'group' && state.currentScheduleName) {
-        url += '&group=' + encodeURIComponent(state.currentScheduleName);
-    }
-    const res = await api(url, { method: 'DELETE' });
+    const params = _weekTargetParams();
+    if (!params) { await showKimiAlert('Сначала откройте расписание'); return; }
+    const res = await api('/api/week?monday=' + m + params, { method: 'DELETE' });
     if (res.error) { await showKimiAlert(res.error); return; }
     await showKimiAlert('Удалено дней: ' + res.days_deleted);
     loadScheduleTable();

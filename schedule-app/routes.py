@@ -1089,41 +1089,47 @@ def validate_lesson():
 def delete_week():
     """Удалить всю неделю (мягкое удаление)
     ---
-    parameters:
-      - in: query
-        name: monday
-        type: string
-        required: true
-        description: Дата понедельника (YYYY-MM-DD)
     responses:
       200:
         description: Объект с days_deleted
       400:
-        description: monday обязателен
+        description: monday, target_type, target_id обязательны
     """
     monday = request.args.get('monday', '')
-    group = request.args.get('group', '')
-    if not monday or not group:
-        return jsonify({"error": "monday and group required"}), 400
+    target_type = request.args.get('target_type', '')
+    target_id = request.args.get('target_id', '')
+    if not monday or not target_type or not target_id:
+        return jsonify({"error": "monday, target_type, target_id required"}), 400
+    if target_type not in ('group', 'teacher', 'classroom'):
+        return jsonify({"error": "target_type must be group, teacher, or classroom"}), 400
     week_dates = [d['date'] for d in build_week_dates(monday)]
+    placeholders = ','.join('?' * len(week_dates))
     conn = get_db()
     try:
         conn.execute('BEGIN IMMEDIATE')
-        placeholders = ','.join('?' * len(week_dates))
-        day_filter = f"date IN ({placeholders}) AND group_name = ?"
-        day_params = week_dates[:] + [group]
-        conn.execute(
-            f"UPDATE lessons SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND day_id IN (SELECT id FROM schedule_days WHERE {day_filter})",
-            day_params
-        )
-        conn.execute(
-            f"UPDATE schedule_days SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND {day_filter}",
-            day_params
-        )
-        affected = conn.execute(
-            f"SELECT COUNT(*) FROM schedule_days WHERE {day_filter} AND deleted_at IS NOT NULL",
-            day_params
-        ).fetchone()[0]
+        if target_type == 'group':
+            conn.execute(
+                f"UPDATE lessons SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ?)",
+                week_dates + [target_id]
+            )
+            conn.execute(
+                f"UPDATE schedule_days SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND date IN ({placeholders}) AND group_name = ?",
+                week_dates + [target_id]
+            )
+            affected = conn.execute(
+                f"SELECT COUNT(*) FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ? AND deleted_at IS NOT NULL",
+                week_dates + [target_id]
+            ).fetchone()[0]
+        else:
+            col = 'teacher_id' if target_type == 'teacher' else 'classroom_id'
+            conn.execute(
+                f"UPDATE lessons SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND {col} = ? AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}))",
+                [int(target_id)] + week_dates
+            )
+            affected = conn.execute(
+                f"SELECT COUNT(*) FROM lessons WHERE deleted_at IS NOT NULL AND {col} = ? AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}))",
+                [int(target_id)] + week_dates
+            ).fetchone()[0]
         conn.commit()
     finally:
         conn.close()
@@ -1135,41 +1141,47 @@ def delete_week():
 def restore_week():
     """Восстановить удалённую неделю
     ---
-    parameters:
-      - in: query
-        name: monday
-        type: string
-        required: true
-        description: Дата понедельника (YYYY-MM-DD)
     responses:
       200:
         description: Объект с days_restored
       400:
-        description: monday обязателен
+        description: monday, target_type, target_id обязательны
     """
     monday = request.args.get('monday', '')
-    group = request.args.get('group', '')
-    if not monday or not group:
-        return jsonify({"error": "monday and group required"}), 400
+    target_type = request.args.get('target_type', '')
+    target_id = request.args.get('target_id', '')
+    if not monday or not target_type or not target_id:
+        return jsonify({"error": "monday, target_type, target_id required"}), 400
+    if target_type not in ('group', 'teacher', 'classroom'):
+        return jsonify({"error": "target_type must be group, teacher, or classroom"}), 400
     week_dates = [d['date'] for d in build_week_dates(monday)]
+    placeholders = ','.join('?' * len(week_dates))
     conn = get_db()
     try:
         conn.execute('BEGIN IMMEDIATE')
-        placeholders = ','.join('?' * len(week_dates))
-        day_filter = f"date IN ({placeholders}) AND group_name = ?"
-        day_params = week_dates[:] + [group]
-        conn.execute(
-            f"UPDATE lessons SET deleted_at = NULL WHERE deleted_at IS NOT NULL AND day_id IN (SELECT id FROM schedule_days WHERE {day_filter})",
-            day_params
-        )
-        conn.execute(
-            f"UPDATE schedule_days SET deleted_at = NULL WHERE deleted_at IS NOT NULL AND {day_filter}",
-            day_params
-        )
-        affected = conn.execute(
-            f"SELECT COUNT(*) FROM schedule_days WHERE {day_filter} AND deleted_at IS NULL",
-            day_params
-        ).fetchone()[0]
+        if target_type == 'group':
+            conn.execute(
+                f"UPDATE lessons SET deleted_at = NULL WHERE deleted_at IS NOT NULL AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ?)",
+                week_dates + [target_id]
+            )
+            conn.execute(
+                f"UPDATE schedule_days SET deleted_at = NULL WHERE deleted_at IS NOT NULL AND date IN ({placeholders}) AND group_name = ?",
+                week_dates + [target_id]
+            )
+            affected = conn.execute(
+                f"SELECT COUNT(*) FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ? AND deleted_at IS NULL",
+                week_dates + [target_id]
+            ).fetchone()[0]
+        else:
+            col = 'teacher_id' if target_type == 'teacher' else 'classroom_id'
+            conn.execute(
+                f"UPDATE lessons SET deleted_at = NULL WHERE deleted_at IS NOT NULL AND {col} = ? AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}))",
+                [int(target_id)] + week_dates
+            )
+            affected = conn.execute(
+                f"SELECT COUNT(*) FROM lessons WHERE deleted_at IS NULL AND {col} = ? AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}))",
+                [int(target_id)] + week_dates
+            ).fetchone()[0]
         conn.commit()
     finally:
         conn.close()

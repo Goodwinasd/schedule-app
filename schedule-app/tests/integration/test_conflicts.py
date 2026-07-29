@@ -108,7 +108,7 @@ class TestConflictScenarios:
             'period': 2, 'subject_id': 2, 'teacher_id': 2, 'classroom_id': 2, 'group_id': 1
         }, headers=h)
 
-        resp = client.delete('/api/week?monday=2026-09-07&group=ИС-31', headers=h)
+        resp = client.delete('/api/week?monday=2026-09-07&target_type=group&target_id=ИС-31', headers=h)
         assert resp.status_code == 200
         assert resp.get_json()['days_deleted'] == 1
 
@@ -119,7 +119,7 @@ class TestConflictScenarios:
         schedule = client.get('/api/schedule-table?group=ИС-31&monday=2026-09-07').get_json()
         assert schedule['week_exists'] is False
 
-        resp = client.post('/api/week/restore?monday=2026-09-07&group=ИС-31', headers=h)
+        resp = client.post('/api/week/restore?monday=2026-09-07&target_type=group&target_id=ИС-31', headers=h)
         assert resp.status_code == 200
         assert resp.get_json()['days_restored'] == 1
 

@@ -373,8 +373,8 @@ class TestLessons:
 
 
 class TestWeekRoutes:
-    def test_delete_week(self, client, seed_days, admin_csrf):
-        resp = client.delete('/api/week?monday=2026-09-07&group=Группа-1',
+    def test_delete_week_group(self, client, seed_days, admin_csrf):
+        resp = client.delete('/api/week?monday=2026-09-07&target_type=group&target_id=Группа-1',
                              headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         data = resp.get_json()
@@ -384,10 +384,10 @@ class TestWeekRoutes:
         resp = client.delete('/api/week', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
 
-    def test_restore_week(self, client, seed_days, admin_csrf):
-        client.delete('/api/week?monday=2026-09-07&group=Группа-1',
+    def test_restore_week_group(self, client, seed_days, admin_csrf):
+        client.delete('/api/week?monday=2026-09-07&target_type=group&target_id=Группа-1',
                       headers={'X-CSRF-Token': admin_csrf})
-        resp = client.post('/api/week/restore?monday=2026-09-07&group=Группа-1',
+        resp = client.post('/api/week/restore?monday=2026-09-07&target_type=group&target_id=Группа-1',
                            headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         data = resp.get_json()
@@ -396,6 +396,20 @@ class TestWeekRoutes:
     def test_restore_week_no_params(self, client, admin_csrf):
         resp = client.post('/api/week/restore', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
+
+    def test_delete_week_teacher(self, client, seed_lessons, admin_csrf):
+        resp = client.delete('/api/week?monday=2026-09-07&target_type=teacher&target_id=1',
+                             headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['days_deleted'] >= 1
+
+    def test_delete_week_classroom(self, client, seed_lessons, admin_csrf):
+        resp = client.delete('/api/week?monday=2026-09-07&target_type=classroom&target_id=1',
+                             headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['days_deleted'] >= 1
 
 
 class TestSettings:
