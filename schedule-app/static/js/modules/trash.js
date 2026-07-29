@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { escapeHtml } from './utils.js';
-import { confirmModal } from './modal.js';
+import { confirmModal, showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
 
 export async function loadTrashTab() {
@@ -59,7 +59,7 @@ export async function restoreTrashItem(endpoint, id) {
     if (!await confirmModal('Восстановить ' + (labels[endpoint] || 'запись') + '?')) return;
     const url = endpoint === 'days' ? `/api/days/${id}/restore` : endpoint === 'lessons' ? `/api/lessons/${id}/restore` : `/api/${endpoint}/${id}/restore`;
     const res = await api(url, { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     const item = res.item;
     if (item) {
         if (item.type === 'lesson' && item.subject_name) {
@@ -78,7 +78,7 @@ export async function purgeTrash() {
     if (!await confirmModal('Удалить навсегда записи старше 30 дней?')) return;
     if (!await confirmModal('Это действие необратимо. Продолжить?')) return;
     const res = await api('/api/db/purge-trash', { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
-    alert('Очищено: ' + Object.values(res.purged || {}).reduce((a, b) => a + b, 0) + ' записей');
+    if (res.error) { await showKimiAlert(res.error); return; }
+    await showKimiAlert('Очищено: ' + Object.values(res.purged || {}).reduce((a, b) => a + b, 0) + ' записей');
     loadTrashTab();
 }

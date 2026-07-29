@@ -2,7 +2,7 @@ import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getMonday, addDays, getWeekNumber, formatChipRange, formatShortDate, populateSelectByName } from './utils.js';
 import { api } from './api.js';
-import { openModal, confirmModal } from './modal.js';
+import { openModal, confirmModal, showKimiAlert } from './modal.js';
 import { loadScheduleTable } from './schedule.js';
 
 export function getWeeksList() {
@@ -90,14 +90,14 @@ export function updateWeekPreview() {
 export async function addWeek() {
     const gn = document.getElementById('week-group').value;
     const ds = document.getElementById('week-start-date').value;
-    if (!ds) return alert('Выберите дату понедельника');
-    if (!gn) return alert('Выберите группу');
+    if (!ds) { await showKimiAlert('Выберите дату понедельника'); return; }
+    if (!gn) { await showKimiAlert('Выберите группу'); return; }
     const monday = new Date(ds + 'T00:00:00');
     const days = DAY_ORDER.map((n, i) => ({ day_name: n, date: toISODate(addDays(monday, i)), group_name: gn }));
     const check = await api('/api/validate-week', { method: 'POST', body: JSON.stringify({ group_name: gn, dates: days.map(d => d.date) }) });
-    if (!check.ok) { alert(check.warnings.map(w => w.message).join('\n')); return; }
+    if (!check.ok) { await showKimiAlert(check.warnings.map(w => w.message).join('\n')); return; }
     const res = await api('/api/days/batch', { method: 'POST', body: JSON.stringify({ days }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     window.closeModals();
     loadScheduleTable();
 }
@@ -107,8 +107,8 @@ export async function restoreWeek() {
     if (!await confirmModal('Восстановить все удаленные дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
     const res = await api('/api/week/restore?monday=' + m, { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
-    alert('Восстановлено дней: ' + res.days_restored);
+    if (res.error) { await showKimiAlert(res.error); return; }
+    await showKimiAlert('Восстановлено дней: ' + res.days_restored);
     loadScheduleTable();
 }
 
@@ -117,7 +117,7 @@ export async function deleteWeek() {
     if (!await confirmModal('Удалить все дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
     const res = await api('/api/week?monday=' + m, { method: 'DELETE' });
-    if (res.error) { alert(res.error); return; }
-    alert('Удалено дней: ' + res.days_deleted);
+    if (res.error) { await showKimiAlert(res.error); return; }
+    await showKimiAlert('Удалено дней: ' + res.days_deleted);
     loadScheduleTable();
 }

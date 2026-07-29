@@ -1,5 +1,7 @@
 import { api } from './api.js';
 import { escapeHtml } from './utils.js';
+import { showKimiAlert } from './modal.js';
+import { showToast } from './toast.js';
 
 export async function loadSettingsTab() {
     const cont = document.getElementById('settings-content');
@@ -24,8 +26,8 @@ export async function saveSetting(key) {
     if (!inp) return;
     const val = inp.value.trim();
     const res = await api(`/api/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value: val }) });
-    if (res.error) { alert(res.error); return; }
-    alert('Сохранено');
+    if (res.error) { await showKimiAlert(res.error); return; }
+    showToast('Сохранено', 'success');
     loadSettingsTab();
 }
 
@@ -66,9 +68,9 @@ export async function addExcludedDate() {
     const start = document.getElementById('excl-start');
     const end = document.getElementById('excl-end');
     const reason = document.getElementById('excl-reason');
-    if (!start || !start.value || !end || !end.value) { alert('Укажите начальную и конечную дату'); return; }
+    if (!start || !start.value || !end || !end.value) { await showKimiAlert('Укажите начальную и конечную дату'); return; }
     const res = await api('/api/excluded-dates', { method: 'POST', body: JSON.stringify({ start_date: start.value, end_date: end.value, reason: (reason ? reason.value : '') }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     loadExcludedDates();
 }
 

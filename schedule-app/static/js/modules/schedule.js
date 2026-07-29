@@ -2,7 +2,7 @@ import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getWeekNumber, getMonday, addDays, formatDateRange, formatChipRange, shiftLabel, populateSelect } from './utils.js';
 import { api } from './api.js';
-import { openModal, confirmModal } from './modal.js';
+import { openModal, confirmModal, showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
 
 function checkConflictsForLesson(lesson, dayDate, period) {
@@ -192,10 +192,10 @@ export async function addLesson() {
         const dn = dayNames[dt.getDay() === 0 ? 6 : dt.getDay() - 1];
         const go = state.groupsList.find(g => g.id === d.group_id);
         const dayRes = await api('/api/days', { method: 'POST', body: JSON.stringify({ day_name: dn, date: state.currentLessonDate, group_name: go ? go.name : '' }) });
-        if (dayRes.error) { alert(dayRes.error); return; }
+        if (dayRes.error) { await showKimiAlert(dayRes.error); return; }
         dayId = dayRes.id;
     }
-    if (!dayId) { alert('Не удалось определить день для пары'); return; }
+    if (!dayId) { await showKimiAlert('Не удалось определить день для пары'); return; }
     const res = await api(`/api/days/${dayId}/lessons`, { method: 'POST', body: JSON.stringify(d) });
     if (res.error) {
         const el = document.getElementById('validation-warnings');
@@ -253,7 +253,7 @@ export async function deleteCurrentLesson() {
     if (!lessonId) return;
     if (!await confirmModal('Удалить пара?')) return;
     const res = await api(`/api/lessons/${lessonId}`, { method: 'DELETE' });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     window.closeModals();
     loadScheduleTable();
 }

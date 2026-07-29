@@ -1,7 +1,7 @@
 import state from './state.js';
 import { escapeHtml, getMonday, addDays, toISODate, formatChipRange } from './utils.js';
 import { api } from './api.js';
-import { openModal, _confirmState } from './modal.js';
+import { openModal, _confirmState, showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
 import { loadReferences, renderRefList, populateSubjectTeacherSelect } from './references.js';
 import { loadScheduleTable, addLesson } from './schedule.js';
@@ -164,7 +164,7 @@ async function loadHealthTab() {
 export async function login() {
     const data = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ password: document.getElementById('login-password').value }) });
     if (data.success) { state.isAdmin = true; state.csrfToken = data.csrf_token || ''; closeModals(); updateUI(); }
-    else alert('Неверный пароль');
+    else await showKimiAlert('Неверный пароль');
 }
 
 export async function logout() {

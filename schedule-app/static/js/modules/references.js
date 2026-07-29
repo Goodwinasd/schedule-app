@@ -1,7 +1,8 @@
 import state from './state.js';
 import { api } from './api.js';
 import { escapeHtml, populateSelect, populateSelectByName } from './utils.js';
-import { confirmModal } from './modal.js';
+import { confirmModal, showKimiAlert, showKimiPrompt } from './modal.js';
+import { showToast } from './toast.js';
 
 export async function loadReferences() {
     const refs = await Promise.all([
@@ -53,7 +54,7 @@ export async function addGroup() {
     const name = inp.value.trim();
     if (!name) return;
     const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     inp.value = ''; document.getElementById('ref-groups-distance').checked = false;
     renderRefList('groups', 'ref-groups');
 }
@@ -61,13 +62,13 @@ export async function addGroup() {
 export async function editGroup(id) {
     const g = state.groupsList.find(g => g.id === id);
     if (!g) return;
-    const nn = prompt('Название:', g.name);
+    const nn = await showKimiPrompt('Название:', g.name);
     if (nn === null || !nn.trim()) return;
-    const nc = prompt('Курс (1-4):', g.course);
+    const nc = await showKimiPrompt('Курс (1-4):', String(g.course));
     if (nc === null) return;
     const dist = await confirmModal('Заочное отделение?');
     const res = await api(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), course: parseInt(nc) || g.course, is_distance: dist }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     renderRefList('groups', 'ref-groups');
 }
 
@@ -79,7 +80,7 @@ export async function addSubject() {
     const body = { name };
     if (sel && sel.value) body.default_teacher_id = parseInt(sel.value);
     const res = await api('/api/subjects', { method: 'POST', body: JSON.stringify(body) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     inp.value = ''; if (sel) sel.value = '';
     renderRefList('subjects', 'ref-subjects');
 }
@@ -87,46 +88,46 @@ export async function addSubject() {
 export async function editTeacher(id) {
     const t = state.teachersList.find(t => t.id === id);
     if (!t) return;
-    const nn = prompt('ФИО преподавателя:', t.name);
+    const nn = await showKimiPrompt('ФИО преподавателя:', t.name);
     if (nn === null || !nn.trim()) return;
-    const tp = prompt('Телефон:', t.phone || '');
+    const tp = await showKimiPrompt('Телефон:', t.phone || '');
     if (tp === null) return;
     const res = await api(`/api/teachers/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), phone: tp.trim() }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     renderRefList('teachers', 'ref-teachers');
 }
 
 export async function editClassroom(id) {
     const c = state.classroomsList.find(c => c.id === id);
     if (!c) return;
-    const nn = prompt('Название аудитории:', c.name);
+    const nn = await showKimiPrompt('Название аудитории:', c.name);
     if (nn === null || !nn.trim()) return;
     const res = await api(`/api/classrooms/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim() }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     renderRefList('classrooms', 'ref-classrooms');
 }
 
 export async function editSubject(id) {
     const s = state.subjectsList.find(s => s.id === id);
     if (!s) return;
-    const nn = prompt('Название предмета:', s.name);
+    const nn = await showKimiPrompt('Название предмета:', s.name);
     if (nn === null || !nn.trim()) return;
     const opts = ['Без преподавателя', ...state.teachersList.map((t, i) => `${i + 1}. ${t.name}`)];
-    const ts = prompt('Номер преподавателя (или 0 для без преподавателя):\n' + opts.map((o, i) => `  ${i} — ${o}`).join('\n'), s.default_teacher_id ? state.teachersList.findIndex(t => t.id === s.default_teacher_id) + 1 : 0);
+    const ts = await showKimiPrompt('Номер преподавателя (или 0 для без преподавателя):\n' + opts.map((o, i) => `  ${i} — ${o}`).join('\n'), s.default_teacher_id ? String(state.teachersList.findIndex(t => t.id === s.default_teacher_id) + 1) : '0');
     if (ts === null) return;
     const ti = parseInt(ts);
     const body = { name: nn.trim() };
-    if (ti > 0 && ti <= state.teachersList.length) body.default_teacher_id = state.teachersList[ti - 1].id;
+    if (!isNaN(ti) && ti > 0 && ti <= state.teachersList.length) body.default_teacher_id = state.teachersList[ti - 1].id;
     else body.default_teacher_id = null;
     const res = await api(`/api/subjects/${id}`, { method: 'PUT', body: JSON.stringify(body) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     renderRefList('subjects', 'ref-subjects');
 }
 
 export async function advanceCourses() {
     if (!await confirmModal('Перевести все курсы на +1?\nГруппы 4-го курса будут Удалены.')) return;
     const res = await api('/api/groups/advance-courses', { method: 'POST' });
-    if (res.success) { alert(`Готово! Удалено групп: ${res.deleted}`); renderRefList('groups', 'ref-groups'); }
+    if (res.success) { await showKimiAlert(`Готово! Удалено групп: ${res.deleted}`); renderRefList('groups', 'ref-groups'); }
 }
 
 export async function addRefItem(endpoint, inputId, containerId) {
@@ -136,7 +137,7 @@ export async function addRefItem(endpoint, inputId, containerId) {
     const body = { name };
     if (endpoint === 'teachers') { const phone = document.getElementById('ref-teachers-phone'); if (phone) body.phone = phone.value.trim(); }
     const res = await api(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify(body) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     inp.value = '';
     if (endpoint === 'teachers') { const phone = document.getElementById('ref-teachers-phone'); if (phone) phone.value = ''; }
     renderRefList(endpoint, containerId);
@@ -145,20 +146,20 @@ export async function addRefItem(endpoint, inputId, containerId) {
 export async function deleteRefItem(endpoint, id, containerId) {
     if (!await confirmModal('Удалить?\n\nВнимание: запись может использоваться в расписании.')) return;
     const res = await api(`/api/${endpoint}/${id}`, { method: 'DELETE' });
-    if (res.error) { alert(res.error); return; }
-    if (res.warning) alert(res.warning);
+    if (res.error) { await showKimiAlert(res.error); return; }
+    if (res.warning) await showKimiAlert(res.warning);
     renderRefList(endpoint, containerId);
 }
 
 export async function restoreRefItem(endpoint, id, containerId) {
     if (!await confirmModal('Восстановить запись?')) return;
     const res = await api(`/api/${endpoint}/${id}/restore`, { method: 'POST' });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     renderRefList(endpoint, containerId);
 }
 
 export async function quickAdd(endpoint, selectId) {
-    const name = prompt('Введите название:');
+    const name = await showKimiPrompt('Введите название:');
     if (!name || !name.trim()) return;
     const res = await api(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
     await loadReferences();
@@ -168,10 +169,10 @@ export async function quickAdd(endpoint, selectId) {
 }
 
 export async function quickAddGroup() {
-    const name = prompt('Номер группы:');
+    const name = await showKimiPrompt('Номер группы:');
     if (!name || !name.trim()) return;
     const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name: name.trim(), course: 1, is_distance: false }) });
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { await showKimiAlert(res.error); return; }
     await loadReferences();
     populateSelectByName('week-group', state.groupsList, '— выбрать группу —');
     document.getElementById('week-group').value = name.trim();
