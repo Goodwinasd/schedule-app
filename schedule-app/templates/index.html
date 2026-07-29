@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Расписание</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=18">
+    <link rel="stylesheet" href="/static/css/style.css?v=19">
 </head>
 <body>
     <div id="app">
@@ -175,13 +175,15 @@
         <div class="modal-content modal-wide">
             <div class="ref-header">
                 <h2>⚙️ Администрирование</h2>
-                <button class="ref-done" data-action="closeModals">✅ Готово</button>
+                <div class="ref-header-actions">
+                    <button class="btn btn-ghost btn-sm" data-action="openDashboard">📊 Аналитика и окна</button>
+                    <button class="ref-done" data-action="closeModals">✅ Готово</button>
+                </div>
             </div>
             <div class="admin-tabs" id="admin-tabs">
                 <button class="admin-tab active" draggable="true" data-tab="refs" data-action="switchAdminTab" data-params='["refs"]'><span class="tab-grip">⠿</span> Справочники</button>
                 <button class="admin-tab" draggable="true" data-tab="trash" data-action="switchAdminTab" data-params='["trash"]'><span class="tab-grip">⠿</span> Корзина</button>
                 <button class="admin-tab" draggable="true" data-tab="system" data-action="switchAdminTab" data-params='["system"]'><span class="tab-grip">⠿</span> Система</button>
-                <button class="admin-tab" draggable="true" data-tab="availability" data-action="switchAdminTab" data-params='["availability"]'><span class="tab-grip">⠿</span> 📅 Окна</button>
             </div>
             <div id="admin-tab-refs" class="admin-tab-content active">
                 <div class="ref-grid">

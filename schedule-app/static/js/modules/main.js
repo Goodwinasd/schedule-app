@@ -8,7 +8,7 @@ import state from './state.js';
 import { api } from './api.js';
 import {
     goHome, showSchedule, showLoginModal, closeModals,
-    showAdminPanel, switchAdminTab,
+    showAdminPanel, switchAdminTab, openDashboard,
     login, logout,
     showAvailability, selectAvailWeek, availCarouselSkip,
     selectAvailDay, setAvailMode, loadAvailability, updateUI, toggleConflicts,
@@ -39,7 +39,7 @@ Object.assign(window, {
     toggleAvailHeatmap, toggleAvailGroupByCourse, closeAvailability,
     exportAvailExcel, exportAvailPDF,
     renderAvailTable, _clickLesson,
-    switchAdminTab, restoreTrashItem, purgeTrash, confirmModal,
+    switchAdminTab, openDashboard, restoreTrashItem, purgeTrash, confirmModal,
     addExcludedDate, deleteExcludedDate,
     _showKimiAlert: showKimiAlert,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable

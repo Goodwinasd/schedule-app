@@ -669,18 +669,25 @@ main {
 .ref-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     background: #FFFFFF;
     border-radius: var(--radius);
     padding: 12px 20px;
 }
 
 .ref-header h2 {
-    flex: 1;
+    flex: 0 0 auto;
     font-size: 18px;
     font-weight: 600;
     color: var(--text);
-    text-align: center;
     margin: 0;
+}
+
+.ref-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
 }
 
 .ref-done {

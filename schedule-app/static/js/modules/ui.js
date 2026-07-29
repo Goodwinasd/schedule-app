@@ -117,7 +117,7 @@ export function showAdminPanel() {
     _restoreAdminTabOrder();
     const first = document.querySelector('.admin-tab');
     if (first) first.classList.add('active');
-    const firstContent = document.getElementById('admin-tab-refs');
+    const firstContent = document.getElementById('admin-tab-' + (first ? first.dataset.tab : 'refs'));
     if (firstContent) firstContent.classList.add('active');
 }
 
@@ -178,17 +178,17 @@ function _onTabDrop(e) {
 export function switchAdminTab(tab) {
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.admin-tab-panel').forEach(p => p.classList.remove('active'));
     const tabBtn = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
     if (tabBtn) tabBtn.classList.add('active');
     const content = document.getElementById(`admin-tab-${tab}`);
-    if (content) { content.classList.add('active'); return; }
-    if (tab === 'availability') {
-        closeModals();
-        showAvailability();
-    }
+    if (content) content.classList.add('active');
     if (tab === 'trash') loadTrashTab();
     if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
+}
+
+export function openDashboard() {
+    closeModals();
+    showAvailability();
 }
 
 async function loadHealthTab() {
