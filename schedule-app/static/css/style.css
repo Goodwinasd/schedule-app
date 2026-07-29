@@ -1371,13 +1371,25 @@ main {
 }
 .admin-tab {
     padding: 8px 16px;
-    cursor: pointer;
+    cursor: grab;
     border: none;
     background: none;
     font-size: 14px;
     color: var(--text-secondary);
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.admin-tab:active {
+    cursor: grabbing;
+}
+.admin-tab.dragging {
+    opacity: 0.4;
+}
+.admin-tab.drag-over {
+    background: var(--surface-hover);
+    border-bottom-color: var(--accent);
 }
 .admin-tab.active {
     color: var(--accent);

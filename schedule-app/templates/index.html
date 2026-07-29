@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Расписание</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <link rel="stylesheet" href="/static/css/style.css?v=14">
 </head>
 <body>
     <div id="app">
@@ -176,11 +176,11 @@
                 <h2>⚙️ Администрирование</h2>
                 <button class="ref-done" data-action="closeModals">✅ Готово</button>
             </div>
-            <div class="admin-tabs">
-                <button class="admin-tab active" data-tab="refs" data-action="switchAdminTab" data-params='["refs"]'>Справочники</button>
-                <button class="admin-tab" data-tab="trash" data-action="switchAdminTab" data-params='["trash"]'>Корзина</button>
-                <button class="admin-tab" data-tab="system" data-action="switchAdminTab" data-params='["system"]'>Система</button>
-                <button class="admin-tab" data-tab="availability" data-action="switchAdminTab" data-params='["availability"]'>📅 Окна</button>
+            <div class="admin-tabs" id="admin-tabs">
+                <button class="admin-tab active" draggable="true" data-tab="refs" data-action="switchAdminTab" data-params='["refs"]'>Справочники</button>
+                <button class="admin-tab" draggable="true" data-tab="trash" data-action="switchAdminTab" data-params='["trash"]'>Корзина</button>
+                <button class="admin-tab" draggable="true" data-tab="system" data-action="switchAdminTab" data-params='["system"]'>Система</button>
+                <button class="admin-tab" draggable="true" data-tab="availability" data-action="switchAdminTab" data-params='["availability"]'>📅 Окна</button>
             </div>
             <div id="admin-tab-refs" class="admin-tab-content active">
                 <div class="ref-grid">

@@ -114,10 +114,65 @@ export function showAdminPanel() {
     populateSubjectTeacherSelect();
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    _restoreAdminTabOrder();
     const first = document.querySelector('.admin-tab');
     if (first) first.classList.add('active');
     const firstContent = document.getElementById('admin-tab-refs');
     if (firstContent) firstContent.classList.add('active');
+}
+
+function _restoreAdminTabOrder() {
+    const container = document.getElementById('admin-tabs');
+    if (!container) return;
+    const order = localStorage.getItem('admin_tabs_order');
+    const tabs = container.querySelectorAll('.admin-tab');
+    if (order) {
+        try {
+            const ids = JSON.parse(order);
+            const tabMap = {};
+            tabs.forEach(t => { tabMap[t.dataset.tab] = t; });
+            ids.forEach(id => { if (tabMap[id]) container.appendChild(tabMap[id]); });
+        } catch (e) {}
+    }
+    tabs.forEach(tab => {
+        tab.addEventListener('dragstart', _onTabDragStart);
+        tab.addEventListener('dragend', _onTabDragEnd);
+        tab.addEventListener('dragover', _onTabDragOver);
+        tab.addEventListener('drop', _onTabDrop);
+    });
+}
+
+function _onTabDragStart(e) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', e.target.dataset.tab);
+    e.target.classList.add('dragging');
+}
+
+function _onTabDragEnd(e) {
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.admin-tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+}
+
+function _onTabDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.admin-tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+    e.currentTarget.classList.add('drag-over');
+}
+
+function _onTabDrop(e) {
+    e.preventDefault();
+    const fromTab = e.dataTransfer.getData('text/plain');
+    const toTab = e.currentTarget.dataset.tab;
+    if (fromTab === toTab) return;
+    const container = document.getElementById('admin-tabs');
+    const fromEl = container.querySelector(`[data-tab="${fromTab}"]`);
+    const toEl = container.querySelector(`[data-tab="${toTab}"]`);
+    if (!fromEl || !toEl) return;
+    container.insertBefore(fromEl, toEl.nextSibling);
+    document.querySelectorAll('.admin-tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+    const ids = Array.from(container.querySelectorAll('.admin-tab')).map(t => t.dataset.tab);
+    localStorage.setItem('admin_tabs_order', JSON.stringify(ids));
 }
 
 export function switchAdminTab(tab) {
