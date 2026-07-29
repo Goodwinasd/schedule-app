@@ -197,6 +197,12 @@ function _onTabDrop(e) {
 }
 
 export function switchAdminTab(tab) {
+    const adminContent = document.querySelector('#references-modal .modal-content.t-modal');
+    let oldHeight;
+    if (adminContent) {
+        oldHeight = adminContent.offsetHeight;
+        adminContent.style.height = oldHeight + 'px';
+    }
     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
     const tabBtn = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
@@ -205,6 +211,13 @@ export function switchAdminTab(tab) {
     if (content) content.classList.add('active');
     if (tab === 'trash') loadTrashTab();
     if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
+    if (adminContent) {
+        requestAnimationFrame(() => {
+            const newHeight = adminContent.scrollHeight;
+            adminContent.style.height = newHeight + 'px';
+        });
+        setTimeout(() => { adminContent.style.height = ''; }, 250);
+    }
 }
 
 export function openDashboard() {
