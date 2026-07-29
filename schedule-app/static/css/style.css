@@ -684,20 +684,23 @@ main {
 }
 
 .ref-done {
-    background: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
     border: none;
-    padding: 0;
+    border-radius: 12px;
     font-family: inherit;
-    font-size: 15px;
-    font-weight: 500;
-    color: #5B8C7A;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
     cursor: pointer;
-    transition: color 0.15s;
+    transition: background 0.2s ease;
 }
 
 .ref-done:hover {
-    color: #3D6B58;
-    text-decoration: underline;
+    background: var(--accent-hover);
 }
 
 #references-modal .ref-grid {
