@@ -374,26 +374,26 @@ class TestLessons:
 
 class TestWeekRoutes:
     def test_delete_week(self, client, seed_days, admin_csrf):
-        resp = client.delete('/api/week?monday=2026-09-07',
+        resp = client.delete('/api/week?monday=2026-09-07&group=Группа-1',
                              headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['days_deleted'] >= 2
 
-    def test_delete_week_no_monday(self, client, admin_csrf):
+    def test_delete_week_no_params(self, client, admin_csrf):
         resp = client.delete('/api/week', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
 
     def test_restore_week(self, client, seed_days, admin_csrf):
-        client.delete('/api/week?monday=2026-09-07',
+        client.delete('/api/week?monday=2026-09-07&group=Группа-1',
                       headers={'X-CSRF-Token': admin_csrf})
-        resp = client.post('/api/week/restore?monday=2026-09-07',
+        resp = client.post('/api/week/restore?monday=2026-09-07&group=Группа-1',
                            headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['days_restored'] >= 2
 
-    def test_restore_week_no_monday(self, client, admin_csrf):
+    def test_restore_week_no_params(self, client, admin_csrf):
         resp = client.post('/api/week/restore', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
 

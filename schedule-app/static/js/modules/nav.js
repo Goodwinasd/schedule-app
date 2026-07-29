@@ -113,7 +113,11 @@ export async function restoreWeek() {
     if (!state.currentMonday) return;
     if (!await confirmModal('Восстановить все удаленные дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
-    const res = await api('/api/week/restore?monday=' + m, { method: 'POST' });
+    let url = '/api/week/restore?monday=' + m;
+    if (state.currentScheduleType === 'group' && state.currentScheduleName) {
+        url += '&group=' + encodeURIComponent(state.currentScheduleName);
+    }
+    const res = await api(url, { method: 'POST' });
     if (res.error) { await showKimiAlert(res.error); return; }
     await showKimiAlert('Восстановлено дней: ' + res.days_restored);
     loadScheduleTable();
