@@ -4,6 +4,7 @@ import { escapeHtml, toISODate, getWeekNumber, getMonday, addDays, formatDateRan
 import { api } from './api.js';
 import { openModal, confirmModal, showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
+import { showLoader, hideLoader } from './loader.js';
 
 function checkConflictsForLesson(lesson, dayDate, period) {
     if (!state.showConflicts) return null;
@@ -104,14 +105,16 @@ function renderScheduleTable(data) {
 }
 
 export async function loadScheduleTable() {
+    showLoader('Загрузка расписания');
     const cont = document.getElementById('schedule-table-container');
-    cont.innerHTML = '<div class="loading">Загрузка...</div>';
+    cont.innerHTML = '';
     const ms = toISODate(state.currentMonday);
     let data;
     if (state.currentScheduleType === 'group') data = await api(`/api/schedule-table?group=${encodeURIComponent(state.currentScheduleName)}&monday=${ms}`);
     else if (state.currentScheduleType === 'teacher') data = await api(`/api/teacher-schedule-table?teacher_id=${state.currentScheduleId}&monday=${ms}`);
     else if (state.currentScheduleType === 'classroom') data = await api(`/api/classroom-schedule-table?classroom_id=${state.currentScheduleId}&monday=${ms}`);
     if (!data || !data.periods || !data.periods.length || data.week_exists === false) {
+        hideLoader();
         cont.innerHTML = '<div class="no-schedule"><span class="emoji">📅</span><p>Нет расписания на эту неделю</p></div>';
         return;
     }
@@ -121,6 +124,7 @@ export async function loadScheduleTable() {
         data._excluded = excluded;
     }
     cont.innerHTML = renderScheduleTable(data);
+    hideLoader();
 }
 
 export function printSchedule() {

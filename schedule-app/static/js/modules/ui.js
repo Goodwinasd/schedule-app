@@ -8,6 +8,7 @@ import { loadScheduleTable, addLesson } from './schedule.js';
 import { loadTrashTab } from './trash.js';
 import { loadSettingsTab, loadExcludedDates } from './settings.js';
 import { renderCarousel, getWeeksList } from './nav.js';
+import { showLoader, hideLoader } from './loader.js';
 
 /* ======================== Navigation ======================== */
 
@@ -132,9 +133,11 @@ export function switchAdminTab(tab) {
 }
 
 async function loadHealthTab() {
+    showLoader('Диагностика БД');
     const cont = document.getElementById('db-health-content');
-    cont.innerHTML = '<div class="loading">Загрузка...</div>';
+    cont.innerHTML = '';
     const data = await api('/api/db/health');
+    hideLoader();
     if (data.error) { cont.innerHTML = '<div style="color:var(--danger)">Ошибка загрузки диагностики</div>'; return; }
     let html = `<div style="margin:8px 0;font-size:13px"><strong>Целостность БД:</strong> ${escapeHtml(data.integrity_check)}</div>`;
     html += '<table class="ref-table"><tr><th>Таблица</th><th>Всего</th><th>Удалено</th></tr>';
@@ -241,7 +244,9 @@ function _availUrl() {
 }
 
 export async function loadAvailability() {
+    showLoader('Загрузка доступности');
     state.availData = await api(_availUrl());
+    hideLoader();
     if (state.availData.error) {
         showToast('Ошибка загрузки данных доступности', 'error');
         return;

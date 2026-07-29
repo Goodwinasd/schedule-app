@@ -2,11 +2,14 @@ import { api } from './api.js';
 import { escapeHtml } from './utils.js';
 import { showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
+import { showLoader, hideLoader } from './loader.js';
 
 export async function loadSettingsTab() {
+    showLoader('Настройки');
     const cont = document.getElementById('settings-content');
-    cont.innerHTML = '<div class="loading">Загрузка...</div>';
+    cont.innerHTML = '';
     const data = await api('/api/settings');
+    hideLoader();
     if (data.error) { cont.innerHTML = '<div style="color:var(--danger)">Ошибка загрузки настроек</div>'; return; }
     const labels = { session_lifetime: 'Время сессии (сек)', login_rate_limit: 'Лимит попыток входа', login_rate_window: 'Окно попыток входа (сек)', backup_retention_days: 'Хранение бэкапов (дней)' };
     const descs = { session_lifetime: 'Через сколько секунд сессия администратора истекает', login_rate_limit: 'Максимум неудачных попыток входа до блокировки', login_rate_window: 'Время в секундах, за которое считаются попытки', backup_retention_days: 'Сколько дней хранить автоматические бэкапы БД' };
@@ -34,8 +37,10 @@ export async function saveSetting(key) {
 export async function loadExcludedDates() {
     const cont = document.getElementById('excluded-dates-content');
     if (!cont) return;
-    cont.innerHTML = '<div class="loading">Загрузка...</div>';
+    showLoader('Исключённые даты');
+    cont.innerHTML = '';
     const data = await api('/api/excluded-dates');
+    hideLoader();
     if (data.error) { cont.innerHTML = '<div style="color:var(--danger)">Ошибка загрузки</div>'; return; }
     let html = '<div style="margin:12px 0"><strong style="font-size:14px">Исключённые даты</strong></div>';
     if (!data.length) {

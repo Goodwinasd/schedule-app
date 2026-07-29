@@ -2,9 +2,12 @@ import { api } from './api.js';
 import { escapeHtml } from './utils.js';
 import { confirmModal, showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
+import { showLoader, hideLoader } from './loader.js';
 
 export async function loadTrashTab() {
+    showLoader('Корзина');
     const data = await api('/api/trash');
+    hideLoader();
     const cont = document.getElementById('trash-content');
     if (!cont) return;
     if (data.error) { cont.innerHTML = '<div style="color:var(--danger)">Ошибка загрузки корзины</div>'; return; }
