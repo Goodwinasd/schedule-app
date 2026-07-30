@@ -2289,11 +2289,14 @@ def schedule_export_excel():
             entity_list = [dict(r) for r in rows] if rows else []
             if not entity_list:
                 return jsonify({"error": "Нет групп для экспорта"}), 404
+            if not start_date:
+                from datetime import date, timedelta
+                today = date.today()
+                start_date = (today - timedelta(days=today.weekday())).isoformat()
             wb = Workbook()
             wb.remove(wb.active)
             for group in entity_list:
-                monday = start_date or _find_nearest_monday(conn, group['name'])
-                week_dates, periods = _get_export_data('group', group['name'], monday)
+                week_dates, periods = _get_export_data('group', group['name'], start_date)
                 ws = wb.create_sheet(title=_safe_filename(group['name'])[:31])
                 _write_excel_sheet(ws, week_dates, periods,
                                    f"Группа {group['name']}", header_font, header_fill, cell_font, border, wrap)
@@ -2341,13 +2344,6 @@ def schedule_export_excel():
 
         week_dates, periods = _get_export_data(schedule_type, name, monday,
                                                 entity_id=entity_id if schedule_type != 'group' else None)
-        has_data = any(
-            p['lessons'].get(d['date'], '') if isinstance(p['lessons'].get(d['date'], ''), str)
-            else len(p['lessons'].get(d['date'], [])) > 0
-            for p in periods for d in week_dates
-        )
-        if not has_data:
-            return jsonify({"error": "No schedule data for this period"}), 404
 
         wb = Workbook()
         ws = wb.active

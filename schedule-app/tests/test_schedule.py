@@ -211,6 +211,12 @@ class TestSmartExportExcel:
         resp = client.get('/api/schedule/export/excel?type=group&id=999')
         assert resp.status_code == 404
 
+    def test_export_excel_empty_week_returns_xlsx(self, client, seed_refs, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=group&id=1&start_date=2026-09-07')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        assert len(resp.data) > 0
+
     def test_export_excel_missing_id(self, client, admin_csrf):
         resp = client.get('/api/schedule/export/excel?type=group')
         assert resp.status_code == 400
