@@ -11,9 +11,21 @@ export function confirmModal(message) {
         document.getElementById('confirm-modal-message').textContent = message;
         document.getElementById('modal-overlay').classList.add('active');
         document.getElementById('confirm-modal').style.display = '';
-        document.getElementById('confirm-modal-ok').onclick = () => { _confirmState.resolver = null; try { resolve(true); } finally { window.closeModals(); } };
-        document.getElementById('confirm-modal-cancel').onclick = () => { _confirmState.resolver = null; try { resolve(false); } finally { window.closeModals(); } };
+        document.getElementById('confirm-modal-ok').onclick = () => { _confirmState.resolver = null; resolve(true); _closeConfirmOnly(); };
+        document.getElementById('confirm-modal-cancel').onclick = () => { _confirmState.resolver = null; resolve(false); _closeConfirmOnly(); };
     });
+}
+
+function _closeConfirmOnly() {
+    const overlay = document.getElementById('modal-overlay');
+    const confirmEl = document.getElementById('confirm-modal');
+    if (confirmEl) confirmEl.style.display = 'none';
+    const anyModalOpen = document.querySelectorAll('.modal:not(#confirm-modal):not([style*="display: none"])');
+    if (anyModalOpen.length === 0) {
+        overlay.classList.remove('active');
+    }
+    const cm = document.getElementById('checkmark-anim');
+    if (cm) cm.setAttribute('data-state', 'out');
 }
 
 export function showKimiAlert(message, title) {

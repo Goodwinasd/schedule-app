@@ -1,0 +1,28 @@
+# Dependencies and virtual environments
+venv/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+
+# Databases and heavy binaries
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and temporary files
+*.log
+.DS_Store
+tmp/
+coverage/
+.pytest_cache/
+
+# Locked dependency files (very heavy!)
+package-lock.json
+poetry.lock
+yarn.lock
+
+# Builds and cache
+dist/
+build/
+.git/

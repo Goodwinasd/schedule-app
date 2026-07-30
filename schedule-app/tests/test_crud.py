@@ -1,3 +1,29 @@
+class TestDependencyProtection:
+    def test_delete_subject_in_use_returns_409(self, client, seed_lessons, admin_csrf):
+        resp = client.delete('/api/subjects/1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        assert 'уроках' in resp.get_json()['error']
+
+    def test_delete_teacher_in_use_returns_409(self, client, seed_lessons, admin_csrf):
+        resp = client.delete('/api/teachers/1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        assert 'уроках' in resp.get_json()['error']
+
+    def test_delete_classroom_in_use_returns_409(self, client, seed_lessons, admin_csrf):
+        resp = client.delete('/api/classrooms/1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        assert 'уроках' in resp.get_json()['error']
+
+    def test_delete_group_in_use_returns_409(self, client, seed_lessons, admin_csrf):
+        resp = client.delete('/api/groups/1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        assert 'уроках' in resp.get_json()['error']
+
+    def test_delete_subject_not_in_use_succeeds(self, client, seed_refs, admin_csrf):
+        resp = client.delete('/api/subjects/1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+
 class TestSubjects:
     ENDPOINT = '/api/subjects'
 

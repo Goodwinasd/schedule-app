@@ -9,6 +9,20 @@ import { loadTrashTab } from './trash.js';
 import { loadSettingsTab, loadExcludedDates } from './settings.js';
 import { renderCarousel, getWeeksList } from './nav.js';
 import { showLoader, hideLoader } from './loader.js';
+import { loadCurriculum } from './curriculum.js';
+import { onEvent, CURRICULUM_UPDATED, SCHEDULE_UPDATED, HOLIDAYS_UPDATED, REFERENCES_UPDATED, DATA_MUTATED } from './events.js';
+
+function refreshAnalyticsIfVisible() {
+    const availView = document.getElementById('availability-view');
+    if (availView && availView.style.display !== 'none') {
+        loadAvailability();
+    }
+}
+onEvent(CURRICULUM_UPDATED, refreshAnalyticsIfVisible);
+onEvent(SCHEDULE_UPDATED, refreshAnalyticsIfVisible);
+onEvent(HOLIDAYS_UPDATED, refreshAnalyticsIfVisible);
+onEvent(REFERENCES_UPDATED, refreshAnalyticsIfVisible);
+onEvent(DATA_MUTATED, refreshAnalyticsIfVisible);
 
 /* ======================== Navigation ======================== */
 
@@ -211,9 +225,10 @@ export function switchAdminTab(tab) {
             void content.offsetWidth;
             content.classList.remove('is-animating-in');
         }
-        if (tab === 'trash') loadTrashTab();
-        if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
-        if (adminContent) {
+    if (tab === 'trash') loadTrashTab();
+    if (tab === 'system') { loadHealthTab(); loadSettingsTab(); loadExcludedDates(); }
+    if (tab === 'curriculum') loadCurriculum();
+    if (adminContent) {
             requestAnimationFrame(() => {
                 adminContent.style.height = adminContent.scrollHeight + 'px';
             });

@@ -33,6 +33,9 @@ lessons = Table(
     Column('classroom_id', Integer, ForeignKey('classrooms_list.id'), nullable=True),
     Column('group_id', Integer, ForeignKey('groups_list.id'), nullable=True),
     Column('subgroup', Integer, nullable=True),
+    Column('is_substitution', Boolean, server_default='0'),
+    Column('original_teacher_id', Integer, ForeignKey('teachers.id'), nullable=True),
+    Column('substitution_reason', Text, nullable=True),
     Column('created_at', TIMESTAMP, server_default='CURRENT_TIMESTAMP'),
     Column('deleted_at', TIMESTAMP, nullable=True),
 )

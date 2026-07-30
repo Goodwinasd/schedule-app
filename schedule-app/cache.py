@@ -1,6 +1,5 @@
 import time
 import logging
-from functools import wraps
 
 logger = logging.getLogger(__name__)
 
@@ -35,20 +34,3 @@ class TTLCache:
 
 
 refs_cache = TTLCache(ttl_seconds=300)
-
-
-def cached(ttl=300):
-    def decorator(f):
-        cache = TTLCache(ttl)
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            key = f.__name__ + ':' + str(args) + str(sorted(kwargs.items()))
-            cached = cache.get(key)
-            if cached is not None:
-                return cached
-            result = f(*args, **kwargs)
-            cache.set(key, result)
-            return result
-        wrapper.cache = cache
-        return wrapper
-    return decorator

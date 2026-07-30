@@ -4,6 +4,7 @@ import { escapeHtml, toISODate, getMonday, addDays, getWeekNumber, formatChipRan
 import { api } from './api.js';
 import { openModal, confirmModal, showKimiAlert } from './modal.js';
 import { loadScheduleTable } from './schedule.js';
+import { dispatchEvent, SCHEDULE_UPDATED } from './events.js';
 
 export function getWeeksList() {
     const now = new Date(), year = now.getFullYear();
@@ -106,6 +107,7 @@ export async function addWeek() {
     const res = await api('/api/days/batch', { method: 'POST', body: JSON.stringify({ days }) });
     if (res.error) { await showKimiAlert(res.error); return; }
     window.closeModals();
+    dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }
 
@@ -130,6 +132,7 @@ export async function restoreWeek() {
     const res = await api('/api/week/restore?monday=' + m + params, { method: 'POST' });
     if (res.error) { await showKimiAlert(res.error); return; }
     await showKimiAlert('Восстановлено дней: ' + res.days_restored);
+    dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }
 

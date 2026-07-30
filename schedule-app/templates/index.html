@@ -18,6 +18,7 @@
                     <button id="btn-admin" class="btn btn-ghost" data-action="showAdminPanel" style="display:none">⚙️ Администрирование</button>
                     <button id="btn-login" class="btn btn-ghost" data-action="showLoginModal">🔒 Войти</button>
                     <button id="btn-logout" class="btn btn-ghost" data-action="logout" style="display:none">🚪 Выйти</button>
+                    <button class="btn btn-ghost btn-sm" id="btn-theme" data-action="toggleTheme" data-tooltip="Переключить тему">🌙 Тёмная тема</button>
                 </div>
             </div>
         </header>
@@ -52,6 +53,9 @@
                     </button>
                     <button class="btn btn-danger btn-restore-week" data-action="deleteWeek" style="margin-left:8px">
                         🗑️ Удалить неделю
+                    </button>
+                    <button class="btn btn-ghost" data-action="generateFromCurriculum" style="margin-left:8px">
+                        🪄 Сгенерировать по плану
                     </button>
                 </div>
                 <div id="print-panel" class="print-panel">
@@ -162,6 +166,17 @@
                 <option value="1">Подгруппа 1</option>
                 <option value="2">Подгруппа 2</option>
             </select>
+            <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                <input type="checkbox" id="lesson-is-substitution" onchange="document.getElementById('substitution-fields').style.display=this.checked?'':'none'">
+                Это замена (больничный)
+            </label>
+            <div id="substitution-fields" style="display:none;margin-top:8px">
+                <label class="field-label">Причина замены</label>
+                <input type="text" id="lesson-substitution-reason" class="input" placeholder="Например: больничный, отпуск" style="max-width:300px">
+                <label class="field-label">Исходный преподаватель</label>
+                <select id="lesson-original-teacher" class="input" style="max-width:250px"><option value="">— не указан —</option></select>
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" data-action="deleteCurrentLesson">Удалить</button>
                 <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" data-action="addSubgroupLesson">+ Подгруппа</button>
@@ -184,6 +199,7 @@
                 <button class="admin-tab active" draggable="true" data-tab="refs" data-tooltip="Управление справочниками" data-action="switchAdminTab" data-params='["refs"]'><span class="tab-grip">⠿</span> Справочники</button>
                 <button class="admin-tab" draggable="true" data-tab="trash" data-tooltip="Восстановление удалённых записей" data-action="switchAdminTab" data-params='["trash"]'><span class="tab-grip">⠿</span> Корзина</button>
                 <button class="admin-tab" draggable="true" data-tab="system" data-tooltip="Настройки и диагностика БД" data-action="switchAdminTab" data-params='["system"]'><span class="tab-grip">⠿</span> Система</button>
+                <button class="admin-tab" draggable="true" data-tab="curriculum" data-tooltip="Учебные планы групп" data-action="switchAdminTab" data-params='["curriculum"]'><span class="tab-grip">⠿</span> 📚 Планы</button>
             </div>
             <div id="admin-tab-refs" class="admin-tab-content tab-content active">
                 <div class="ref-grid">
@@ -246,6 +262,10 @@
                 <div id="settings-content"></div>
                 <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
                 <div id="excluded-dates-content"></div>
+            </div>
+            <div id="admin-tab-curriculum" class="admin-tab-content tab-content">
+                <h3>📚 Учебные планы</h3>
+                <div id="curriculum-content"></div>
             </div>
         </div>
     </div>

@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { openModal, confirmModal, showKimiAlert } from './modal.js';
 import { showToast } from './toast.js';
 import { showLoader, hideLoader } from './loader.js';
+import { dispatchEvent, onEvent, SCHEDULE_UPDATED, DATA_MUTATED, CURRICULUM_UPDATED } from './events.js';
 
 function checkConflictsForLesson(lesson, dayDate, period) {
     if (!state.showConflicts) return null;
@@ -50,7 +51,7 @@ function renderScheduleTable(data) {
         const d = new Date(day.date + 'T00:00:00');
         const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
         const exc = excludedByDate[day.date];
-        const excCls = exc ? ' style="background:#fff3e0"' : '';
+        const excCls = exc ? ' style="background:var(--warning-bg);color:var(--warning-text)"' : '';
         html += `<th class="col-day"${excCls}>${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
     }
     html += '</tr></thead><tbody>';
@@ -59,7 +60,7 @@ function renderScheduleTable(data) {
     for (const day of days) {
         const exc = excludedByDate[day.date];
         if (exc) {
-            html += `<tr class="shift-row"><td colspan="${days.length + 1}" style="background:#fff8e1;color:#e65100;font-size:12px;padding:8px;text-align:center">🚩 ${day.date} — ${exc.join('; ')}</td></tr>`;
+            html += `<tr class="shift-row"><td colspan="${days.length + 1}" style="background:var(--warning-bg);color:var(--warning-text);font-size:12px;padding:8px;text-align:center">🚩 ${day.date} — ${exc.join('; ')}</td></tr>`;
         }
     }
     let lastShift = 0;
@@ -70,7 +71,7 @@ function renderScheduleTable(data) {
         for (const day of days) {
             const isExcluded = excludedByDate[day.date];
             if (isExcluded) {
-                html += `<td class="day-cell" style="background:#fff8e1;text-align:center;font-size:11px;color:#e65100">🚩 отменено</td>`;
+                html += `<td class="day-cell" style="background:var(--warning-bg);text-align:center;font-size:11px;color:var(--warning-text)">🚩 отменено</td>`;
                 continue;
             }
             const lessons = p.lessons[day.date] || [];
@@ -81,12 +82,15 @@ function renderScheduleTable(data) {
                 if (busy) {
                     const inner = lessons.map(l => {
                         state.lessonsMap[l.id] = l;
-                        const meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
+                        const isSub = l.is_substitution ? true : false;
+                        const subCls = isSub ? ' lesson-substitution' : '';
+                        let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
+                        if (isSub) meta += ' 🔄 замена';
                         const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
                         const conflict = checkConflictsForLesson(l, day.date, p.period);
                         const cCls = conflict ? ' ' + conflict.cls : '';
                         const tip = conflict ? ` title="${escapeHtml(conflict.tooltip)}"` : '';
-                        return `<div class="lesson-content${cCls}"${oc}${tip}><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
+                        return `<div class="lesson-content${cCls}${subCls}"${oc}${tip} style="${isSub ? 'background:var(--warning-bg);color:var(--warning-text)' : ''}"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
                     }).join('');
                     html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}">${inner}</td>`;
                 } else {
@@ -144,6 +148,25 @@ export function exportSchedule(format) {
     setTimeout(() => document.body.removeChild(a), 1000);
 }
 
+export async function generateFromCurriculum() {
+    if (!state.currentScheduleType === 'group' || !state.currentScheduleId) {
+        await showKimiAlert('Сначала откройте расписание группы');
+        return;
+    }
+    const groupId = state.currentScheduleId;
+    const monday = toISODate(state.currentMonday);
+    const semester = await confirmModal('Сгенерировать расписание для группы на основе учебного плана?');
+    if (!semester) return;
+    const res = await api('/api/schedule/generate', {
+        method: 'POST',
+        body: JSON.stringify({ group_id: groupId, semester: 1, monday, week_count: 18 }),
+    });
+    if (res.error) { await showKimiAlert(res.error); return; }
+    showToast(`Создано пар: ${res.created}`, 'success');
+    dispatchEvent(SCHEDULE_UPDATED);
+    loadScheduleTable();
+}
+
 export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) {
     state.currentLessonDayId = dayId;
     state.currentLessonDate = dateStr || null;
@@ -174,9 +197,14 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
         validateLesson();
     };
     document.getElementById('lesson-group').onchange = () => document.getElementById('lesson-subgroup').value = '';
+    document.getElementById('lesson-is-substitution').checked = false;
+    document.getElementById('substitution-fields').style.display = 'none';
+    document.getElementById('lesson-substitution-reason').value = '';
+    populateSelect('lesson-original-teacher', state.teachersList, '— не указан —');
 }
 
 async function collectLessonData() {
+    const isSub = document.getElementById('lesson-is-substitution').checked;
     return {
         period: parseInt(document.getElementById('lesson-period').value),
         subject_id: parseInt(document.getElementById('lesson-subject').value) || null,
@@ -184,6 +212,9 @@ async function collectLessonData() {
         classroom_id: parseInt(document.getElementById('lesson-classroom').value) || null,
         group_id: parseInt(document.getElementById('lesson-group').value) || null,
         subgroup: parseInt(document.getElementById('lesson-subgroup').value) || null,
+        is_substitution: isSub,
+        original_teacher_id: isSub ? (parseInt(document.getElementById('lesson-original-teacher').value) || null) : null,
+        substitution_reason: isSub ? (document.getElementById('lesson-substitution-reason').value || null) : null,
     };
 }
 
@@ -208,6 +239,7 @@ export async function addLesson() {
         return;
     }
     window.closeModals();
+    dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }
 
@@ -230,6 +262,12 @@ export function editLesson(lesson) {
     ['subject', 'teacher', 'classroom', 'group'].forEach(f => document.getElementById(`lesson-${f}`).value = lesson[`${f}_id`] || '');
     document.getElementById('lesson-subgroup').value = lesson.subgroup || '';
     document.getElementById('lesson-teacher').disabled = state.currentScheduleType === 'teacher';
+    populateSelect('lesson-original-teacher', state.teachersList, '— не указан —');
+    const isSub = lesson.is_substitution ? true : false;
+    document.getElementById('lesson-is-substitution').checked = isSub;
+    document.getElementById('substitution-fields').style.display = isSub ? '' : 'none';
+    document.getElementById('lesson-substitution-reason').value = lesson.substitution_reason || '';
+    document.getElementById('lesson-original-teacher').value = lesson.original_teacher_id || '';
     document.getElementById('btn-save-lesson').onclick = () => saveLesson(lesson.id);
 }
 
@@ -243,6 +281,7 @@ export async function saveLesson(lessonId) {
         return;
     }
     window.closeModals();
+    dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }
 
@@ -259,6 +298,7 @@ export async function deleteCurrentLesson() {
     const res = await api(`/api/lessons/${lessonId}`, { method: 'DELETE' });
     if (res.error) { await showKimiAlert(res.error); return; }
     window.closeModals();
+    dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }
 
@@ -286,3 +326,12 @@ export function validateLesson() {
         }
     }, 300);
 }
+
+onEvent(DATA_MUTATED, (e) => {
+    if (['curriculum', 'holidays', 'groups', 'teachers', 'subjects', 'classrooms'].includes(e.detail.entity)) {
+        const sv = document.getElementById('schedule-view');
+        if (sv && sv.style.display !== 'none') {
+            loadScheduleTable();
+        }
+    }
+});

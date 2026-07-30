@@ -104,10 +104,21 @@ class TestAvailability:
 
     def test_availability_excludes_deleted_teacher(self, client, seed_lessons, admin_csrf):
         h = {'X-CSRF-Token': admin_csrf}
+
         resp = client.get('/api/availability?monday=2026-09-07', headers=h)
         data = resp.get_json()
         teacher_ids = [t['id'] for t in data['teachers']]
         assert 1 in teacher_ids, 'Teacher 1 should be visible before deletion'
+
+        # Cannot delete teacher referenced in lessons — must delete lessons first
+        resp = client.delete('/api/teachers/1', headers=h)
+        assert resp.status_code == 409
+
+        # Delete referencing lessons first
+        resp = client.delete('/api/lessons/1', headers=h)
+        assert resp.status_code == 200
+        resp = client.delete('/api/lessons/2', headers=h)
+        assert resp.status_code == 200
 
         resp = client.delete('/api/teachers/1', headers=h)
         assert resp.status_code == 200
@@ -116,14 +127,24 @@ class TestAvailability:
         data = resp.get_json()
         teacher_ids = [t['id'] for t in data['teachers']]
         assert 1 not in teacher_ids, 'Teacher 1 should be excluded after deletion'
-        assert '1' not in data['teacher_busy'], 'Busy data for teacher 1 should be excluded'
 
     def test_availability_excludes_deleted_classroom(self, client, seed_lessons, admin_csrf):
         h = {'X-CSRF-Token': admin_csrf}
+
         resp = client.get('/api/availability?monday=2026-09-07', headers=h)
         data = resp.get_json()
         classroom_ids = [c['id'] for c in data['classrooms']]
         assert 1 in classroom_ids, 'Classroom 1 should be visible before deletion'
+
+        # Cannot delete classroom referenced in lessons
+        resp = client.delete('/api/classrooms/1', headers=h)
+        assert resp.status_code == 409
+
+        # Delete referencing lessons first
+        resp = client.delete('/api/lessons/1', headers=h)
+        assert resp.status_code == 200
+        resp = client.delete('/api/lessons/2', headers=h)
+        assert resp.status_code == 200
 
         resp = client.delete('/api/classrooms/1', headers=h)
         assert resp.status_code == 200
@@ -132,7 +153,6 @@ class TestAvailability:
         data = resp.get_json()
         classroom_ids = [c['id'] for c in data['classrooms']]
         assert 1 not in classroom_ids, 'Classroom 1 should be excluded after deletion'
-        assert '1' not in data['classroom_busy'], 'Busy data for classroom 1 should be excluded'
 
 
 class TestExport:

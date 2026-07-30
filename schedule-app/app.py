@@ -14,7 +14,7 @@ from config import (
     SECRET_KEY, PERMANENT_SESSION_LIFETIME, BACKUPS_DIR, DB_PATH, DATA_DIR, DEBUG, HOST, PORT,
     TRASH_RETENTION_DAYS,
 )
-from db import get_db, run_alembic_upgrade
+from db import create_backup, get_db, run_alembic_upgrade, ensure_curriculum_table, cleanup_orphan_schedule_records
 from routes import bp
 
 logger = logging.getLogger(__name__)
@@ -89,6 +89,9 @@ if __name__ == '__main__':
     scheduler.add_job(_run_backup_tasks, 'interval', hours=6, id='backup_job')
     scheduler.start()
 
+    create_backup()
     run_alembic_upgrade()
+    ensure_curriculum_table()
+    cleanup_orphan_schedule_records()  # audit-only at startup (force_delete=False)
     _cleanup_old_deleted()
     app.run(debug=DEBUG, host=HOST, port=PORT)

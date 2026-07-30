@@ -22,9 +22,11 @@ from config import (
     TRASH_RETENTION_DAYS,
     LOGIN_CLEANUP_INTERVAL
 )
-from db import get_db, is_date_excluded
+from db import create_backup, prepare_for_restore, verify_db_integrity, find_orphaned_records, cleanup_orphan_schedule_records, get_db, is_date_excluded
+from generator import generate_schedule
 from utils import _safe_filename, _validate_lesson_data, LESSON_SELECT, LESSON_SELECT_WITH_DAY
 from cache import refs_cache
+from schedule_balancer import weekly_pairs, validate_weekly_load
 
 bp = Blueprint('main', __name__)
 
@@ -505,6 +507,16 @@ def _export_pdf(week_dates, periods, title):
     return buf
 
 
+def _check_dependencies(conn, table, item_id):
+    """Check if a reference entity is used in active lessons."""
+    col_map = {'subjects': 'subject_id', 'teachers': 'teacher_id', 'classrooms_list': 'classroom_id', 'groups_list': 'group_id'}
+    col = col_map.get(table)
+    if not col:
+        return None
+    row = conn.execute(f"SELECT COUNT(*) FROM lessons WHERE {col} = ? AND deleted_at IS NULL", (item_id,)).fetchone()[0]
+    return row if row else None
+
+
 def generic_crud(table, label, order_by='id', extra_fields=None):
     extra_fields = extra_fields or []
 
@@ -640,21 +652,24 @@ def generic_crud(table, label, order_by='id', extra_fields=None):
         def delete_item(item_id):
             """Мягкое удаление записи из справочника
             ---
-            parameters:
-              - in: path
-                name: item_id
-                type: integer
-                required: true
             responses:
               200:
                 description: success (установлен deleted_at)
+              409:
+                description: Запись используется в расписании
             """
             conn = get_db()
+            count = _check_dependencies(conn, table, item_id)
+            if count:
+                conn.close()
+                labels = {'subjects': 'Предмет', 'teachers': 'Преподаватель', 'classrooms_list': 'Аудитория', 'groups_list': 'Группа'}
+                name = labels.get(table, 'Запись')
+                return jsonify({"error": f"{name} используется в {count} уроках. Удалите уроки перед удалением {name.lower()}."}), 409
             conn.execute(f"UPDATE {table} SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL", (item_id,))
             conn.commit()
             conn.close()
             refs_cache.invalidate_prefix(f'ref_list_{table}')
-            return jsonify({"success": True, "warning": "Запись помечена как удалённая. Она может использоваться в расписании."})
+            return jsonify({"success": True})
         delete_item.__name__ = f'delete_{label}'
         return delete_item
 
@@ -662,6 +677,101 @@ def generic_crud(table, label, order_by='id', extra_fields=None):
     bp.add_url_rule(f'/api/{label}', f'create_{label}', make_create(label, table, extra_fields), methods=['POST'])
     bp.add_url_rule(f'/api/{label}/<int:item_id>', f'update_{label}', make_update(label, table, extra_fields), methods=['PUT'])
     bp.add_url_rule(f'/api/{label}/<int:item_id>', f'delete_{label}', make_delete(label, table), methods=['DELETE'])
+
+
+@bp.route('/api/curriculum', methods=['GET'])
+@login_required
+def get_curriculum():
+    group_id = request.args.get('group_id', type=int)
+    conn = get_db()
+    query = '''SELECT c.*, s.name AS subject_name, t.name AS teacher_name
+               FROM curriculum c
+               LEFT JOIN subjects s ON c.subject_id = s.id
+               LEFT JOIN teachers t ON c.teacher_id = t.id'''
+    params = []
+    if group_id:
+        query += ' WHERE c.group_id = ?'
+        params.append(group_id)
+    query += ' ORDER BY c.semester, s.name'
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@bp.route('/api/curriculum', methods=['POST'])
+@login_required
+def create_curriculum():
+    data = request.get_json()
+    group_id = data.get('group_id')
+    subject_id = data.get('subject_id')
+    teacher_id = data.get('teacher_id')
+    semester = data.get('semester', 1)
+    total_hours = data.get('total_hours', 72)
+    weeks_in_semester = data.get('weeks_in_semester', 18)
+    if not group_id or not subject_id:
+        return jsonify({"error": "group_id and subject_id required"}), 400
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            'INSERT INTO curriculum (group_id, subject_id, teacher_id, semester, total_hours, weeks_in_semester) VALUES (?, ?, ?, ?, ?, ?)',
+            (group_id, subject_id, teacher_id, semester, total_hours, weeks_in_semester)
+        )
+        conn.commit()
+        item_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Этот предмет уже есть в учебном плане группы"}), 409
+    conn.close()
+    return jsonify({"id": item_id}), 201
+
+
+@bp.route('/api/curriculum/<int:item_id>', methods=['DELETE'])
+@login_required
+def delete_curriculum(item_id):
+    conn = get_db()
+    conn.execute('DELETE FROM curriculum WHERE id = ?', (item_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@bp.route('/api/schedule/workload/<int:group_id>')
+def workload(group_id):
+    """Get workload analysis for a group's current week."""
+    monday = request.args.get('monday', '')
+    if not monday:
+        return jsonify({"error": "monday required"}), 400
+    week_dates = [d['date'] for d in build_week_dates(monday)]
+    conn = get_db()
+    placeholders = ','.join('?' * len(week_dates))
+    lessons = conn.execute(
+        f"SELECT sd.date, l.period FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id WHERE sd.date IN ({placeholders}) AND sd.group_name = (SELECT name FROM groups_list WHERE id = ?) AND l.deleted_at IS NULL AND sd.deleted_at IS NULL",
+        week_dates + [group_id]
+    ).fetchall()
+
+    lessons_by_date = {}
+    for l in lessons:
+        lessons_by_date.setdefault(l['date'], []).append(l)
+
+    validation = validate_weekly_load(lessons_by_date)
+
+    cur = conn.execute(
+        "SELECT c.*, s.name AS subject_name FROM curriculum c LEFT JOIN subjects s ON c.subject_id = s.id WHERE c.group_id = ? ORDER BY c.semester",
+        (group_id,)
+    ).fetchall()
+    plan = []
+    for c in cur:
+        plan.append({
+            'subject_name': c['subject_name'],
+            'total_hours': c['total_hours'],
+            'weekly': weekly_pairs(c['total_hours'], c['weeks_in_semester']),
+        })
+
+    conn.close()
+    return jsonify({
+        'workload': validation,
+        'plan': plan,
+    })
 
 
 @bp.route('/')
@@ -2007,21 +2117,22 @@ def update_group(item_id):
 def delete_group(item_id):
     """Удалить группу
     ---
-    parameters:
-      - in: path
-        name: item_id
-        type: integer
-        required: true
     responses:
       200:
         description: success
+      409:
+        description: Группа используется в расписании
     """
     conn = get_db()
+    count = _check_dependencies(conn, 'groups_list', item_id)
+    if count:
+        conn.close()
+        return jsonify({"error": f"Группа используется в {count} уроках. Удалите уроки перед удалением группы."}), 409
     conn.execute("UPDATE groups_list SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL", (item_id,))
     conn.commit()
     conn.close()
     refs_cache.invalidate_prefix('ref_list_groups_list')
-    return jsonify({"success": True, "warning": "Запись помечена как удалённая."})
+    return jsonify({"success": True})
 
 
 @bp.route('/api/groups/<int:item_id>/restore', methods=['POST'])
@@ -2191,8 +2302,8 @@ def availability():
             JOIN schedule_days sd ON l.day_id = sd.id
             LEFT JOIN teachers t ON l.teacher_id = t.id AND t.deleted_at IS NULL
             LEFT JOIN classrooms_list c ON l.classroom_id = c.id AND c.deleted_at IS NULL
-            LEFT JOIN groups_list g ON l.group_id = g.id
-            LEFT JOIN subjects s ON l.subject_id = s.id
+            LEFT JOIN groups_list g ON l.group_id = g.id AND g.deleted_at IS NULL
+            LEFT JOIN subjects s ON l.subject_id = s.id AND s.deleted_at IS NULL
             WHERE sd.date IN ({placeholders})
               AND l.subject_id IS NOT NULL
               AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
@@ -2399,3 +2510,107 @@ def purge_trash():
     conn.close()
     refs_cache.invalidate_prefix('ref_list_')
     return jsonify({"purged": result})
+
+
+@bp.route('/api/admin/backup/download', methods=['GET'])
+@login_required
+def admin_backup_download():
+    return send_file(config.DB_PATH, as_attachment=True, download_name=f'schedule_backup_{datetime.now().strftime("%Y-%m-%d_%H-%M")}.db')
+
+
+@bp.route('/api/admin/backup/restore', methods=['POST'])
+@login_required
+def admin_backup_restore():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    f = request.files['file']
+    if f.filename == '':
+        return jsonify({"error": "Empty filename"}), 400
+    if not (f.filename.endswith('.sqlite') or f.filename.endswith('.db')):
+        return jsonify({"error": "Only .sqlite or .db files allowed"}), 400
+    create_backup()
+    prepare_for_restore()
+    f.save(config.DB_PATH)
+    for ext in ('-wal', '-shm'):
+        p = config.DB_PATH + ext
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    ok, err = verify_db_integrity()
+    if not ok:
+        logger.error("Restored DB integrity check failed: %s", err)
+        return jsonify({"error": f"Restored database is corrupt: {err}"}), 500
+    refs_cache.invalidate_prefix('ref_list_')
+    refs_cache.invalidate_all()
+    logger.info("Database restored from uploaded file: %s — integrity OK", f.filename)
+    return jsonify({"success": True, "message": "База данных восстановлена и проверена. Страница будет перезагружена."})
+
+
+@bp.route('/api/admin/db/check-orphans', methods=['GET', 'POST'])
+@login_required
+def admin_check_orphans():
+    if request.method == 'POST':
+        body = request.get_json(silent=True) or {}
+        force = body.get('force', False)
+        result = cleanup_orphan_schedule_records(force_delete=force)
+        return jsonify(result)
+    orphans = find_orphaned_records()
+    total = len(orphans['lessons']) + len(orphans['curriculum'])
+    return jsonify({"found": total, "lessons": orphans['lessons'], "curriculum": orphans['curriculum']})
+
+
+@bp.route('/api/schedule/generate', methods=['POST'])
+@login_required
+def schedule_generate():
+    body = request.get_json(silent=True) or {}
+    group_id = body.get('group_id')
+    semester = body.get('semester', 1)
+    monday = body.get('monday', '')
+    week_count = body.get('week_count', 18)
+    if not group_id or not monday:
+        return jsonify({"error": "group_id and monday required"}), 400
+    conn = get_db()
+    group = conn.execute("SELECT id, name FROM groups_list WHERE id = ? AND deleted_at IS NULL", (group_id,)).fetchone()
+    if not group:
+        conn.close()
+        return jsonify({"error": "Group not found"}), 404
+    result = generate_schedule(conn, group_id, group['name'], semester, monday, week_count)
+    conn.commit()
+    conn.close()
+    refs_cache.invalidate_prefix('ref_list_')
+    logger.info("Generator created %d lessons for group %s semester %d", result['created'], group['name'], semester)
+    return jsonify(result)
+
+
+@bp.route('/api/schedule/substitutions-suggest', methods=['GET'])
+@login_required
+def substitutions_suggest():
+    """Find available teachers for a substitution on a given day and period.
+    Reuses the same availability model as /api/availability — finds teachers
+    who are NOT busy at the given date+period."""
+    date_str = request.args.get('date', '')
+    period = request.args.get('period', type=int)
+    exclude_teacher_id = request.args.get('exclude_teacher_id', type=int)
+    if not date_str or not period:
+        return jsonify({"error": "date and period required"}), 400
+    conn = get_db()
+    busy_ids = set()
+    busy_rows = conn.execute('''
+        SELECT DISTINCT l.teacher_id FROM lessons l
+        JOIN schedule_days sd ON l.day_id = sd.id
+        WHERE sd.date = ? AND l.period = ? AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+          AND l.teacher_id IS NOT NULL AND l.subject_id IS NOT NULL
+    ''', (date_str, period)).fetchall()
+    for r in busy_rows:
+        busy_ids.add(r['teacher_id'])
+    if exclude_teacher_id:
+        busy_ids.discard(exclude_teacher_id)
+    teachers = conn.execute('''
+        SELECT id, name FROM teachers
+        WHERE deleted_at IS NULL ORDER BY name
+    ''').fetchall()
+    conn.close()
+    available = [{'id': t['id'], 'name': t['name']} for t in teachers if t['id'] not in busy_ids]
+    return jsonify({"available": available})

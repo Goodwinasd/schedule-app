@@ -17,10 +17,10 @@ import {
     renderAvailTable, _clickLesson,
 } from './ui.js';
 import { confirmModal, showKimiAlert } from './modal.js';
-import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson } from './schedule.js';
+import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson, generateFromCurriculum } from './schedule.js';
 import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup } from './references.js';
 import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
-import { saveSetting, addExcludedDate, deleteExcludedDate } from './settings.js';
+import { saveSetting, addExcludedDate, deleteExcludedDate, downloadBackup, restoreBackup, checkOrphans, confirmDeleteOrphans, clearOrphanResult } from './settings.js';
 import { restoreTrashItem, purgeTrash } from './trash.js';
 
 /* Привязка к window для onclick-вызовов из HTML */
@@ -29,7 +29,7 @@ Object.assign(window, {
     selectWeekByDate, carouselSkip, showAddWeekModal, addWeek, restoreWeek, deleteWeek,
     loadScheduleTable, printSchedule, exportSchedule,
     showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson,
-    deleteCurrentLesson, validateLesson,
+    deleteCurrentLesson, validateLesson, generateFromCurriculum,
     loadReferences, showAdminPanel, renderRefList,
     addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses,
     addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, saveSetting,
@@ -41,7 +41,9 @@ Object.assign(window, {
     renderAvailTable, _clickLesson,
     switchAdminTab, openDashboard, restoreTrashItem, purgeTrash, confirmModal,
     addExcludedDate, deleteExcludedDate,
+    downloadBackup, restoreBackup, checkOrphans, confirmDeleteOrphans, clearOrphanResult,
     _showKimiAlert: showKimiAlert,
+    toggleTheme,
     // Для доступа из inline onclick к lessonsMap в renderScheduleTable
     lessonsMap: state.lessonsMap,
 });
@@ -59,8 +61,29 @@ document.addEventListener('click', e => {
     }
 });
 
+/** Theme Management */
+function initTheme() {
+    let theme = localStorage.getItem('theme');
+    if (!theme) {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = theme === 'dark' ? '☀️ Светлая тема' : '🌙 Тёмная тема';
+}
+
+export function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = next === 'dark' ? '☀️ Светлая тема' : '🌙 Тёмная тема';
+}
+
 /** Инициализация */
 async function init() {
+    initTheme();
     state.bellSchedule = await api('/api/bell-schedule');
     const data = await api('/api/auth/check');
     state.isAdmin = data.is_admin;

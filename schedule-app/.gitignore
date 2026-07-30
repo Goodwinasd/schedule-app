@@ -1,8 +1,38 @@
+# Environment
 .env
-schedule.db
-schedule_backup_*.db
-backups/
-__pycache__/
-*.pyc
+
+# Databases
+*.db
 *.db-shm
 *.db-wal
+schedule_backup_*.db
+
+# Backups
+backups/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+
+# Logs and temp
+*.log
+.DS_Store
+tmp/
+.pytest_cache/
+
+# Coverage annotation artifacts
+*,cover
+.coverage
+
+# Dependencies
+package-lock.json
+poetry.lock
+yarn.lock
+
+# Build
+dist/
+build/
