@@ -148,6 +148,17 @@ export function exportSchedule(format) {
     setTimeout(() => document.body.removeChild(a), 1000);
 }
 
+export function smartExportExcel() {
+    if (!state.currentScheduleType || !state.currentScheduleId || !state.currentMonday) {
+        showToast('Сначала откройте расписание группы, преподавателя или аудитории', 'info');
+        return;
+    }
+    const monday = toISODate(state.currentMonday);
+    const url = `/api/schedule/export/excel?type=${encodeURIComponent(state.currentScheduleType)}&id=${state.currentScheduleId}&start_date=${monday}`;
+    const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => document.body.removeChild(a), 1000);
+}
+
 export async function generateFromCurriculum() {
     if (!state.currentScheduleType === 'group' || !state.currentScheduleId) {
         await showKimiAlert('Сначала откройте расписание группы');

@@ -17,7 +17,7 @@ import {
     renderAvailTable, _clickLesson,
 } from './ui.js';
 import { confirmModal, showKimiAlert } from './modal.js';
-import { loadScheduleTable, printSchedule, exportSchedule, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson, generateFromCurriculum } from './schedule.js';
+import { loadScheduleTable, printSchedule, exportSchedule, smartExportExcel, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson, generateFromCurriculum } from './schedule.js';
 import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup } from './references.js';
 import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek } from './nav.js';
 import { saveSetting, addExcludedDate, deleteExcludedDate, downloadBackup, restoreBackup, checkOrphans, confirmDeleteOrphans, clearOrphanResult } from './settings.js';
@@ -27,7 +27,7 @@ import { restoreTrashItem, purgeTrash } from './trash.js';
 Object.assign(window, {
     goHome, showSchedule, showLoginModal, closeModals,
     selectWeekByDate, carouselSkip, showAddWeekModal, addWeek, restoreWeek, deleteWeek,
-    loadScheduleTable, printSchedule, exportSchedule,
+    loadScheduleTable, printSchedule, exportSchedule, smartExportExcel,
     showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson,
     deleteCurrentLesson, validateLesson, generateFromCurriculum,
     loadReferences, showAdminPanel, renderRefList,

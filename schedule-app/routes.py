@@ -2259,6 +2259,199 @@ def export_schedule():
                          mimetype='application/pdf')
 
 
+@bp.route('/api/schedule/export/excel', endpoint='schedule_export_excel')
+def schedule_export_excel():
+    """Умный экспорт расписания в Excel с автоподстройкой под разрезы.
+    Поддерживает group, teacher, classroom и сводный all (по всем группам).
+    Переиспользует LESSON_SELECT_WITH_DAY и _fetch_entity_raw."""
+    schedule_type = request.args.get('type', 'group')
+    entity_id = request.args.get('id', type=int)
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    thin = Side(style='thin', color='999999')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_font = Font(name='Arial', bold=True, size=11)
+    header_fill = PatternFill(start_color='D9E2F3', end_color='D9E2F3', fill_type='solid')
+    cell_font = Font(name='Arial', size=10)
+    wrap = Alignment(wrap_text=True, vertical='top')
+
+    conn = get_db()
+    try:
+        if schedule_type == 'all':
+            rows = conn.execute(
+                "SELECT id, name FROM groups_list WHERE deleted_at IS NULL ORDER BY course, name"
+            ).fetchall()
+            entity_list = [dict(r) for r in rows] if rows else []
+            if not entity_list:
+                return jsonify({"error": "Нет групп для экспорта"}), 404
+            wb = Workbook()
+            wb.remove(wb.active)
+            for group in entity_list:
+                monday = start_date or _find_nearest_monday(conn, group['name'])
+                week_dates, periods = _get_export_data('group', group['name'], monday)
+                ws = wb.create_sheet(title=_safe_filename(group['name'])[:31])
+                _write_excel_sheet(ws, week_dates, periods,
+                                   f"Группа {group['name']}", header_font, header_fill, cell_font, border, wrap)
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            return send_file(buf, as_attachment=True, download_name='raspisanie_vse_gruppy.xlsx',
+                             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+        if schedule_type == 'group':
+            if not entity_id:
+                return jsonify({"error": "id required for group export"}), 400
+            row = conn.execute(
+                "SELECT name FROM groups_list WHERE id = ? AND deleted_at IS NULL", (entity_id,)
+            ).fetchone()
+            if not row:
+                return jsonify({"error": "Group not found"}), 404
+            name = row['name']
+            monday = start_date or _find_nearest_monday(conn, name)
+            title = f"Расписание — Группа {name}"
+        elif schedule_type == 'teacher':
+            if not entity_id:
+                return jsonify({"error": "id required for teacher export"}), 400
+            row = conn.execute(
+                "SELECT name FROM teachers WHERE id = ? AND deleted_at IS NULL", (entity_id,)
+            ).fetchone()
+            if not row:
+                return jsonify({"error": "Teacher not found"}), 404
+            name = row['name']
+            monday = start_date or _find_nearest_monday(conn, entity_id, 'teacher')
+            title = f"Расписание — Преподаватель {name}"
+        elif schedule_type == 'classroom':
+            if not entity_id:
+                return jsonify({"error": "id required for classroom export"}), 400
+            row = conn.execute(
+                "SELECT name FROM classrooms_list WHERE id = ? AND deleted_at IS NULL", (entity_id,)
+            ).fetchone()
+            if not row:
+                return jsonify({"error": "Classroom not found"}), 404
+            name = row['name']
+            monday = start_date or _find_nearest_monday(conn, entity_id, 'classroom')
+            title = f"Расписание — Аудитория {name}"
+        else:
+            return jsonify({"error": "Invalid type"}), 400
+
+        week_dates, periods = _get_export_data(schedule_type, name, monday,
+                                                entity_id=entity_id if schedule_type != 'group' else None)
+        has_data = any(
+            p['lessons'].get(d['date'], '') if isinstance(p['lessons'].get(d['date'], ''), str)
+            else len(p['lessons'].get(d['date'], [])) > 0
+            for p in periods for d in week_dates
+        )
+        if not has_data:
+            return jsonify({"error": "No schedule data for this period"}), 404
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Расписание'
+        _write_excel_sheet(ws, week_dates, periods, title, header_font, header_fill, cell_font, border, wrap)
+        safe_name = _safe_filename(f"raspisanie_{name}_{week_dates[0]['date']}")
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return send_file(buf, as_attachment=True, download_name=f"{safe_name}.xlsx",
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    finally:
+        conn.close()
+
+
+def _find_nearest_monday(conn, entity_ref, entity_type='group'):
+    """Найти ближайший понедельник, на который есть расписание для entity."""
+    if entity_type == 'group':
+        row = conn.execute(
+            "SELECT date FROM schedule_days WHERE group_name = ? AND deleted_at IS NULL ORDER BY date DESC LIMIT 1",
+            (entity_ref,)
+        ).fetchone()
+    elif entity_type == 'teacher':
+        row = conn.execute(
+            "SELECT sd.date FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id "
+            "WHERE l.teacher_id = ? AND l.subject_id IS NOT NULL AND l.deleted_at IS NULL AND sd.deleted_at IS NULL "
+            "ORDER BY sd.date DESC LIMIT 1",
+            (entity_ref,)
+        ).fetchone()
+    elif entity_type == 'classroom':
+        row = conn.execute(
+            "SELECT sd.date FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id "
+            "WHERE l.classroom_id = ? AND l.subject_id IS NOT NULL AND l.deleted_at IS NULL AND sd.deleted_at IS NULL "
+            "ORDER BY sd.date DESC LIMIT 1",
+            (entity_ref,)
+        ).fetchone()
+    else:
+        row = None
+    if row:
+        from datetime import datetime, timedelta
+        dt = datetime.strptime(row['date'], '%Y-%m-%d')
+        monday = dt - timedelta(days=dt.weekday())
+        return monday.strftime('%Y-%m-%d')
+    import datetime as dt_mod
+    today = dt_mod.date.today()
+    monday = today - dt_mod.timedelta(days=today.weekday())
+    return monday.isoformat()
+
+
+def _write_excel_sheet(ws, week_dates, periods, title, header_font, header_fill, cell_font, border, wrap):
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+    row = 1
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=len(week_dates) + 1)
+    title_cell = ws.cell(row=row, column=1, value=title)
+    title_cell.font = Font(name='Arial', bold=True, size=14)
+    row += 1
+
+    ws.cell(row=row, column=1, value='Пара').font = header_font
+    ws.cell(row=row, column=1).fill = header_fill
+    ws.cell(row=row, column=1).border = border
+    ws.cell(row=row, column=1).alignment = Alignment(horizontal='center')
+
+    for i, wd in enumerate(week_dates):
+        d = datetime.strptime(wd['date'], '%Y-%m-%d')
+        header_text = f"{wd['day_name']}\n{d.day}.{d.month}"
+        cell = ws.cell(row=row, column=i + 2, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = Alignment(horizontal='center', wrap_text=True)
+    row += 1
+
+    last_shift = 0
+    for p in periods:
+        if p['shift'] != last_shift:
+            last_shift = p['shift']
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=len(week_dates) + 1)
+            shift_cell = ws.cell(row=row, column=1, value=SHIFT_LABELS[p['shift']])
+            shift_cell.font = Font(name='Arial', bold=True, size=10, color='1A5FB4')
+            shift_cell.fill = PatternFill(start_color='E0ECFF', end_color='E0ECFF', fill_type='solid')
+            shift_cell.alignment = Alignment(horizontal='center')
+            for c in range(1, len(week_dates) + 2):
+                ws.cell(row=row, column=c).border = border
+            row += 1
+
+        time_cell = ws.cell(row=row, column=1, value=f"{p['period']} пара\n{p['start']}–{p['end']}")
+        time_cell.font = cell_font
+        time_cell.border = border
+        time_cell.alignment = Alignment(horizontal='center', vertical='top')
+
+        for i, wd in enumerate(week_dates):
+            cell = ws.cell(row=row, column=i + 2, value=p['lessons'].get(wd['date'], ''))
+            cell.font = cell_font
+            cell.border = border
+            cell.alignment = wrap
+        row += 1
+
+    ws.column_dimensions['A'].width = 16
+    for i in range(len(week_dates)):
+        letter = get_column_letter(i + 2)
+        ws.column_dimensions[letter].width = 28
+
+
 @bp.route('/api/availability')
 @login_required
 def availability():

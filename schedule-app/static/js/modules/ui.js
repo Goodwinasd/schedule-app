@@ -105,6 +105,7 @@ export function showLoginModal() {
     const p = document.getElementById('login-password');
     p.value = '';
     p.focus();
+    p.onkeydown = (e) => { if (e.key === 'Enter') login(); };
 }
 
 /* ======================== Homepage & References ======================== */

@@ -185,6 +185,41 @@ class TestExport:
         assert resp.status_code == 404
 
 
+class TestSmartExportExcel:
+    def test_export_excel_group(self, client, seed_lessons, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=group&id=1&start_date=2026-09-07')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        assert len(resp.data) > 0
+
+    def test_export_excel_teacher(self, client, seed_lessons, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=teacher&id=1&start_date=2026-09-07')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+    def test_export_excel_classroom(self, client, seed_lessons, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=classroom&id=1&start_date=2026-09-07')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+    def test_export_excel_all(self, client, seed_lessons, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=all&start_date=2026-09-07')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+    def test_export_excel_no_data(self, client, seed_refs, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=group&id=999')
+        assert resp.status_code == 404
+
+    def test_export_excel_missing_id(self, client, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=group')
+        assert resp.status_code == 400
+
+    def test_export_excel_invalid_type(self, client, admin_csrf):
+        resp = client.get('/api/schedule/export/excel?type=invalid&id=1')
+        assert resp.status_code == 400
+
+
 class TestCheckDate:
     def test_check_date_not_excluded(self, client, seed_refs):
         resp = client.get('/api/check_date?date=2026-09-07')
