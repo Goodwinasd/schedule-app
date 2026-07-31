@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Расписание</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=28">
+    <link rel="stylesheet" href="/static/css/style.css?v=29">
 </head>
 <body>
     <div id="app">
@@ -44,6 +44,7 @@
             <div id="schedule-view" style="display:none">
                 <div id="week-carousel" class="week-carousel"></div>
                 <div id="schedule-table-container"></div>
+                <div id="plan-progress-box" class="plan-progress-box" style="display:none"></div>
                 <div id="admin-panel" class="admin-panel" style="display:none">
                     <button class="btn btn-primary btn-add-day" data-action="showAddWeekModal">
                         ➕ Добавить неделю
@@ -56,6 +57,9 @@
                     </button>
                     <button class="btn btn-ghost" data-action="generateFromCurriculum" style="margin-left:8px">
                         🪄 Сгенерировать по плану
+                    </button>
+                    <button class="btn btn-ghost" data-action="generateMonth" style="margin-left:8px">
+                        🪄 Сгенерировать на месяц (4 недели)
                     </button>
                 </div>
                 <div id="print-panel" class="print-panel">

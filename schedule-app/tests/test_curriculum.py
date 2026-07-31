@@ -195,6 +195,137 @@ class TestValidateWeeklyLoad:
             assert l['is_substitution'] == 1, f"Lesson {l['id']} not flagged as substitution"
             assert l['original_teacher_id'] == 1, f"Lesson {l['id']} missing original_teacher"
 
+    def test_generate_schedule_monthly_batch(self, client, seed_refs, admin_csrf):
+        """Batch generation (weeks_count=4) must produce schedule on 4 distinct weeks without collisions."""
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.post('/api/curriculum', json={
+            'group_id': 1, 'subject_id': 1, 'teacher_id': 1,
+            'semester': 1, 'total_hours': 144,
+        }, headers=h)
+        assert resp.status_code == 201
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': 1, 'semester': 1, 'monday': '2026-09-07', 'weeks_count': 4,
+        }, headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['weeks_processed'] == 4
+        assert data['created'] > 0
+        # Verify distinct weeks (dates in 4 different ISO weeks, 7 days apart starts)
+        import db as db_module
+        conn = db_module.get_db()
+        rows = conn.execute('''
+            SELECT sd.date FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = 1 AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''').fetchall()
+        conn.close()
+        dates = sorted({r['date'] for r in rows})
+        # 1st course: 4 pairs/week on periods 1-4 → 4 distinct days per week; 4 weeks = 16
+        assert len(dates) >= 16, f"Expected lessons across 4 weeks (>=16 distinct days), got {len(dates)}"
+        # Ensure start dates span > 1 week (multiple calendar weeks present)
+        import datetime as _dt
+        parsed = [_dt.date.fromisoformat(d) for d in dates]
+        weeks_set = set((dd.isocalendar()[0], dd.isocalendar()[1]) for dd in parsed)
+        assert len(weeks_set) >= 3, f"Expected >=3 distinct ISO weeks, got {len(weeks_set)}"
+        # Ensure no collisions via 3D: no two lessons share (date, period, teacher)
+        conn = db_module.get_db()
+        dup = conn.execute('''
+            SELECT COUNT(*) FROM lessons l1 JOIN lessons l2 ON l1.id < l2.id
+            JOIN schedule_days sd1 ON l1.day_id = sd1.id
+            JOIN schedule_days sd2 ON l2.day_id = sd2.id
+            WHERE sd1.date = sd2.date AND l1.period = l2.period AND l1.teacher_id = l2.teacher_id
+              AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL AND sd1.deleted_at IS NULL AND sd2.deleted_at IS NULL
+        ''').fetchone()[0]
+        dup_room = conn.execute('''
+            SELECT COUNT(*) FROM lessons l1 JOIN lessons l2 ON l1.id < l2.id
+            JOIN schedule_days sd1 ON l1.day_id = sd1.id
+            JOIN schedule_days sd2 ON l2.day_id = sd2.id
+            WHERE sd1.date = sd2.date AND l1.period = l2.period
+              AND l1.classroom_id = l2.classroom_id AND l1.classroom_id IS NOT NULL
+              AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL AND sd1.deleted_at IS NULL AND sd2.deleted_at IS NULL
+        ''').fetchone()[0]
+        dup_group = conn.execute('''
+            SELECT COUNT(*) FROM lessons l1 JOIN lessons l2 ON l1.id < l2.id
+            JOIN schedule_days sd1 ON l1.day_id = sd1.id
+            JOIN schedule_days sd2 ON l2.day_id = sd2.id
+            WHERE sd1.date = sd2.date AND l1.period = l2.period AND l1.group_id = l2.group_id
+              AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL AND sd1.deleted_at IS NULL AND sd2.deleted_at IS NULL
+        ''').fetchone()[0]
+        conn.close()
+        assert dup == 0, f"{dup} teacher collisions"
+        assert dup_room == 0, f"{dup_room} classroom collisions"
+        assert dup_group == 0, f"{dup_group} group collisions"
+
+    def test_clear_week_scopes_to_group(self, client, seed_refs, admin_csrf):
+        """Deleting a week must affect ONLY the target group, not others."""
+        h = {'X-CSRF-Token': admin_csrf}
+        # Create second group
+        resp = client.post('/api/groups', json={'name': 'Группа-2', 'course': 2}, headers=h)
+        assert resp.status_code in (200, 201)
+        g2 = resp.get_json()['id']
+        # Create curriculum for both groups
+        for gid in (1, g2):
+            resp = client.post('/api/curriculum', json={
+                'group_id': gid, 'subject_id': 1, 'teacher_id': 1,
+                'semester': 1, 'total_hours': 144,
+            }, headers=h)
+            assert resp.status_code == 201
+        # Generate for both groups on same week
+        for gid in (1, g2):
+            resp = client.post('/api/schedule/generate', json={
+                'group_id': gid, 'semester': 1, 'monday': '2026-09-07', 'week_count': 1,
+            }, headers=h)
+            assert resp.status_code == 200
+        # Delete week for group 1 only
+        resp = client.delete('/api/schedule/clear-week?start_date=2026-09-07&group_id=1', headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['deleted_count'] > 0
+        assert data['deleted_count'] < 36, f"deleted too many: {data['deleted_count']} (must be only group 1)"
+        # Group 1 week now empty
+        g1_table = client.get('/api/schedule-table?group=%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0-1&monday=2026-09-07').get_json()
+        assert g1_table['week_exists'] is False
+        # Group 2 week intact
+        from urllib.parse import quote
+        g2_name = next(g['name'] for g in client.get('/api/groups').get_json() if g['id'] == g2)
+        g2_table = client.get(f'/api/schedule-table?group={quote(g2_name)}&monday=2026-09-07').get_json()
+        assert g2_table['week_exists'] is True
+
+    def test_curriculum_progress_calculation(self, client, seed_refs, admin_csrf):
+        """Progress endpoint must compute expected vs actual pace correctly."""
+        h = {'X-CSRF-Token': admin_csrf}
+        # Plan: 30 pairs total over 15 weeks -> plan_pairs=30
+        # total_hours so that weekly*weeks=30: choose weeks=15, weekly=2 -> total_hours=60, weeks=15
+        # weekly=2 requires ceil(total_hours/(15*2))=2 -> total_hours between 45 and 60
+        resp = client.post('/api/curriculum', json={
+            'group_id': 1, 'subject_id': 1, 'teacher_id': 1,
+            'semester': 1, 'total_hours': 60, 'weeks_in_semester': 15,
+        }, headers=h)
+        assert resp.status_code == 201
+        # Insert 10 actual pairs (already conducted) across weeks before week 5
+        conn = __import__('db', fromlist=['get_db']).get_db()
+        day_names = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+        # Create 10 schedule days (first 2 weeks * 5 days)
+        conn.execute("INSERT INTO schedule_days (day_name, date, group_name) VALUES ('Понедельник','2026-09-07','Группа-1')")
+        for i in range(10):
+            day_id = conn.execute("SELECT id FROM schedule_days WHERE group_name='Группа-1' ORDER BY id LIMIT 1").fetchone()['id']
+            conn.execute("INSERT INTO lessons (day_id, period, subject_id, teacher_id, group_id) VALUES (?, ?, 1, 1, 1)",
+                         (day_id, (i % 4) + 1))
+        conn.commit()
+        conn.close()
+        # Query progress at week 5 of 15 (expected = (30/15)*5 = 10)
+        resp = client.get('/api/curriculum/progress?group_id=1&semester=1&current_week=5&total_weeks=15')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['group_id'] == 1
+        subjects = data['subjects']
+        math_subj = next((s for s in subjects if s['subject_id'] == 1), None)
+        assert math_subj is not None
+        assert math_subj['plan_pairs'] == 30, f"plan_pairs={math_subj['plan_pairs']}"
+        assert math_subj['actual_pairs'] == 10, f"actual={math_subj['actual_pairs']}"
+        assert math_subj['expected_pairs'] == 10, f"expected={math_subj['expected_pairs']}"
+        assert math_subj['delta_pace'] == 0, f"delta={math_subj['delta_pace']}"
+        assert math_subj['status'] == 'success', f"status={math_subj['status']}"
+
     def test_generator_controlled_shift_drift(self, client, seed_refs, admin_csrf):
         """Over several weeks, generated schedule must have varied start periods (1 and 2)
         and NO windows (contiguous periods) inside any day."""

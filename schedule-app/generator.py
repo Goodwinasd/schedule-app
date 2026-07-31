@@ -144,18 +144,31 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         (datetime.strptime(monday_str, '%Y-%m-%d') + timedelta(weeks=w)).strftime('%Y-%m-%d')
     ) for w in range(week_count)]
 
-    # Build a flat pool of (subject_id, teacher_id) pairs to place each week
-    # across ALL curriculum items for this group, then distribute round-robin
+    # Build a flat pool of (subject_id, teacher_id, priority) pairs to place each week.
+    # priority = pace delta (lower = more behind → scheduled first).
+    from math import ceil as _ceil
     for wi, week_dates in enumerate(weeks_dates):
-        # Collect all pairs needed for this week, deducting existing ones
         pool = []
+        # Compute total semester load for the plan to derive expected pace
         for item in curriculum:
             weeks = item['weeks_in_semester'] or 18
             if wi >= weeks:
                 continue
             total_hours = item['total_hours']
             weekly = max(1, (total_hours + weeks * 2 - 1) // (weeks * 2))
-            # Count existing lessons for this subject on this week
+            plan_total = weekly * weeks
+            # Expected pairs by this week (first wi weeks fully scheduled)
+            expected = round((plan_total / weeks) * wi)
+            # Actual pairs done for this subject so far (all weeks until now)
+            actual = conn.execute('''
+                SELECT COUNT(*) FROM lessons l
+                JOIN schedule_days sd ON l.day_id = sd.id
+                WHERE l.subject_id = ? AND l.group_id = ?
+                  AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+                  AND sd.date < ?
+            ''', (item['subject_id'], group_id, week_dates[0])).fetchone()[0]
+            delta_pace = actual - expected
+            # Count existing lessons on the target week
             existing = conn.execute('''
                 SELECT COUNT(*) FROM lessons l
                 JOIN schedule_days sd ON l.day_id = sd.id
@@ -168,12 +181,15 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             remaining = weekly - existing
             if remaining > 0:
                 for _ in range(remaining):
-                    pool.append((item['subject_id'], item['teacher_id']))
+                    pool.append((item['subject_id'], item['teacher_id'], delta_pace))
 
         if not pool:
             continue
 
-        # Seeded shuffle for controlled week-to-week variation
+        # Prioritise subjects lagging pace (most negative delta first)
+        pool.sort(key=lambda x: x[2])
+
+        # Seeded shuffle for controlled week-to-week variation within priority tiers
         monday_date = datetime.strptime(week_dates[0], '%Y-%m-%d')
         iso_year, iso_week, _ = monday_date.isocalendar()
         seed_str = f"{iso_year}_{iso_week}_{group_id}"
@@ -191,8 +207,8 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         # Round-robin: distribute pool across 6 days
         # Day assignment cycles through day_order, wrapping by modulo 6
         day_lessons = [[] for _ in range(6)]
-        for i, (subj_id, teach_id) in enumerate(pool):
-            day_lessons[day_order[i % 6]].append((subj_id, teach_id))
+        for i, (subj_id, teach_id, _prio) in enumerate(pool):
+            day_lessons[day_order[i % 6]].append((subj_id, teach_id, _prio))
 
         # Controlled Shift Drift: choose start period per day (seeded, weighted)
         def pick_start_period(day_idx):
@@ -233,7 +249,7 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                             period = allowed_periods[0]
                     else:
                         period = 1
-                subj_id, primary_tid = lessons[0]
+                subj_id, primary_tid, _prio = lessons[0]
                 actual_tid, original_tid, is_sub = _resolve_teacher_substitution(
                     conn, subj_id, primary_tid, group_id, date_str, period
                 )

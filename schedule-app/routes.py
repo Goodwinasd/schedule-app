@@ -698,6 +698,74 @@ def get_curriculum():
     return jsonify([dict(r) for r in rows])
 
 
+@bp.route('/api/curriculum/progress', methods=['GET'])
+@login_required
+def curriculum_progress():
+    """Progress & pace tracking for a group's semester plan (plan vs actual)."""
+    from math import ceil
+    group_id = request.args.get('group_id', type=int)
+    semester = request.args.get('semester', type=int, default=1)
+    current_week = request.args.get('current_week', type=int, default=1)
+    total_weeks = request.args.get('total_weeks', type=int, default=16)
+    if not group_id:
+        return jsonify({"error": "group_id required"}), 400
+    if total_weeks <= 0:
+        return jsonify({"error": "total_weeks must be positive"}), 400
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT c.*, s.name AS subject_name, t.name AS teacher_name
+        FROM curriculum c
+        LEFT JOIN subjects s ON c.subject_id = s.id
+        LEFT JOIN teachers t ON c.teacher_id = t.id
+        WHERE c.group_id = ? AND c.semester = ?
+        ORDER BY s.name
+    ''', (group_id, semester)).fetchall()
+    subjects = []
+    for r in rows:
+        plan_pairs = max(1, ceil((r['total_hours'] * 1.0) / ((r['weeks_in_semester'] or 18) * 2)))
+        total_pairs = plan_pairs * (r['weeks_in_semester'] or 18)
+        expected = round((total_pairs / total_weeks) * current_week)
+        subjects.append({
+            'subject_id': r['subject_id'],
+            'name': r['subject_name'] or f"Предмет {r['subject_id']}",
+            'teacher_name': r['teacher_name'],
+            'plan_pairs': total_pairs,
+            'actual_pairs': 0,
+            'expected_pairs': expected,
+            'percentage': 0,
+            'status': 'success',
+            'delta_pace': 0,
+        })
+    # Compute actual pairs properly (subject-aware), percentage and status
+    for s in subjects:
+        actual = conn.execute('''
+            SELECT COUNT(*) FROM lessons l
+            JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = ? AND l.subject_id = ?
+              AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''', (group_id, s['subject_id'])).fetchone()[0]
+        s['actual_pairs'] = actual
+        s['percentage'] = round((actual / s['plan_pairs']) * 100, 1) if s['plan_pairs'] else 0
+        delta = actual - s['expected_pairs']
+        s['delta_pace'] = delta
+        if actual > s['plan_pairs']:
+            s['status'] = 'danger'
+        elif abs(delta) <= 1:
+            s['status'] = 'success'
+        elif delta >= -4:
+            s['status'] = 'warning'
+        else:
+            s['status'] = 'danger'
+    conn.close()
+    return jsonify({
+        'group_id': group_id,
+        'semester': semester,
+        'current_week': current_week,
+        'total_weeks': total_weeks,
+        'subjects': subjects,
+    })
+
+
 @bp.route('/api/curriculum', methods=['POST'])
 @login_required
 def create_curriculum():
@@ -1230,6 +1298,10 @@ def delete_week():
                 f"SELECT COUNT(*) FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ? AND deleted_at IS NOT NULL",
                 week_dates + [target_id]
             ).fetchone()[0]
+            pairs_affected = conn.execute(
+                f"SELECT COUNT(*) FROM lessons WHERE deleted_at IS NOT NULL AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ?)",
+                week_dates + [target_id]
+            ).fetchone()[0]
         else:
             col = 'teacher_id' if target_type == 'teacher' else 'classroom_id'
             conn.execute(
@@ -1240,10 +1312,11 @@ def delete_week():
                 f"SELECT COUNT(*) FROM lessons WHERE deleted_at IS NOT NULL AND {col} = ? AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}))",
                 [int(target_id)] + week_dates
             ).fetchone()[0]
+            pairs_affected = affected
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"success": True, "days_deleted": affected})
+    return jsonify({"success": True, "days_deleted": affected, "pairs_deleted": pairs_affected})
 
 
 @bp.route('/api/week/restore', methods=['POST'])
@@ -2757,7 +2830,13 @@ def schedule_generate():
     group_id = body.get('group_id')
     semester = body.get('semester', 1)
     monday = body.get('monday', '')
-    week_count = body.get('week_count', 18)
+    week_count = body.get('week_count', 1)
+    # weeks_count = alias for batch/monthly generation (max 4)
+    weeks_count = body.get('weeks_count')
+    if weeks_count:
+        week_count = min(max(int(weeks_count), 1), 4)
+    else:
+        week_count = max(int(week_count or 1), 1)
     if not group_id or not monday:
         return jsonify({"error": "group_id and monday required"}), 400
     conn = get_db()
@@ -2769,8 +2848,12 @@ def schedule_generate():
     conn.commit()
     conn.close()
     refs_cache.invalidate_prefix('ref_list_')
-    logger.info("Generator created %d lessons for group %s semester %d", result['created'], group['name'], semester)
-    return jsonify(result)
+    logger.info("Generator created %d lessons for group %s semester %d weeks=%d", result['created'], group['name'], semester, week_count)
+    return jsonify({
+        "created": result['created'],
+        "errors": result['errors'],
+        "weeks_processed": week_count,
+    })
 
 
 @bp.route('/api/schedule/substitutions-suggest', methods=['GET'])
@@ -2803,3 +2886,52 @@ def substitutions_suggest():
     conn.close()
     available = [{'id': t['id'], 'name': t['name']} for t in teachers if t['id'] not in busy_ids]
     return jsonify({"available": available})
+
+
+@bp.route('/api/schedule/clear-week', methods=['DELETE'])
+@login_required
+def clear_week_group():
+    """Очистить расписание строго одной группы на указанную неделю (6 дней, Пн–Сб).
+    group_id — обязателен; удаление затрагивает ТОЛЬКО переданную группу.
+    ---
+    parameters:
+      - in: query
+        name: start_date
+        type: string
+        required: true
+        description: Дата понедельника (YYYY-MM-DD)
+      - in: query
+        name: group_id
+        type: integer
+        required: true
+        description: ID группы, чью неделю очищаем
+    responses:
+      200:
+        description: Объект с deleted_count (число удалённых пар) только для этой группы
+      400:
+        description: start_date и/или group_id обязательны
+    """
+    start_date = request.args.get('start_date', '')
+    group_id = request.args.get('group_id', type=int)
+    if not start_date or not group_id:
+        return jsonify({"error": "start_date and group_id required"}), 400
+    week_dates = [d['date'] for d in build_week_dates(start_date)]
+    placeholders = ','.join('?' * len(week_dates))
+    conn = get_db()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        # Soft-delete lessons for this exact group on this week
+        cur = conn.execute(
+            f"UPDATE lessons SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND group_id = ? AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}) AND group_name = (SELECT name FROM groups_list WHERE id = ?))",
+            [group_id] + week_dates + [group_id]
+        )
+        # Soft-delete the schedule days for this group on this week
+        conn.execute(
+            f"UPDATE schedule_days SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND date IN ({placeholders}) AND group_name = (SELECT name FROM groups_list WHERE id = ?)",
+            week_dates + [group_id]
+        )
+        deleted_count = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True, "deleted_count": deleted_count})

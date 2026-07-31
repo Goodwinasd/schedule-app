@@ -129,6 +129,78 @@ export async function loadScheduleTable() {
     }
     cont.innerHTML = renderScheduleTable(data);
     hideLoader();
+    loadPlanProgress();
+}
+
+export async function loadPlanProgress() {
+    const box = document.getElementById('plan-progress-box');
+    if (!box) return;
+    if (state.currentScheduleType !== 'group' || !state.currentScheduleId) {
+        box.style.display = 'none';
+        return;
+    }
+    const monday = toISODate(state.currentMonday);
+    const weekNum = getWeekNumber(state.currentMonday);
+    box.style.display = '';
+    const data = await api(`/api/curriculum/progress?group_id=${state.currentScheduleId}&semester=1&current_week=${weekNum}&total_weeks=16`);
+    if (!data || data.error || !data.subjects) {
+        box.innerHTML = '<div class="plan-progress-empty">План семестра не найден для этой группы</div>';
+        return;
+    }
+    const weekNumber = data.current_week || weekNum || 6;
+    const totalWeeks = data.total_weeks || 16;
+    let html = `<div class="plan-progress-header">
+        <h3>📊 Выполнение плана семестра</h3>
+        <p class="plan-progress-subtitle">
+            Расчёт нагрузки к <b>${weekNum}-й неделе</b> из ${totalWeeks}.
+            Показывает, успевает ли группа вычитать программу или есть отставание от графика.
+        </p>
+    </div>`;
+    for (const s of data.subjects) {
+        const pct = Math.min(s.percentage, 100);
+        const color = s.status === 'danger' ? '#d32f2f' : s.status === 'warning' ? '#f9a825' : '#43a047';
+        let badge = '';
+        let badgeClass = 'badge-success';
+        if (s.actual_pairs > s.expected_pairs) {
+            badgeClass = 'badge-info';
+            badge = `🔵 Опережаем график на +${s.actual_pairs - s.expected_pairs} пар${plural(s.actual_pairs - s.expected_pairs)}`;
+        } else if (s.status === 'danger' && s.delta_pace < -4) {
+            badgeClass = 'badge-danger';
+            badge = `🔴 Сильное отставание (-${-s.delta_pace} пар)`;
+        } else if (s.status === 'warning') {
+            badgeClass = 'badge-warning';
+            badge = `🟡 Отстаём от темпа на ${-s.delta_pace} пар${plural(-s.delta_pace)}`;
+        } else {
+            badge = '🟢 Идём по графику';
+        }
+        const lag = s.delta_pace < 0;
+        const tip = `По учебному плану на весь семестр положено ${s.plan_pairs} пар. ` +
+            `К ${weekNum}-й неделе должно быть проведено около ${s.expected_pairs} пар. ` +
+            `По факту в расписании стоит ${s.actual_pairs} пар. ` +
+            (s.delta_pace === 0 ? 'Предмет идёт точно по плану.' :
+                lag ? `Отставание составляет ${-s.delta_pace} пар${plural(-s.delta_pace)} (рекомендуется добавить этот предмет при генерации следующих недель).`
+                     : `Опережение составляет ${s.delta_pace} пар${plural(s.delta_pace)}.`);
+        html += `<div class="plan-card" title="${escapeHtml(tip)}">
+            <div class="plan-card-title">${escapeHtml(s.name)} ${s.teacher_name ? '(' + escapeHtml(s.teacher_name) + ')' : ''}</div>
+            <div class="plan-card-stats">
+                <div class="plan-stat"><span class="plan-stat-label">Проведено (факт)</span><span class="plan-stat-value">${s.actual_pairs} пар${plural(s.actual_pairs)}</span></div>
+                <div class="plan-stat"><span class="plan-stat-label">Норма к ${weekNum}-й неделе</span><span class="plan-stat-value">${s.expected_pairs} пар${plural(s.expected_pairs)}</span></div>
+                <div class="plan-stat"><span class="plan-stat-label">Всего на семестр</span><span class="plan-stat-value">${s.plan_pairs} пар${plural(s.plan_pairs)}</span></div>
+            </div>
+            <div class="plan-progress-bar"><span style="width:${pct}%;background:${color}"></span></div>
+            <span class="badge ${badgeClass}">${badge}</span>
+        </div>`;
+    }
+    box.innerHTML = html;
+}
+
+function plural(n) {
+    const a = Math.abs(n) % 100;
+    const b = a % 10;
+    if (a > 10 && a < 20) return '';
+    if (b > 1 && b < 5) return 'ы';
+    if (b === 1) return 'у';
+    return '';
 }
 
 export function printSchedule() {
@@ -174,6 +246,32 @@ export async function generateFromCurriculum() {
     });
     if (res.error) { await showKimiAlert(res.error); return; }
     showToast(`Создано пар: ${res.created}`, 'success');
+    dispatchEvent(SCHEDULE_UPDATED);
+    loadScheduleTable();
+}
+
+export async function generateMonth() {
+    if (!state.currentScheduleType === 'group' || !state.currentScheduleId) {
+        await showKimiAlert('Сначала откройте расписание группы');
+        return;
+    }
+    const groupId = state.currentScheduleId;
+    const monday = toISODate(state.currentMonday);
+    const ok = await confirmModal('Сгенерировать расписание для группы на ближайшие 4 недели по учебному плану?');
+    if (!ok) return;
+    showLoader('Собираем расписание на 4 недели...');
+    const res = await api('/api/schedule/generate', {
+        method: 'POST',
+        body: JSON.stringify({ group_id: groupId, semester: 1, monday, weeks_count: 4 }),
+    });
+    hideLoader();
+    if (res.error) { await showKimiAlert(res.error); return; }
+    await showKimiAlert(
+        '✅ Месячный план успешно сгенерирован!\n\n' +
+        `• Обработано недель: ${res.weeks_processed}\n` +
+        `• Всего создано занятий: ${res.created}\n` +
+        '• Отстающие дисциплины сбалансированы'
+    );
     dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }

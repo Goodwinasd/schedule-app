@@ -140,10 +140,18 @@ export async function deleteWeek() {
     if (!state.currentMonday) return;
     if (!await confirmModal('Удалить все дни и пары за эту неделю?')) return;
     const m = toISODate(state.currentMonday);
+    // Для группы используем строго изолированный по group_id эндпоинт
+    if (state.currentScheduleType === 'group') {
+        const res = await api('/api/schedule/clear-week?start_date=' + m + '&group_id=' + state.currentScheduleId, { method: 'DELETE' });
+        if (res.error) { await showKimiAlert(res.error); return; }
+        await showKimiAlert('Неделя очищена. Удалено занятий (пар): ' + res.deleted_count);
+        loadScheduleTable();
+        return;
+    }
     const params = _weekTargetParams();
     if (!params) { await showKimiAlert('Сначала откройте расписание'); return; }
     const res = await api('/api/week?monday=' + m + params, { method: 'DELETE' });
     if (res.error) { await showKimiAlert(res.error); return; }
-    await showKimiAlert('Удалено дней: ' + res.days_deleted);
+    await showKimiAlert('Неделя очищена. Удалено занятий (пар): ' + (res.pairs_deleted ?? res.days_deleted));
     loadScheduleTable();
 }
