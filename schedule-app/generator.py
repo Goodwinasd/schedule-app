@@ -194,6 +194,21 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         for i, (subj_id, teach_id) in enumerate(pool):
             day_lessons[day_order[i % 6]].append((subj_id, teach_id))
 
+        # Controlled Shift Drift: choose start period per day (seeded, weighted)
+        def pick_start_period(day_idx):
+            d_seed = f"{iso_year}_{iso_week}_{group_id}_day{day_idx}"
+            drng = random.Random(d_seed)
+            roll = drng.random()
+            if is_first_course:
+                # 80% -> 1, 20% -> 2 (never evening)
+                return 1 if roll < 0.8 else 2
+            if roll < 0.7:
+                return 1
+            elif roll < 0.9:
+                return 2
+            else:
+                return drng.choice([4, 5])
+
         for day_idx, lessons in enumerate(day_lessons):
             if not lessons:
                 continue
@@ -201,24 +216,31 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             if _is_holiday(conn, date_str):
                 continue
             day_id = _get_or_create_day(conn, date_str, group_name)
-            # Place lessons sequentially in periods 1..8
-            # Try to keep same room within day (room hopping minimisation)
+            # Number of lessons to place in this day (a contiguous block)
+            block_count = len(lessons)
+            start_period = pick_start_period(day_idx)
             last_classroom_id = None
-            if is_first_course:
-                period_range = allowed_periods
-            else:
-                period_range = range(5, 9) if (is_even and day_idx % 2 == 0) else range(1, 5)
-                period_range = list(period_range) + [p for p in range(1, 9) if p not in period_range]
-            for period in period_range:
-                if not lessons:
-                    break
+            # Sequential block from start_period (Fallback: drop to earlier/window-safe slots on collision)
+            period = start_period
+            placed_in_day = 0
+            while lessons and placed_in_day < block_count:
+                if period > 8:
+                    # Ran out of periods; fallback to earliest free slot 1..8
+                    # (continuity sacrificed only at day end near max load)
+                    if is_first_course:
+                        period = 1
+                        if any(p >= 5 for p in allowed_periods):
+                            period = allowed_periods[0]
+                    else:
+                        period = 1
                 subj_id, primary_tid = lessons[0]
-                # Resolve substitution if planned teacher is absent
                 actual_tid, original_tid, is_sub = _resolve_teacher_substitution(
                     conn, subj_id, primary_tid, group_id, date_str, period
                 )
                 if actual_tid is None:
-                    continue  # no free/substitute teacher for this slot; skip (fallback handled by round-robin)
+                    lessons.pop(0)  # no substitute — skip this pair
+                    placed_in_day += 1
+                    continue
                 classroom_id = _pick_classroom(conn, subj_id, actual_tid, date_str, period, last_classroom_id)
                 conflicts, blocking = _validate_slot_3d(
                     conn, date_str, period, group_id,
@@ -234,5 +256,16 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                     created += 1
                     last_classroom_id = classroom_id
                     lessons.pop(0)
+                    placed_in_day += 1
+                    period += 1
+                else:
+                    # Fallback: try earliest free slot of the day (window-safe rollback)
+                    fallback_period = 1
+                    if is_first_course:
+                        fallback_period = allowed_periods[0]
+                    if fallback_period != period:
+                        period = fallback_period
+                    else:
+                        period += 1  # advance to avoid infinite loop
 
     return {'created': created, 'errors': errors}

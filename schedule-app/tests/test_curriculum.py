@@ -195,6 +195,48 @@ class TestValidateWeeklyLoad:
             assert l['is_substitution'] == 1, f"Lesson {l['id']} not flagged as substitution"
             assert l['original_teacher_id'] == 1, f"Lesson {l['id']} missing original_teacher"
 
+    def test_generator_controlled_shift_drift(self, client, seed_refs, admin_csrf):
+        """Over several weeks, generated schedule must have varied start periods (1 and 2)
+        and NO windows (contiguous periods) inside any day."""
+        import db as db_module
+        h = {'X-CSRF-Token': admin_csrf}
+        # Create a senior-course group (course=2) so evening shifts are allowed
+        resp = client.post('/api/groups', json={'name': '02-Тест', 'course': 2}, headers=h)
+        assert resp.status_code in (200, 201)
+        gid = resp.get_json()['id']
+        conn = db_module.get_db()
+        conn.execute("INSERT INTO curriculum (group_id, subject_id, teacher_id, semester, total_hours, weeks_in_semester) VALUES (?, 1, 1, 1, 144, 18)", (gid,))
+        conn.commit()
+        conn.close()
+        # Generate 6 weeks to cover many start-period rolls
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': gid, 'semester': 1, 'monday': '2026-07-27', 'week_count': 6,
+        }, headers=h)
+        assert resp.status_code == 200
+        assert resp.get_json()['created'] > 0
+        # Read all generated lessons grouped by (date) and check no windows inside day
+        lessons = db_module.get_db().execute('''
+            SELECT l.period, sd.date, sd.group_name FROM lessons l
+            JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = ? AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+            ORDER BY sd.date, l.period
+        ''', (gid,)).fetchall()
+        periods_seen = set()
+        days = {}
+        for l in lessons:
+            periods_seen.add(l['period'])
+            days.setdefault(l['date'], []).append(l['period'])
+        # Must have period 1 somewhere (morning standard)
+        assert 1 in periods_seen, "No period 1 lessons generated"
+        # Must have period 2 somewhere (first-pair shift) — across 6 weeks highly likely
+        assert 2 in periods_seen, "No shifted start at period 2 — drift likely not applied"
+        # No windows: within each day periods must be contiguous starting from min
+        for date_str, ps in days.items():
+            ps = sorted(set(ps))
+            start = ps[0]
+            for i, p in enumerate(ps):
+                assert p == start + i, f"Window in schedule on {date_str}: {ps}"
+
     def test_generator_3d_collision_prevention(self, client, seed_refs, admin_csrf):
         """100% no collisions across group/teacher/classroom in generated schedule."""
         import db as db_module
