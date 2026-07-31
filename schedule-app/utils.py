@@ -83,5 +83,46 @@ def _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subjec
     return warnings, blocking
 
 
+def _validate_slot_3d(conn, date_str, period, group_id, teacher_id=None, classroom_id=None, exclude_lesson_id=None):
+    """Strict 3D collision check for a slot (date, period):
+    group free / teacher free / classroom free. Any overlap blocks the slot."""
+    conflicts = []
+    blocking = False
+    if group_id is not None:
+        row = conn.execute('''
+            SELECT 1 FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE sd.date = ? AND l.period = ? AND l.group_id = ?
+              AND l.subject_id IS NOT NULL AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+              AND (? IS NULL OR l.id != ?)
+            LIMIT 1
+        ''', (date_str, period, group_id, exclude_lesson_id, exclude_lesson_id)).fetchone()
+        if row:
+            conflicts.append('group')
+            blocking = True
+    if teacher_id:
+        row = conn.execute('''
+            SELECT 1 FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE sd.date = ? AND l.period = ? AND l.teacher_id = ?
+              AND l.subject_id IS NOT NULL AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+              AND (? IS NULL OR l.id != ?)
+            LIMIT 1
+        ''', (date_str, period, teacher_id, exclude_lesson_id, exclude_lesson_id)).fetchone()
+        if row:
+            conflicts.append('teacher')
+            blocking = True
+    if classroom_id:
+        row = conn.execute('''
+            SELECT 1 FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE sd.date = ? AND l.period = ? AND l.classroom_id = ?
+              AND l.subject_id IS NOT NULL AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+              AND (? IS NULL OR l.id != ?)
+            LIMIT 1
+        ''', (date_str, period, classroom_id, exclude_lesson_id, exclude_lesson_id)).fetchone()
+        if row:
+            conflicts.append('classroom')
+            blocking = True
+    return conflicts, blocking
+
+
 def _safe_filename(s):
     return re.sub(r'[\\/:*?"<>|]+', '_', s).strip('_')

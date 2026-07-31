@@ -75,6 +75,25 @@ def ensure_curriculum_table():
     conn.close()
 
 
+def ensure_teacher_tables():
+    """Create teacher_absences and teacher_subjects if they don't exist."""
+    conn = get_db()
+    conn.execute('''CREATE TABLE IF NOT EXISTS teacher_absences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        reason TEXT
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS teacher_subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL
+    )''')
+    conn.commit()
+    conn.close()
+
+
 def run_alembic_upgrade():
     """Применить все неприменённые миграции через Alembic.
     Используется в production (app.py) и в тестах (conftest.py)."""

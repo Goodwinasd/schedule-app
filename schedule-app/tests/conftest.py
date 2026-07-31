@@ -25,6 +25,7 @@ def app():
 
     db_module.run_alembic_upgrade()
     db_module.ensure_curriculum_table()
+    db_module.ensure_teacher_tables()
 
     from app import app as flask_app
     flask_app.testing = True
@@ -78,7 +79,7 @@ def _clean_tables():
         conn = db_module.get_db()
         tables = ['lesson_history', 'lessons', 'schedule_days', 'groups_list',
                   'classrooms_list', 'subjects', 'teachers', 'excluded_dates',
-                  'settings', 'curriculum']
+                  'settings', 'curriculum', 'teacher_absences', 'teacher_subjects']
         for t in tables:
             conn.execute(f'DELETE FROM {t}')
         conn.execute("INSERT INTO settings (key, value) VALUES ('session_lifetime', '3600')")
