@@ -82,7 +82,7 @@ function renderScheduleTable(data) {
                     const inner = lessons.map(l => {
                         state.lessonsMap[l.id] = l;
                         const isSub = l.is_substitution ? true : false;
-                        const subCls = isSub ? ' lesson-substitution' : '';
+                        const subCls = isSub ? ' is-substitution' : '';
                         let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
                         if (isSub) meta += ' 🔄 замена';
                         const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
@@ -90,7 +90,7 @@ function renderScheduleTable(data) {
                         const conflict = checkConflictsForLesson(l, day.date, p.period);
                         const cCls = conflict ? ' ' + conflict.cls : '';
                         const tip = conflict ? ` title="${escapeHtml(conflict.tooltip)}"` : '';
-                        return `<div class="lesson-content${cCls}${subCls}"${oc}${drag}${tip} style="${isSub ? 'background:var(--warning-bg);color:var(--warning-text)' : ''}"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
+                        return `<div class="lesson-content${cCls}${subCls}"${oc}${drag}${tip}><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
                     }).join('');
                     html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}" data-day-id="${day.day_id || ''}" data-date="${day.date}" data-period="${p.period}">${inner}</td>`;
                 } else {

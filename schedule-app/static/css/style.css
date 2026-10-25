@@ -1,4 +1,4 @@
-﻿
+
 * {
     margin: 0;
     padding: 0;
@@ -908,6 +908,18 @@ main {
 
 .busy-cell .lesson-content:hover {
     background: var(--color-surface-hover);
+}
+
+/* Замена преподавателя: цветовая метка берётся из темы, а не из инлайн-стиля в JS */
+.schedule-table .lesson-content.is-substitution {
+    background: var(--warning-bg);
+    border-radius: var(--radius-xs);
+    padding: var(--space-1) var(--space-2);
+}
+
+.schedule-table .lesson-content.is-substitution .lesson-subject,
+.schedule-table .lesson-content.is-substitution .lesson-meta {
+    color: var(--warning-text);
 }
 
 /* ---- Drag-and-Drop расписания (только для админа) ---- */
