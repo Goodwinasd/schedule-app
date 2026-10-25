@@ -423,6 +423,9 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     document.getElementById('validation-warnings').style.display = 'none';
     document.getElementById('btn-delete-lesson').style.display = 'none';
     document.getElementById('btn-add-subgroup').style.display = 'none';
+    document.getElementById('btn-move-lesson').style.display = 'none';
+    document.getElementById('move-lesson-block').style.display = 'none';
+    document.getElementById('move-lesson-divider').style.display = 'none';
     const sel = document.getElementById('lesson-period');
     sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${period && b.period === period ? 'selected' : ''}>${b.period}-я пара (${escapeHtml(b.start)} - ${escapeHtml(b.end)})</option>`).join('');
     sel.onchange = () => validateLesson();
@@ -501,6 +504,9 @@ export function editLesson(lesson) {
     document.getElementById('validation-warnings').style.display = 'none';
     document.getElementById('btn-delete-lesson').style.display = '';
     document.getElementById('btn-add-subgroup').style.display = '';
+    document.getElementById('btn-move-lesson').style.display = '';
+    document.getElementById('move-lesson-block').style.display = 'none';
+    document.getElementById('move-lesson-divider').style.display = 'none';
     const sel = document.getElementById('lesson-period');
     sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${b.period === lesson.period ? 'selected' : ''}>${b.period}-я пара (${escapeHtml(b.start)} - ${escapeHtml(b.end)})</option>`).join('');
     populateSelect('lesson-subject', state.subjectsList, '— выбрать —');
@@ -540,6 +546,79 @@ export function addSubgroupLesson() {
     const d = document.getElementById('lesson-period');
     window.closeModals();
     setTimeout(() => showAddLessonModal(state.currentLessonDayId, parseInt(d.value), parseInt(document.getElementById('lesson-group').value) || null), 100);
+}
+
+/* ---- Мобильный перенос урока ----
+   На тач-устройствах HTML5 drag&drop не работает, поэтому перенос доступен
+   через мини-форму в модалке: день + пара → частичный PUT (остальные поля целы). */
+
+function _fillMoveSelects() {
+    const shortDays = { 'Понедельник': 'Пн', 'Вторник': 'Вт', 'Среда': 'Ср', 'Четверг': 'Чт', 'Пятница': 'Пт', 'Суббота': 'Сб' };
+    const daySel = document.getElementById('move-day');
+    const perSel = document.getElementById('move-period');
+    const days = (lastScheduleData && Array.isArray(lastScheduleData.days) ? lastScheduleData.days : [])
+        .filter(d => d.day_id);
+    daySel.innerHTML = days.map(d => {
+        const date = d.date ? `${d.date.slice(8, 10)}.${d.date.slice(5, 7)}` : '';
+        const label = `${shortDays[d.day_name] || (d.day_name || '').slice(0, 2)} ${date}`.trim();
+        return `<option value="${d.day_id}"${d.day_id === state.currentLessonDayId ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('');
+    const periods = (Array.isArray(state.bellSchedule) && state.bellSchedule.length)
+        ? state.bellSchedule.map(b => b.period)
+        : Array.from({ length: 8 }, (_, i) => i + 1);
+    const currentPeriod = parseInt(document.getElementById('lesson-period').value, 10) || null;
+    perSel.innerHTML = periods.map(p =>
+        `<option value="${p}"${p === currentPeriod ? ' selected' : ''}>${p}-я пара</option>`).join('');
+}
+
+export function showMoveForm() {
+    if (!state.currentEditLessonId) {
+        showToast('Сначала сохраните урок', 'info');
+        return;
+    }
+    const hasDays = lastScheduleData && Array.isArray(lastScheduleData.days)
+        && lastScheduleData.days.some(d => d.day_id);
+    if (!hasDays) {
+        showToast('Нет данных о днях этой недели', 'info');
+        return;
+    }
+    _fillMoveSelects();
+    const block = document.getElementById('move-lesson-block');
+    block.style.display = '';
+    document.getElementById('move-lesson-divider').style.display = '';
+    // На телефоне модалка выше экрана — прокручиваем к форме, чтобы её было видно.
+    block.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+export function cancelMove() {
+    document.getElementById('move-lesson-block').style.display = 'none';
+    document.getElementById('move-lesson-divider').style.display = 'none';
+}
+
+export async function saveMove() {
+    const lessonId = state.currentEditLessonId;
+    if (!lessonId) return;
+    const dayId = parseInt(document.getElementById('move-day').value, 10);
+    const period = parseInt(document.getElementById('move-period').value, 10);
+    if (!dayId || !period) {
+        showToast('Выберите день и пару', 'error');
+        return;
+    }
+    // Частичный PUT: subject/teacher/classroom/subgroup/замена остаются прежними
+    const res = await api(`/api/lessons/${lessonId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ day_id: dayId, period }),
+    });
+    if (res.error) {
+        const el = document.getElementById('validation-warnings');
+        el.style.display = '';
+        el.innerHTML = '<div class="validation-warnings"><div class="validation-warning error">'
+            + `<span class="validation-warning-icon">!!</span><span>${escapeHtml(res.error)}</span></div></div>`;
+        return;
+    }
+    window.closeModals();
+    dispatchEvent(SCHEDULE_UPDATED);
+    await loadScheduleTable();
 }
 
 export async function deleteCurrentLesson() {

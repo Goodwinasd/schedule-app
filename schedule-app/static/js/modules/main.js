@@ -17,7 +17,7 @@ import {
     renderAvailTable, _clickLesson, ensureDOMNotEmpty,
 } from './ui.js';
 import { confirmModal, showKimiAlert } from './modal.js';
-import { loadScheduleTable, printSchedule, exportSchedule, smartExportExcel, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson, generateFromCurriculum, generateMonth, refreshSubstitutionSuggest, pickSubstituteTeacher, toggleWeekPublish } from './schedule.js';
+import { loadScheduleTable, printSchedule, exportSchedule, smartExportExcel, showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson, deleteCurrentLesson, validateLesson, generateFromCurriculum, generateMonth, refreshSubstitutionSuggest, pickSubstituteTeacher, toggleWeekPublish, showMoveForm, cancelMove, saveMove } from './schedule.js';
 import { loadReferences, renderRefList, addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses, addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, addSpecialty, editSpecialty, loadSpecialties, openImportModal, closeImportModal, downloadImportTemplate, uploadImportExcel } from './references.js';
 import { renderCarousel, setActiveWeek, selectWeekByDate, carouselSkip, showAddWeekModal, updateWeekPreview, addWeek, restoreWeek, deleteWeek, setYear, goToCurrentWeek } from './nav.js';
 import { saveSetting, addExcludedDate, deleteExcludedDate, downloadBackup, restoreBackup, checkOrphans, confirmDeleteOrphans, clearOrphanResult, loadBellScheduleTab, applyBellPreset, saveBellSchedule } from './settings.js';
@@ -31,7 +31,7 @@ Object.assign(window, {
     showAddLessonModal, addLesson, editLesson, saveLesson, addSubgroupLesson,
 deleteCurrentLesson, validateLesson, generateFromCurriculum, generateMonth,
 refreshSubstitutionSuggest, pickSubstituteTeacher,
-    toggleWeekPublish,
+    toggleWeekPublish, showMoveForm, cancelMove, saveMove,
     loadReferences, showAdminPanel, renderRefList,
     addGroup, editGroup, addSubject, editSubject, editTeacher, editClassroom, advanceCourses,
     addRefItem, deleteRefItem, restoreRefItem, quickAdd, quickAddGroup, saveSetting,

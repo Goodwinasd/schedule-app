@@ -1,4 +1,4 @@
-
+﻿
 * {
     margin: 0;
     padding: 0;
@@ -3289,5 +3289,41 @@ select.input:focus {
     .carousel-chip .chip-indicator {
         font-size: 10px;
         line-height: 1.2;
+    }
+}
+
+/* ---- Шаг 5.3: перенос урока на тач-устройствах (drag&drop там не работает) ---- */
+#add-lesson-modal .modal-actions {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+}
+
+/* Вторичные действия слева, «Отмена/Сохранить» — справа; спейсер не нужен. */
+#add-lesson-modal .modal-actions > .flex-1 {
+    display: none;
+}
+
+#add-lesson-modal #btn-save-lesson {
+    margin-left: auto;
+}
+
+.lesson-move {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-xs);
+    background: var(--color-surface-2);
+}
+
+@media screen and (max-width: 768px) {
+    .lesson-move .field-row {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
+    .lesson-move .field-row .input,
+    .lesson-move .field-row .btn {
+        flex: 1 1 100%;
     }
 }

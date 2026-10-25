@@ -10,7 +10,7 @@
     <meta name="description" content="Расписание занятий: группы, преподаватели, аудитории, свободные окна">
     <!-- Пустая data:-иконка убирает 404 на /favicon.ico из каждой загрузки страницы -->
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="/static/css/style.css?v=30">
+    <link rel="stylesheet" href="/static/css/style.css?v=31">
     <!-- Версия закреплена: без неё CDN отдавал «последнюю», и графики могли
          перестать рисоваться после мажорного обновления Chart.js -->
     <script defer crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -218,9 +218,21 @@
                     <div class="field-note" id="substitution-note"></div>
                 </div>
             </div>
+            <hr class="divider" id="move-lesson-divider" style="display:none">
+            <div id="move-lesson-block" class="lesson-move" style="display:none">
+                <div class="field-row">
+                    <select id="move-day" class="input" aria-label="Новый день недели"></select>
+                    <select id="move-period" class="input" aria-label="Новая пара"></select>
+                </div>
+                <div class="field-row">
+                    <button class="btn btn-primary btn-sm" type="button" data-action="saveMove">Сохранить перенос</button>
+                    <button class="btn btn-ghost btn-sm" type="button" data-action="cancelMove">Отмена</button>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" data-action="deleteCurrentLesson">Удалить</button>
                 <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" data-action="addSubgroupLesson">+ Подгруппа</button>
+                <button class="btn btn-ghost" id="btn-move-lesson" style="display:none" data-action="showMoveForm">📅 Переместить</button>
                 <div class="flex-1"></div>
                 <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
                 <button class="btn btn-primary" id="btn-save-lesson" data-action="addLesson">Добавить</button>
@@ -364,6 +376,6 @@
         <h1 id="print-title"></h1>
         <p id="print-subtitle"></p>
     </div>
-    <script type="module" src="/static/js/modules/main.js?v=3"></script>
+    <script type="module" src="/static/js/modules/main.js?v=4"></script>
 </body>
 </html>
