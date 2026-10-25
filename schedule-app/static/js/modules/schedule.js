@@ -154,6 +154,7 @@ export async function loadScheduleTable() {
     }
     lastScheduleData = data;
     cont.innerHTML = renderScheduleTable(data);
+    ensureDayTabs(data);
     renderPublishStatus(data);
     loadPlanProgress();
 }
@@ -186,6 +187,60 @@ function renderPublishStatus(data) {
     bar.innerHTML = `<div class="schedule-status-wrap">${group}</div>`;
     bar.style.display = '';
 }
+
+/**
+ * Мобильный переключатель дней (<=768px). Добавляет табы над таблицей и ставит
+ * на контейнер data-view-day="N"; CSS показывает только колонку времени и день N.
+ * DOM таблицы (tr/td) не перестраивается — меняется только атрибут.
+ */
+function ensureDayTabs(data) {
+    const cont = document.getElementById('schedule-table-container');
+    if (!cont || !data || !Array.isArray(data.days)) return;
+    const wrap = cont.querySelector('.schedule-table-wrap');
+    if (!wrap) return;
+
+    let tabs = document.getElementById('mobile-day-tabs');
+    if (!tabs) {
+        tabs = document.createElement('div');
+        tabs.id = 'mobile-day-tabs';
+        tabs.className = 'mobile-day-tabs';
+        tabs.setAttribute('role', 'tablist');
+        tabs.setAttribute('aria-label', 'День недели');
+        cont.insertBefore(tabs, wrap);
+    }
+
+    const days = data.days;
+    const todayIso = toISODate(new Date());
+    const todayIdx = days.findIndex(d => d.date === todayIso);
+    const saved = parseInt(wrap.dataset.viewDay || '', 10);
+    const active = saved >= 1 && saved <= days.length ? saved : (todayIdx >= 0 ? todayIdx + 1 : 1);
+
+    tabs.innerHTML = days.map((d, i) => {
+        const num = i + 1;
+        const short = (d.day_name || '').slice(0, 2) || ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][i] || '';
+        const date = d.date ? `${d.date.slice(8, 10)}.${d.date.slice(5, 7)}` : '';
+        const isToday = d.date === todayIso ? ' is-today' : '';
+        const on = num === active;
+        return `<button type="button" class="mobile-day-tab${on ? ' active' : ''}${isToday}" data-day-index="${num}" role="tab" aria-selected="${on}" aria-pressed="${on}">${escapeHtml(short)}<span class="mobile-day-date">${escapeHtml(date)}</span></button>`;
+    }).join('');
+
+    wrap.dataset.viewDay = String(active);
+}
+
+// Один делегированный обработчик на все табы: переключаем атрибут и активный класс.
+document.addEventListener('click', (e) => {
+    const tab = e.target.closest('.mobile-day-tab');
+    if (!tab) return;
+    const wrap = document.querySelector('.schedule-table-wrap');
+    if (!wrap) return;
+    wrap.dataset.viewDay = tab.dataset.dayIndex;
+    tab.parentElement.querySelectorAll('.mobile-day-tab').forEach(t => {
+        const on = t === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', String(on));
+        t.setAttribute('aria-pressed', String(on));
+    });
+});
 
 export async function toggleWeekPublish(publish) {
     if (state.currentScheduleType !== 'group' || !state.currentScheduleName || !state.currentMonday) {
@@ -716,6 +771,7 @@ async function moveLesson(lessonId, sourcePeriod, targetDayId, targetPeriod, tar
 
     const cont = document.getElementById('schedule-table-container');
     cont.innerHTML = renderScheduleTable(lastScheduleData);
+    ensureDayTabs(lastScheduleData);
 
     const res = await api(`/api/lessons/${lessonId}`, {
         method: 'PUT',
@@ -725,6 +781,7 @@ async function moveLesson(lessonId, sourcePeriod, targetDayId, targetPeriod, tar
     if (res.error) {
         lastScheduleData = backup;
         cont.innerHTML = renderScheduleTable(backup);
+        ensureDayTabs(backup);
         const cell = cont.querySelector(`td.day-cell[data-day-id="${targetDayId}"][data-period="${targetPeriod}"]`);
         if (cell) {
             cell.classList.add('drop-error');

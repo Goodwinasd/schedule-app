@@ -3116,3 +3116,171 @@ select.input:focus {
         z-index: 3;
     }
 }
+
+/* ---- Шаг 5.2: мобильный день-вью, чипы недель, компактная шапка ---- */
+
+/* Табы дней создаёт JS всегда, но видимы они только на телефоне.
+   Это единственное правило вне @media: без него табы протекли бы на десктоп. */
+.mobile-day-tabs {
+    display: none;
+}
+
+@media screen and (max-width: 768px) {
+    .mobile-day-tabs {
+        display: flex;
+        gap: var(--space-1);
+        overflow-x: auto;
+        margin-bottom: var(--space-2);
+        padding-bottom: 2px;
+    }
+
+    .mobile-day-tab {
+        flex: 1 0 auto;
+        min-width: 50px;
+        min-height: var(--control-h-sm);
+        padding: 2px var(--space-2);
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-xs);
+        background: var(--color-surface);
+        color: var(--color-text-secondary);
+        font: inherit;
+        font-size: var(--text-2xs);
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .mobile-day-tab .mobile-day-date {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--color-text-muted);
+    }
+
+    .mobile-day-tab.is-today:not(.active) {
+        border-color: var(--accent-500);
+        color: var(--accent-700);
+    }
+
+    .mobile-day-tab.active {
+        background: var(--accent-500);
+        border-color: var(--accent-500);
+        color: var(--accent-on);
+    }
+
+    .mobile-day-tab.active .mobile-day-date {
+        color: var(--accent-on);
+        opacity: 0.8;
+    }
+
+    /* День-вью: колонка времени (1) + выбранный день (N+1). Структура таблицы
+       не меняется — скрываем колонки по индексу, показываем нужную. */
+    .schedule-table-wrap[data-view-day] .schedule-table {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .schedule-table-wrap[data-view-day] .schedule-table th,
+    .schedule-table-wrap[data-view-day] .schedule-table td {
+        display: none;
+    }
+
+    .schedule-table-wrap[data-view-day] .schedule-table th:nth-child(1),
+    .schedule-table-wrap[data-view-day] .schedule-table td:nth-child(1),
+    .schedule-table-wrap[data-view-day="1"] .schedule-table th:nth-child(2),
+    .schedule-table-wrap[data-view-day="1"] .schedule-table td:nth-child(2),
+    .schedule-table-wrap[data-view-day="2"] .schedule-table th:nth-child(3),
+    .schedule-table-wrap[data-view-day="2"] .schedule-table td:nth-child(3),
+    .schedule-table-wrap[data-view-day="3"] .schedule-table th:nth-child(4),
+    .schedule-table-wrap[data-view-day="3"] .schedule-table td:nth-child(4),
+    .schedule-table-wrap[data-view-day="4"] .schedule-table th:nth-child(5),
+    .schedule-table-wrap[data-view-day="4"] .schedule-table td:nth-child(5),
+    .schedule-table-wrap[data-view-day="5"] .schedule-table th:nth-child(6),
+    .schedule-table-wrap[data-view-day="5"] .schedule-table td:nth-child(6),
+    .schedule-table-wrap[data-view-day="6"] .schedule-table th:nth-child(7),
+    .schedule-table-wrap[data-view-day="6"] .schedule-table td:nth-child(7) {
+        display: table-cell;
+    }
+
+    /* Чипы недель: фиксированная ширина и аккуратное обрезание длинного текста */
+    .carousel-chip {
+        flex: 0 0 auto;
+        min-width: 84px;
+        max-width: 84px;
+        padding: 6px var(--space-2);
+        overflow: hidden;
+    }
+
+    .carousel-chip .chip-week,
+    .carousel-chip .chip-range,
+    .carousel-chip .chip-indicator {
+        display: block;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .carousel-chip .chip-week { font-size: var(--text-2xs); }
+    .carousel-chip .chip-range { font-size: 10px; }
+
+    /* Компактная шапка: меньше вертикальных зазоров между блоками действий */
+    .schedule-actions {
+        gap: var(--space-2);
+        margin-bottom: var(--space-1);
+    }
+
+    #schedule-status-bar {
+        margin: 0 0 var(--space-2);
+        justify-content: flex-start;
+    }
+
+    .schedule-status-wrap {
+        gap: var(--space-2);
+    }
+
+    .publish-group .btn {
+        min-height: 28px;
+        padding: 0 var(--space-2);
+        font-size: var(--text-2xs);
+    }
+}
+
+/* Шаг 5.2 (продолжение): карусель недель на телефоне.
+   Слева стрелки, год и «Сегодня» съедали всю строку — полосе чипов оставалось
+   63px, и активный чип обрезался. Выносим полосу на отдельную строку. */
+@media screen and (max-width: 768px) {
+    .carousel-nav {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
+    .carousel-strip {
+        order: 3;
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .carousel-arrow-left { order: 1; }
+    .carousel-arrow-right { order: 2; }
+
+    .carousel-year,
+    #carousel-year,
+    #year-select {
+        order: 2;
+        flex: 0 0 auto;
+        width: auto;
+        min-width: 72px;
+        max-width: none;
+    }
+
+    .btn-today { order: 2; }
+
+    .carousel-chip .chip-indicator {
+        font-size: 10px;
+        line-height: 1.2;
+    }
+}

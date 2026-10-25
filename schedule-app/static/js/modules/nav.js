@@ -54,6 +54,17 @@ export function getWeeksList(year = state.currentYear) {
     return weeks;
 }
 
+/** Подпись диапазона недели: на телефоне длинный текст («с 3 по 8 августа») не влезает в чип. */
+function _chipRange(monday) {
+    if (!window.matchMedia('(max-width: 768px)').matches) return formatChipRange(monday);
+    const sat = addDays(monday, 5);
+    const mon = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+    const m1 = mon[monday.getMonth()], m2 = mon[sat.getMonth()];
+    return m1 === m2
+        ? `${monday.getDate()}–${sat.getDate()} ${m1}`
+        : `${monday.getDate()} ${m1} – ${sat.getDate()} ${m2}`;
+}
+
 export async function renderCarousel() {
     const cont = document.getElementById('week-carousel');
     if (!cont) return;
@@ -78,7 +89,7 @@ export async function renderCarousel() {
     for (const w of weeks) {
         const cls = w.date === sel ? ' carousel-chip active' : w.date === today ? ' carousel-chip today' : ' carousel-chip';
         const nowCls = w.date === today ? ' current-week' : '';
-        html += `<div class="${cls}${nowCls}" data-date="${w.date}" onclick="selectWeekByDate('${w.date}')"><span class="chip-week">${w.weekNumber} неделя</span><span class="chip-range">${formatChipRange(w.monday)}</span><span class="chip-indicator" data-week="${w.date}">○ Пустая</span></div>`;
+        html += `<div class="${cls}${nowCls}" data-date="${w.date}" onclick="selectWeekByDate('${w.date}')"><span class="chip-week">${w.weekNumber} неделя</span><span class="chip-range">${_chipRange(w.monday)}</span><span class="chip-indicator" data-week="${w.date}">○ Пустая</span></div>`;
     }
     html += '</div>';
     html += `<button class="carousel-arrow carousel-arrow-right${idx >= weeks.length - 1 ? ' disabled' : ''}" id="carousel-arrow-right" onclick="carouselSkip(1)" title="следующая неделя →" aria-label="Следующая неделя">${ICON_CHEVRON_RIGHT}</button>`;
