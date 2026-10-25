@@ -1,9 +1,8 @@
 # Изменение №4 (бэкенд-рефакторинг): выделены маршруты в routes.py
 
 import os
-import shutil
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from flask import Flask, request
 from flask_cors import CORS
@@ -50,19 +49,9 @@ def _cleanup_old_deleted():
     conn.close()
 
 
-def _get_retention_days():
-    try:
-        conn = get_db()
-        row = conn.execute("SELECT value FROM settings WHERE key = 'backup_retention_days'").fetchone()
-        conn.close()
-        if row:
-            return int(row['value'])
-    except Exception:
-        pass
-    return 30
-
-
 def _maybe_create_backup():
+    """Один бэкап в сутки. Саму копию делает db.create_backup() (VACUUM INTO + retention),
+    чтобы в проекте была ровно одна система бэкапов."""
     if not os.path.exists(DB_PATH):
         return
     today = datetime.now().strftime('%Y-%m-%d')
@@ -70,26 +59,12 @@ def _maybe_create_backup():
                 if f.startswith(f'schedule_backup_{today}') and f.endswith('.db')]
     if existing:
         return
-    ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
-    shutil.copy2(DB_PATH, os.path.join(BACKUPS_DIR, f'schedule_backup_{ts}.db'))
-    logger.info("Backup created: schedule_backup_%s.db", ts)
-
-
-def _cleanup_old_backups():
-    cutoff = (datetime.now() - timedelta(days=_get_retention_days())).strftime('%Y-%m-%d')
-    for f in os.listdir(BACKUPS_DIR):
-        if f.startswith('schedule_backup_') and f.endswith('.db'):
-            date_part = f.replace('schedule_backup_', '').split('_')[0]
-            if date_part < cutoff:
-                path = os.path.join(BACKUPS_DIR, f)
-                os.remove(path)
-                logger.info("Removed old backup: %s", f)
+    create_backup()
 
 
 def _run_backup_tasks():
     os.makedirs(BACKUPS_DIR, exist_ok=True)
     _maybe_create_backup()
-    _cleanup_old_backups()
 
 
 if __name__ == '__main__':
@@ -102,7 +77,6 @@ if __name__ == '__main__':
     scheduler.add_job(_run_backup_tasks, 'interval', hours=6, id='backup_job')
     scheduler.start()
 
-    create_backup()
     run_alembic_upgrade()
     ensure_curriculum_table()
     seed_specialties()

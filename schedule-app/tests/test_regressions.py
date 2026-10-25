@@ -3,6 +3,8 @@
 Каждый тест соответствует конкретному исправлению в routes.py / settings.js.
 """
 
+import os
+
 import pytest
 
 
@@ -302,3 +304,41 @@ class TestPdfExportEscaping:
             'Математика &amp; &lt;Тригонометрия&gt;'
         assert routes._pdf_safe('без спецсимволов') == 'без спецсимволов'
         assert routes._pdf_safe(None) == ''
+
+
+class TestSafeBackup:
+    """Бэкап живой WAL-базы: VACUUM INTO вместо shutil.copy2, единая политика хранения."""
+
+    def test_create_backup_contains_latest_data(self, db, app):
+        import sqlite3
+
+        import config
+        import db as db_module
+
+        conn = db_module.get_db()
+        conn.execute("INSERT INTO subjects (name) VALUES ('Бэкап-тест')")
+        conn.commit()
+        conn.close()
+
+        path = db_module.create_backup()
+        assert path and os.path.exists(path)
+
+        con = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+        try:
+            names = [row[0] for row in con.execute('SELECT name FROM subjects')]
+            integrity = con.execute('PRAGMA integrity_check').fetchone()[0]
+        finally:
+            con.close()
+        assert 'Бэкап-тест' in names, 'в бэкапе нет свежих данных (WAL не попал в копию)'
+        assert integrity == 'ok'
+
+    def test_cleanup_removes_expired_backups(self, db, app):
+        import config
+        import db as db_module
+
+        os.makedirs(config.BACKUPS_DIR, exist_ok=True)
+        old = os.path.join(config.BACKUPS_DIR, 'schedule_backup_2000-01-01_00-00-00.db')
+        with open(old, 'wb') as f:
+            f.write(b'stale')
+        db_module._cleanup_old_backups()
+        assert not os.path.exists(old)

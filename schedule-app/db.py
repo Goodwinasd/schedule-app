@@ -1,17 +1,15 @@
 import os
-import shutil
 import sqlite3
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import config
 
 logger = logging.getLogger(__name__)
 SLOW_THRESHOLD_MS = int(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '500'))
 _slow_counter = 0
-BACKUPS_DIR = config.BACKUPS_DIR
-MAX_BACKUPS = 10
+MAX_BACKUP_FILES = 30  # жёсткий предохранитель от накопления файлов
 
 
 class _TimedConnection(sqlite3.Connection):
@@ -206,27 +204,78 @@ def verify_db_integrity():
         return False, str(e)
 
 
-def create_backup():
-    os.makedirs(BACKUPS_DIR, exist_ok=True)
+def _retention_days():
+    """Срок хранения бэкапов: settings.backup_retention_days, иначе 30 дней."""
+    try:
+        con = sqlite3.connect(config.DB_PATH)
+        try:
+            row = con.execute(
+                "SELECT value FROM settings WHERE key = 'backup_retention_days'"
+            ).fetchone()
+        finally:
+            con.close()
+        if row and row[0]:
+            return max(1, int(row[0]))
+    except (sqlite3.Error, TypeError, ValueError):
+        pass
+    return 30
+
+
+def safe_backup(dest_path):
+    """Консистентная копия живой БД средствами SQLite.
+
+    `shutil.copy2` копировал только основной файл: в режиме WAL последние
+    транзакции лежат в `-wal`, и снимок мог оказаться устаревшим или «рваным».
+    `VACUUM INTO` создаёт целостную копию без длинной блокировки записи.
+    """
+    if os.path.exists(dest_path):
+        os.remove(dest_path)
+    con = sqlite3.connect(config.DB_PATH)
+    try:
+        con.execute('VACUUM INTO ?', (dest_path,))
+    finally:
+        con.close()
+    return dest_path
+
+
+def create_backup(prefix='schedule_backup'):
+    """Единая точка создания бэкапа: одно имя, один каталог, retention из настроек."""
+    backups_dir = config.BACKUPS_DIR  # читаем динамически: тесты подменяют config
+    os.makedirs(backups_dir, exist_ok=True)
     if not os.path.exists(config.DB_PATH):
         logger.warning("DB file not found at %s, skipping backup", config.DB_PATH)
-        return
+        return None
     ts = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    backup_path = os.path.join(BACKUPS_DIR, f'db_backup_{ts}.sqlite')
-    shutil.copy2(config.DB_PATH, backup_path)
-    logger.info("Backup created: %s", backup_path)
-    _rotate_backups()
+    path = os.path.join(backups_dir, f'{prefix}_{ts}.db')
+    safe_backup(path)
+    logger.info("Backup created: %s", path)
+    _cleanup_old_backups(backups_dir)
+    return path
 
 
-def _rotate_backups():
-    backups = sorted([
-        f for f in os.listdir(BACKUPS_DIR)
-        if f.startswith('db_backup_') and f.endswith('.sqlite')
-    ])
-    while len(backups) > MAX_BACKUPS:
-        oldest = backups.pop(0)
-        os.remove(os.path.join(BACKUPS_DIR, oldest))
-        logger.info("Removed old backup: %s", oldest)
+def _cleanup_old_backups(backups_dir=None):
+    """Удалить бэкапы старше retention и лишние сверх жёсткого лимита."""
+    backups_dir = backups_dir or config.BACKUPS_DIR
+    cutoff = (datetime.now() - timedelta(days=_retention_days())).strftime('%Y-%m-%d')
+    files = sorted(
+        f for f in os.listdir(backups_dir)
+        if f.startswith('schedule_backup_') and f.endswith('.db')
+    )
+    for name in files:
+        date_part = name.replace('schedule_backup_', '').split('_')[0]
+        if date_part < cutoff:
+            try:
+                os.remove(os.path.join(backups_dir, name))
+                logger.info("Removed old backup: %s", name)
+            except OSError:
+                pass
+    alive = [f for f in files if os.path.exists(os.path.join(backups_dir, f))]
+    for name in (alive[:-MAX_BACKUP_FILES] if len(alive) > MAX_BACKUP_FILES else []):
+        try:
+            os.remove(os.path.join(backups_dir, name))
+            logger.info("Removed backup over cap: %s", name)
+        except OSError:
+            pass
 
 
 def find_orphaned_records():
