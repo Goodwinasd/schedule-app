@@ -3554,7 +3554,8 @@ def schedule_generate():
     if not group:
         conn.close()
         return jsonify({"error": "Group not found"}), 404
-    result = generate_schedule(conn, group_id, group['name'], semester, monday, week_count)
+    result = generate_schedule(conn, group_id, group['name'], semester, monday, week_count,
+                              optimize=bool(body.get('optimize', True)), seed=body.get('seed'))
     conn.commit()
     conn.close()
     refs_cache.invalidate_prefix('ref_list_')

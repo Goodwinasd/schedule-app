@@ -1,5 +1,7 @@
 import logging
+import math
 import random
+import time
 from datetime import datetime, timedelta
 from utils import _validate_slot_3d
 
@@ -164,7 +166,221 @@ def _mirror_week_lessons(conn, group_name, placed):
     return mirrored
 
 
-def generate_schedule(conn, group_id, group_name, semester, monday_str, week_count):
+
+# ---- Фаза 2: имитация отжига (оптимизация готового черновика) ----
+
+W_TEACHER_GAP_BASE = 10   # окно преподавателя: базовый штраф за разрыв
+W_TEACHER_GAP_STEP = 6    # + за каждую «пустую» пару в разрыве
+W_GROUP_GAP_BASE = 4      # окно группы: средний штраф
+W_GROUP_GAP_STEP = 2
+W_OVERLOAD = 5            # каждая пара сверх дневного лимита
+OPTIMIZE_ITERATIONS = 1000
+OPTIMIZE_TIME_BUDGET = 2.5
+ANNEAL_T_START = 8.0
+ANNEAL_T_END = 0.5
+
+
+def _is_saturday(date_str):
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d').weekday() == 5
+    except (TypeError, ValueError):
+        return False
+
+
+def _gap_cost(periods, base, step):
+    """Штраф за разрывы между парами в один день: gap = пропущенные пары."""
+    ordered = sorted(periods)
+    total = 0
+    for prev, nxt in zip(ordered, ordered[1:]):
+        gap = nxt - prev - 1
+        if gap > 0:
+            total += base + step * gap
+    return total
+
+
+def _calculate_cost(plan, fixed=None):
+    """Стоимость плана: чем меньше — тем лучше.
+
+    Штрафы: окна преподавателей (сильные), окна групп (средние),
+    перегруз дня у группы (слабый). `fixed` — чужие занятия (из БД),
+    чтобы окна преподавателя считались по всей его дневной нагрузке.
+    """
+    teacher_days, group_days = {}, {}
+    for item in list(plan) + list(fixed or []):
+        date, period = item.get('date'), item.get('period')
+        if date is None or period is None:
+            continue
+        tid, gid = item.get('teacher_id'), item.get('group_id')
+        if tid is not None:
+            teacher_days.setdefault((tid, date), set()).add(period)
+        if gid is not None:
+            group_days.setdefault((gid, date), set()).add(period)
+
+    cost = 0
+    for periods in teacher_days.values():
+        cost += _gap_cost(periods, W_TEACHER_GAP_BASE, W_TEACHER_GAP_STEP)
+    for (gid, date), periods in group_days.items():
+        cost += _gap_cost(periods, W_GROUP_GAP_BASE, W_GROUP_GAP_STEP)
+        limit = MAX_PAIRS_SATURDAY if _is_saturday(date) else MAX_PAIRS_WEEKDAY
+        if len(periods) > limit:
+            cost += W_OVERLOAD * (len(periods) - limit)
+    return cost
+
+
+def _occupancy(items):
+    """Множества занятых (дата, пара) по преподавателю/аудитории/группе."""
+    teachers, classrooms, groups = {}, {}, {}
+    for item in items:
+        key = (item.get('date'), item.get('period'))
+        if item.get('teacher_id') is not None:
+            teachers.setdefault(key, set()).add(item['teacher_id'])
+        if item.get('classroom_id') is not None:
+            classrooms.setdefault(key, set()).add(item['classroom_id'])
+        if item.get('group_id') is not None:
+            groups.setdefault(key, set()).add(item['group_id'])
+    return teachers, classrooms, groups
+
+
+def _slot_taken(occupancy, date, period, item):
+    teachers, classrooms, groups = occupancy
+    key = (date, period)
+    if item.get('teacher_id') is not None and item['teacher_id'] in teachers.get(key, ()):
+        return True
+    if item.get('classroom_id') is not None and item['classroom_id'] in classrooms.get(key, ()):
+        return True
+    if item.get('group_id') is not None and item['group_id'] in groups.get(key, ()):
+        return True
+    return False
+
+
+def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
+                       time_budget=OPTIMIZE_TIME_BUDGET, fixed=None, allowed_periods=None):
+    """Имитация отжига: двигаем пары по периодам в рамках тех же дней.
+
+    Жёсткие ограничения (преподаватель/аудитория/группа) проверяются по
+    in-memory индексам занятости: конфликтный ход просто не применяется.
+    Детерминированность — за счёт `random.Random(seed)`.
+    Возвращает лучший найденный план (не хуже исходного).
+    """
+    if not plan:
+        return []
+    rng = random.Random(seed)
+    current = [dict(item) for item in plan]
+    fixed = [dict(item) for item in (fixed or [])]
+    allowed = sorted(set(allowed_periods) if allowed_periods else {1, 2, 3, 4, 5, 6, 7, 8})
+    if len(allowed) < 2:
+        return current
+
+    def cost_of(items):
+        return _calculate_cost(items, fixed)
+
+    current_cost = cost_of(current)
+    best = [dict(item) for item in current]
+    best_cost = current_cost
+    deadline = time.time() + max(0.0, time_budget)
+    count = len(current)
+
+    for step in range(iterations):
+        if step % 25 == 0 and time.time() >= deadline:
+            logger.info("Annealing: остановлен по таймауту на итерации %d (cost=%d)", step, best_cost)
+            break
+        progress = step / max(1, iterations - 1)
+        temperature = ANNEAL_T_START * (ANNEAL_T_END / ANNEAL_T_START) ** progress
+
+        if count >= 2 and rng.random() < 0.6:
+            i, j = rng.sample(range(count), 2)
+            a, b = current[i], current[j]
+            if b['period'] not in allowed or a['period'] not in allowed:
+                continue
+            if (a['date'], a['period'], a.get('group_id')) == (b['date'], b['period'], b.get('group_id')):
+                continue
+            rest = [item for k, item in enumerate(current) if k not in (i, j)]
+            occupancy = _occupancy(rest + fixed)
+            if (_slot_taken(occupancy, b['date'], b['period'], a)
+                    or _slot_taken(occupancy, a['date'], a['period'], b)):
+                continue
+            current[i] = {**a, 'date': b['date'], 'period': b['period']}
+            current[j] = {**b, 'date': a['date'], 'period': a['period']}
+            new_cost = cost_of(current)
+            if new_cost <= current_cost or rng.random() < math.exp(-(new_cost - current_cost) / max(temperature, 1e-9)):
+                current_cost = new_cost
+                if new_cost < best_cost:
+                    best_cost = new_cost
+                    best = [dict(item) for item in current]
+            else:
+                current[i], current[j] = a, b
+        else:
+            i = rng.randrange(count)
+            a = current[i]
+            new_period = rng.choice(allowed)
+            if new_period == a['period']:
+                continue
+            rest = [item for k, item in enumerate(current) if k != i]
+            occupancy = _occupancy(rest + fixed)
+            if _slot_taken(occupancy, a['date'], new_period, a):
+                continue
+            old_period = a['period']
+            current[i] = {**a, 'period': new_period}
+            new_cost = cost_of(current)
+            if new_cost <= current_cost or rng.random() < math.exp(-(new_cost - current_cost) / max(temperature, 1e-9)):
+                current_cost = new_cost
+                if new_cost < best_cost:
+                    best_cost = new_cost
+                    best = [dict(item) for item in current]
+            else:
+                current[i] = {**a, 'period': old_period}
+
+    return best
+
+
+def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed, lesson_ids=None):
+    """Отжиг для уже созданной недели: меняем только `period` (day_id не трогаем).
+
+    Составные потоки (группы с «+») пропускаем: их пары зеркалируются в другие
+    группы, и перестановка одной стороны рассинхронизировала бы дубли.
+    """
+    if not lesson_ids:
+        return 0
+    if _mirror_target_groups(conn, group_name):
+        logger.info("Annealing skipped for %s: composite stream mirroring", group_name)
+        return 0
+    placeholders = ','.join('?' * len(week_dates))
+    ids_clause = ','.join('?' * len(lesson_ids))
+    rows = conn.execute(f"""
+        SELECT l.id, sd.date, l.period, l.subject_id, l.teacher_id, l.classroom_id, l.group_id
+        FROM lessons l
+        JOIN schedule_days sd ON l.day_id = sd.id
+        WHERE l.group_id = ? AND sd.date IN ({placeholders}) AND l.id IN ({ids_clause})
+          AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+    """, [group_id] + list(week_dates) + list(lesson_ids)).fetchall()
+    if len(rows) < 2:
+        return 0
+    fixed_rows = conn.execute(f"""
+        SELECT sd.date, l.period, l.teacher_id, l.classroom_id, l.group_id
+        FROM lessons l
+        JOIN schedule_days sd ON l.day_id = sd.id
+        WHERE sd.date IN ({placeholders}) AND l.group_id != ?
+          AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+    """, list(week_dates) + [group_id]).fetchall()
+
+    plan = [dict(row) for row in rows]
+    fixed = [dict(row) for row in fixed_rows]
+    before = _calculate_cost(plan, fixed)
+    optimized = _optimize_schedule(plan, seed=seed, fixed=fixed, allowed_periods=allowed_periods)
+    after = _calculate_cost(optimized, fixed)
+
+    original_period = {item['id']: item['period'] for item in plan}
+    moved = 0
+    for item in optimized:
+        if item['period'] != original_period.get(item['id']):
+            conn.execute('UPDATE lessons SET period = ? WHERE id = ?', (item['period'], item['id']))
+            moved += 1
+    logger.info("Annealing %s %s: cost %d -> %d, moved %d", group_name, week_dates[0], before, after, moved)
+    return moved
+
+
+def generate_schedule(conn, group_id, group_name, semester, monday_str, week_count,
+                      optimize=True, seed=None):
     curriculum = conn.execute('''
         SELECT c.*, s.name AS subject_name, t.name AS teacher_name
         FROM curriculum c
@@ -179,6 +395,7 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
     created = 0
     mirrored = 0
     errors = []
+    opt_seed = seed if seed is not None else f"{group_id}_{monday_str}_{semester}"
 
     # Determine course to clamp allowed periods
     group_row = conn.execute(
@@ -278,6 +495,7 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                 return drng.choice([4, 5])
 
         placed = []  # (date, period, subject, teacher, classroom, is_sub, original_teacher) for mirroring
+        created_ids = []  # id только что созданных пар — их и оптимизируем
         for day_idx, lessons in enumerate(day_lessons):
             if not lessons:
                 continue
@@ -328,12 +546,13 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                     teacher_id=actual_tid, classroom_id=classroom_id
                 )
                 if not blocking:
-                    conn.execute('''
+                    cur = conn.execute('''
                         INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, group_id,
                                              is_substitution, original_teacher_id)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (day_id, period, subj_id, actual_tid, classroom_id, group_id,
                           int(is_sub), original_tid))
+                    created_ids.append(cur.lastrowid)
                     created += 1
                     last_classroom_id = classroom_id
                     placed.append((date_str, period, subj_id, actual_tid, classroom_id, is_sub, original_tid))
@@ -361,6 +580,14 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                         lessons.pop(0)
                         placed_in_day += 1
                         block_attempts = 0
+
+        # Фаза 2: оптимизация недели (окна/перегруз). Ошибка оптимизации не валит генерацию.
+        if optimize:
+            try:
+                _optimize_week(conn, group_id, group_name, week_dates, allowed_periods,
+                               f"{opt_seed}_{wi}", lesson_ids=created_ids)
+            except Exception:
+                logger.exception("Annealing failed for %s %s — kept draft", group_name, week_dates[0])
 
         # Post-processing: mirror week's pairs to linked groups of a composite stream (e.g. '02-0923+11/24')
         mirrored += _mirror_week_lessons(conn, group_name, placed)
