@@ -1,4 +1,4 @@
-﻿
+
 * {
     margin: 0;
     padding: 0;
@@ -618,16 +618,23 @@ main {
 .carousel-strip {
     flex: 1 1 auto;
     min-width: 0;
-    overflow: hidden;
+    overflow-x: auto;   /* было hidden: полоса не скроллилась ни свайпом, ни колесом */
+    overflow-y: hidden;
     display: flex;
     gap: 8px;
     padding: 8px 4px;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    scroll-snap-type: x proximity;      /* остановка по границам чипов */
+    overscroll-behavior-x: contain;     /* свайп не улетает в скролл страницы */
 }
 
 .carousel-strip::-webkit-scrollbar {
     display: none;
+}
+
+.carousel-chip {
+    scroll-snap-align: start;
 }
 
 .carousel-chip {

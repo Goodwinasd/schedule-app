@@ -1,4 +1,4 @@
-import state from './state.js';
+﻿import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getMonday, addDays, getWeekNumber, formatChipRange, formatShortDate, populateSelectByName } from './utils.js';
 import { api } from './api.js';
@@ -68,6 +68,9 @@ function _chipRange(monday) {
 export async function renderCarousel() {
     const cont = document.getElementById('week-carousel');
     if (!cont) return;
+    // innerHTML ниже уничтожает скролл полосы, поэтому запоминаем позицию и вернём её.
+    const stripBefore = document.getElementById('carousel-strip');
+    const savedScroll = stripBefore ? stripBefore.scrollLeft : null;
     _syncYearFromMonday();
     const year = state.currentYear;
     const weeks = getWeeksList(year);
@@ -84,7 +87,7 @@ export async function renderCarousel() {
     years.sort((a, b) => a - b);
 
     let html = '<div class="carousel-nav">';
-    html += `<button class="carousel-arrow carousel-arrow-left${idx <= 0 ? ' disabled' : ''}" id="carousel-arrow-left" onclick="carouselSkip(-1)" title="← предыдущая неделя" aria-label="Предыдущая неделя">${ICON_CHEVRON_LEFT}</button>`;
+    html += `<button class="carousel-arrow carousel-arrow-left${idx <= 0 ? ' disabled' : ''}" id="carousel-arrow-left" data-arrow="-1" title="← предыдущая неделя" aria-label="Предыдущая неделя">${ICON_CHEVRON_LEFT}</button>`;
     html += '<div class="carousel-strip" id="carousel-strip">';
     for (const w of weeks) {
         const cls = w.date === sel ? ' carousel-chip active' : w.date === today ? ' carousel-chip today' : ' carousel-chip';
@@ -92,7 +95,7 @@ export async function renderCarousel() {
         html += `<div class="${cls}${nowCls}" data-date="${w.date}" onclick="selectWeekByDate('${w.date}')"><span class="chip-week">${w.weekNumber} неделя</span><span class="chip-range">${_chipRange(w.monday)}</span><span class="chip-indicator" data-week="${w.date}">○ Пустая</span></div>`;
     }
     html += '</div>';
-    html += `<button class="carousel-arrow carousel-arrow-right${idx >= weeks.length - 1 ? ' disabled' : ''}" id="carousel-arrow-right" onclick="carouselSkip(1)" title="следующая неделя →" aria-label="Следующая неделя">${ICON_CHEVRON_RIGHT}</button>`;
+    html += `<button class="carousel-arrow carousel-arrow-right${idx >= weeks.length - 1 ? ' disabled' : ''}" id="carousel-arrow-right" data-arrow="1" title="следующая неделя →" aria-label="Следующая неделя">${ICON_CHEVRON_RIGHT}</button>`;
     html += `<select id="carousel-year" class="carousel-year" onchange="setYear(this.value)" title="Год">`;
     for (const y of years) html += `<option value="${y}"${y === year ? ' selected' : ''}>${y}</option>`;
     html += '<option value="add_year">+ Добавить год</option>';
@@ -101,6 +104,11 @@ export async function renderCarousel() {
     html += `<button class="btn btn-ghost btn-sm btn-today" onclick="goToCurrentWeek()" title="Перейти к текущей неделе">📅 Сегодня</button>`;
     html += '</div>';
     cont.innerHTML = html;
+    // Возвращаем позицию полосы, чтобы перерисовка не «прыгала» к началу.
+    if (savedScroll !== null && savedScroll > 0) {
+        const stripRestored = document.getElementById('carousel-strip');
+        if (stripRestored) stripRestored.scrollLeft = savedScroll;
+    }
 
     const active = await _fetchActiveMondays();
     if (state.currentYear !== year) return;
@@ -139,21 +147,19 @@ function _carouselMetrics() {
     return { perView };
 }
 
-/** Прокрутка строго по границам целых карточек, чтобы не было «срезанных» недель. */
+/** Прокрутка к активной неделе — только если она не видна целиком. */
 function _scrollActiveChipIntoView() {
     const strip = document.getElementById('carousel-strip');
     if (!strip) return;
-    const chips = Array.from(strip.querySelectorAll('.carousel-chip'));
-    const idx = chips.findIndex(c => c.classList.contains('active'));
-    if (idx < 0) return;
-    const { perView } = _carouselMetrics();
-    const pageStart = Math.floor(idx / perView) * perView;
-    const targetChip = chips[pageStart];
-    if (!targetChip) return;
-    const target = targetChip.offsetLeft;
-    if (Math.abs(strip.scrollLeft - target) > 2) {
-        strip.scrollTo({ left: target, behavior: 'smooth' });
-    }
+    const chip = strip.querySelector('.carousel-chip.active');
+    if (!chip) return;
+    const left = chip.offsetLeft;
+    const right = left + chip.offsetWidth;
+    const viewLeft = strip.scrollLeft;
+    const viewRight = viewLeft + strip.clientWidth;
+    if (left >= viewLeft && right <= viewRight) return;   // уже в кадре — не дёргаем
+    const centered = left - (strip.clientWidth - chip.offsetWidth) / 2;
+    strip.scrollTo({ left: Math.max(0, centered), behavior: 'smooth' });
 }
 
 export function selectWeekByDate(dateStr) {
@@ -173,9 +179,8 @@ export function carouselSkip(n) {
         loadScheduleTable();
         return;
     }
-    // Прокрутка строго на целую «страницу» карточек (без срезанных недель)
-    const step = _carouselMetrics().perView;
-    idx += step * n;
+    // Шаг — одна неделя; страницу двигают Shift/двойной клик (см. обработчики ниже)
+    idx += n;
     if (idx < 0) {
         state.currentYear -= 1;
         const w2 = getWeeksList(state.currentYear);
@@ -187,7 +192,7 @@ export function carouselSkip(n) {
         state.currentMonday = new Date(w2[0].date + 'T00:00:00');
         renderCarousel();
     } else {
-        state.currentMonday = addDays(state.currentMonday, step * n * 7);
+        state.currentMonday = addDays(state.currentMonday, n * 7);
         setActiveWeek();
     }
     loadScheduleTable();
@@ -383,3 +388,61 @@ export async function deleteWeek() {
     await showKimiAlert('Неделя очищена. Удалено занятий (пар): ' + (res.pairs_deleted ?? res.days_deleted));
     loadScheduleTable();
 }
+
+/* ---- Навигация карусели: стрелки (неделя / страница), колесо, клавиатура ---- */
+
+let _arrowTimer = null;
+
+function _pageStep() {
+    return _carouselMetrics().perView;
+}
+
+function _moveWeeks(delta) {
+    if (delta) carouselSkip(delta);
+}
+
+// Одиночный клик по стрелке ждёт 160 мс: двойной клик отменяет его и уезжает на страницу.
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-arrow]');
+    if (!btn || btn.classList.contains('disabled')) return;
+    const dir = parseInt(btn.dataset.arrow, 10);
+    if (!dir) return;
+    if (e.shiftKey) { _moveWeeks(dir * _pageStep()); return; }
+    clearTimeout(_arrowTimer);
+    _arrowTimer = setTimeout(() => _moveWeeks(dir), 160);
+});
+
+document.addEventListener('dblclick', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-arrow]');
+    if (!btn || btn.classList.contains('disabled')) return;
+    clearTimeout(_arrowTimer);
+    _moveWeeks(parseInt(btn.dataset.arrow, 10) * _pageStep());
+});
+
+// Колесо над полосой листает её; на краях отдаёт событие странице, чтобы не «залипать».
+document.addEventListener('wheel', (e) => {
+    const strip = e.target.closest && e.target.closest('#carousel-strip');
+    if (!strip) return;
+    const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (!delta) return;
+    const max = strip.scrollWidth - strip.clientWidth;
+    if (max <= 0) return;
+    const atStart = strip.scrollLeft <= 0 && delta < 0;
+    const atEnd = strip.scrollLeft >= max - 1 && delta > 0;
+    if (atStart || atEnd) return;
+    e.preventDefault();
+    strip.scrollLeft += delta;
+}, { passive: false });
+
+// ←/→ двигают на неделю, Shift+←/→ — на страницу (когда фокус внутри карусели).
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const nav = document.getElementById('week-carousel');
+    if (!nav) return;
+    const active = document.activeElement;
+    if (!active || !nav.contains(active)) return;
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName)) return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowLeft' ? -1 : 1;
+    _moveWeeks(dir * (e.shiftKey ? _pageStep() : 1));
+});
