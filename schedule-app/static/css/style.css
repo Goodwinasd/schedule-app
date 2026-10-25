@@ -220,6 +220,10 @@
     --control-h: 36px;
     --control-h-lg: 40px;
     --focus-ring: 0 0 0 3px rgba(0, 184, 122, 0.30);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --skeleton-from: #E5E7EB;
+    --skeleton-to: #F3F4F6;
     --duration: 150ms;
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -251,6 +255,10 @@
     --shadow-lg: 0 24px 48px -16px rgba(0, 0, 0, 0.70);
     --shadow-inset: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
     --focus-ring: 0 0 0 3px rgba(45, 212, 160, 0.35);
+    --glass-bg: rgba(18, 24, 33, 0.82);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --skeleton-from: #121821;
+    --skeleton-to: #1A2230;
 }
 
 /* Алиасы: исторические имена → новые токены. Объявлены после обоих тем,
@@ -343,11 +351,12 @@ main {
 .btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 12px 24px;
+    gap: var(--space-2);
+    min-height: var(--control-h);
+    padding: 0 var(--space-4);
     border: none;
-    border-radius: 12px;
-    font-size: 14px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-base);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -436,19 +445,20 @@ main {
 }
 
 .btn-sm {
-    padding: 8px 12px;
-    font-size: 12px;
-    min-height: 36px;
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-3);
+    font-size: var(--text-sm);
 }
 
 .input {
     width: 100%;
-    padding: 12px 16px;
+    min-height: var(--control-h);
+    padding: var(--space-2) var(--space-3);
     background: var(--input-bg);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     color: var(--text);
-    font-size: 14px;
+    font-size: var(--text-base);
     font-family: inherit;
     outline: none;
     transition: box-shadow 0.2s, background 0.2s, border-color 0.2s;
@@ -494,6 +504,18 @@ main {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
+}
+
+/* Группы сгруппированы по курсам: внутри #groups-grid лежат .course-subsection,
+   поэтому auto-fill оставлял справа пустые колонки. auto-fit схлопывает
+   неиспользованные треки, и секции курсов растягиваются на всю ширину. */
+#groups-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    align-items: start;
+}
+
+.course-subsection {
+    min-width: 0;
 }
 
 .select-card {
@@ -2839,9 +2861,13 @@ main,
     }
 }
 
-/* ==== Шаг 1 Глобального UI-Апгрейда: микро-физика кликов (Linear) + моноширинные цифры ==== */
+/* ==========================================================================
+   ЕДИНЫЙ СЛОЙ UI (сведён из четырёх прежних блоков «Глобального UI-Апгрейда»)
+   Всё построено на токенах: литеральных цветов нет, поэтому светлая и тёмная
+   темы переключаются палитрой, а не отдельными переопределениями.
+   ========================================================================== */
 
-/* 1. Пружинная физика переходов */
+/* 1. Интерактивность: пружинный переход, «прожатие», микро-подъём */
 .btn,
 .carousel-btn,
 .carousel-arrow,
@@ -2855,7 +2881,6 @@ main,
     transition: var(--transition-spring);
 }
 
-/* 2. Тактильный отклик при клике: «прожатие» */
 .btn:not(:disabled):active,
 .carousel-btn:not(:disabled):active,
 .carousel-arrow:not(.disabled):active,
@@ -2865,14 +2890,13 @@ main,
 .select-card:active,
 .checkbox-label:active,
 .lesson-content[draggable="true"]:not(.dragging):active {
-    transform: scale(0.97) !important;
+    transform: scale(0.98);
 }
 
-/* 3. Лёгкий микро-подъём при наведении */
-.btn:hover,
-.carousel-btn:hover,
-.carousel-arrow:hover,
-.nav-btn:hover,
+.btn:not(:disabled):hover,
+.carousel-btn:not(:disabled):hover,
+.carousel-arrow:not(.disabled):hover,
+.nav-btn:not(:disabled):hover,
 .admin-tab:hover,
 .avail-day-tab:hover,
 .select-card:hover,
@@ -2881,12 +2905,12 @@ main,
     transform: translateY(-1px);
 }
 
-/* Drag-and-drop не должен «прожиматься» во время перетаскивания */
+/* Во время перетаскивания урок не должен «прожиматься» */
 .lesson-content.dragging {
-    transition: all 0.15s ease;
+    transition: all var(--duration-quick) var(--ease);
 }
 
-/* 4. Моноширинные цифры (Swiss-watch tabular nums) */
+/* 2. Моноширинные цифры: время, даты, счётчики */
 .schedule-table tbody td.time-cell,
 .schedule-table tbody td.time-cell .period-num,
 .schedule-table thead th .day-date,
@@ -2903,134 +2927,86 @@ main,
     font-feature-settings: "tnum";
 }
 
-/* ==== Шаг 2 Глобального UI-Апгрейда: слои глубины, парящие панели, матовое стекло ==== */
-
-/* 1. Многоуровневая система глубины (Apple/Linear) — тёмная тема */
-[data-theme="dark"] body {
-    background: #080c14;
+/* 3. Единые слои глубины: карточки и модалки берут фон/рамку/тень из темы */
+.schedule-table-wrap,
+.select-card,
+.analytics-card,
+.chart-card,
+.trash-card,
+.ref-section {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
 }
 
-/* Блоки-«карточки»: слой #111827, микро-рамка, радиус 14px */
-[data-theme="dark"] .schedule-table-wrap,
-[data-theme="dark"] .select-card,
-[data-theme="dark"] .analytics-card,
-[data-theme="dark"] .chart-card,
-[data-theme="dark"] .trash-card,
-[data-theme="dark"] .ref-section {
-    background: #111827;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
+.modal-content {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
 }
 
-[data-theme="dark"] .ref-section {
-    padding: 14px;
-}
-
-/* Модальные окна: слой выше (#1f2937) + объёмная глубокая тень */
-[data-theme="dark"] .modal-content {
-    background: #1f2937;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
-}
-
-/* 2. Матовое стекло для парящих панелей: шапка, карусель недель, статус-бар */
-[data-theme="dark"] header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(17, 24, 39, 0.82) !important;
+/* 4. Матовое стекло: шапка, карусель недель, статус-бар */
+header,
+.week-carousel,
+.schedule-status-bar {
+    background: var(--glass-bg);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--glass-border);
 }
 
-[data-theme="dark"] .week-carousel,
-[data-theme="dark"] .schedule-status-bar {
-    background: rgba(17, 24, 39, 0.82);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .schedule-status-bar {
-    border-radius: 12px;
+.schedule-status-bar {
+    border-radius: var(--radius-md);
     border-bottom: none;
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
 }
 
-/* Светлая тема: матовое стекло шапки и карусели недель */
-[data-theme="light"] header,
-[data-theme="light"] .week-carousel {
-    background: rgba(255, 255, 255, 0.85) !important;
-    backdrop-filter: blur(16px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
-}
-
-/* 3. Утончённые микро-рамки элементов управления */
-[data-theme="dark"] .btn {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .btn:hover {
-    border-color: rgba(255, 255, 255, 0.25);
-}
-
-[data-theme="dark"] .btn:focus-visible {
-    border-color: var(--accent);
+/* 5. Контролы: рамка и фокус — один визуальный язык */
+.btn:focus-visible,
+.input:focus,
+select.input:focus {
+    border-color: var(--accent-500);
+    box-shadow: var(--focus-ring);
     outline: none;
 }
 
-[data-theme="dark"] .input:hover,
-[data-theme="dark"] select.input:hover {
-    border-color: rgba(255, 255, 255, 0.25);
-}
-
-[data-theme="dark"] .input:focus,
-[data-theme="dark"] select.input:focus {
-    border-color: var(--accent);
-}
-
-/* Сегмент-контрол публикации недели остаётся монолитным (без рамок между кнопками) */
-[data-theme="dark"] .publish-group .btn {
+/* Сегмент-контрол публикации недели остаётся монолитным */
+.publish-group .btn {
     border: none;
 }
 
-[data-theme="dark"] .publish-group .btn.btn-outline-secondary {
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
+.publish-group .btn.btn-outline-secondary {
+    border-left: 1px solid var(--color-border);
 }
 
-/* ==== Шаг 3 Глобального UI-Апгрейда: скелетон-загрузчики (Shimmer) ==== */
+/* Активные статусы: спокойная тень вместо неонового свечения */
+.btn-success.active,
+.publish-group .btn-success.active,
+.btn-warning.active,
+.publish-group .btn-warning.active {
+    box-shadow: var(--shadow-sm);
+}
 
+.carousel-chip.active,
+.chip-week.active,
+.chip.active {
+    box-shadow: var(--shadow-xs);
+}
+
+/* 6. Скелетоны загрузки */
 .skeleton {
-    border-radius: 8px !important;
-    pointer-events: none !important;
-}
-
-/* Тёмная тема */
-[data-theme="dark"] .skeleton {
-    background: linear-gradient(90deg, #111827 25%, #1f2937 50%, #111827 75%) !important;
-    background-size: 200% 100% !important;
-    animation: skeletonShimmer 1.4s infinite ease-in-out !important;
-}
-
-/* Светлая тема */
-[data-theme="light"] .skeleton,
-body:not([data-theme="dark"]) .skeleton {
-    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%) !important;
-    background-size: 200% 100% !important;
-    animation: skeletonShimmer 1.4s infinite ease-in-out !important;
-}
-
-@keyframes skeletonShimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    border-radius: var(--radius-xs);
+    background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-to) 50%, var(--skeleton-from) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite ease-in-out;
+    pointer-events: none;
 }
 
 .skeleton-text {
     display: block;
-    height: 16px;
-    margin-bottom: 6px;
+    height: var(--space-4);
+    margin-bottom: var(--space-1);
     width: 80%;
 }
 
@@ -3043,8 +3019,8 @@ body:not([data-theme="dark"]) .skeleton {
 .avail-skeleton {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 16px;
+    gap: var(--space-2);
+    padding: var(--space-4);
 }
 
 .skeleton-table {
@@ -3053,53 +3029,7 @@ body:not([data-theme="dark"]) .skeleton {
     table-layout: fixed;
 }
 
-/* ==== Шаг 4 Глобального UI-Апгрейда: семантика цвета и неоновое свечение (Ambient Glows) ==== */
-
-/* 1. Активные кнопки статуса публикации недели */
-.btn-success.active,
-.publish-group .btn-success.active {
-    box-shadow: 0 0 15px var(--color-success-glow), 0 2px 4px rgba(0, 0, 0, 0.4) !important;
-}
-
-.btn-warning.active,
-.publish-group .btn-warning.active {
-    box-shadow: 0 0 15px var(--color-warning-glow), 0 2px 4px rgba(0, 0, 0, 0.4) !important;
-}
-
-/* 2. Выбранная карточка недели в карусели — мягкая световая аура */
-.carousel-chip.active,
-.chip-week.active,
-.chip.active {
-    box-shadow: 0 0 12px var(--color-success-glow);
-}
-
-/* 3. Подсвечиваемые ячейки окон (свободные пары) — предупредительное внутреннее свечение */
-.gap-period,
-.avail-cell-free {
-    box-shadow: inset 0 0 10px var(--color-warning-glow);
-}
-
-/* 4. Фокус и наведение: мягкий подсвеченный контур */
-.input:focus,
-select.input:focus,
-[data-theme="dark"] .input:focus,
-[data-theme="dark"] select.input:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-glow);
-}
-
-.btn:focus-visible,
-[data-theme="dark"] .btn:focus-visible {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-glow);
-}
-
-.btn:hover,
-[data-theme="dark"] .btn:hover {
-    border-color: var(--color-accent);
-}
-
-.input:hover,
-select.input:hover {
-    border-color: var(--color-accent);
+@keyframes skeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
