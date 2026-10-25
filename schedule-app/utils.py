@@ -1,6 +1,7 @@
 # Изменение №3 (бэкенд-рефакторинг): выделен utils.py
 
 import re
+from datetime import datetime
 
 # Схемы колонок для импорта справочников из Excel.
 # Каждое свойство (name/phone/course/specialty) имеет список допустимых заголовков:
@@ -271,3 +272,25 @@ def _validate_slot_3d(conn, date_str, period, group_id, teacher_id=None, classro
 
 def _safe_filename(s):
     return re.sub(r'[\\/:*?"<>|]+', '_', s).strip('_')
+
+
+def parse_date_arg(value):
+    """Разобрать дату `YYYY-MM-DD` из параметра запроса.
+
+    Возвращает `datetime.date` или `None`, если формат неверный. Нужна, чтобы
+    эндпоинты отвечали 400 вместо 500 (раньше `strptime` бросал исключение).
+    """
+    try:
+        return datetime.strptime(str(value), '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_int_arg(value):
+    """Разобрать целое из параметра запроса; `None`, если значение не число."""
+    if value is None or value == '':
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

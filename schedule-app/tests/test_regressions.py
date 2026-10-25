@@ -1,4 +1,4 @@
-"""Регрессии по итогам аудита: частичный PUT, метки удаления, публичные поля, 400 вместо 500.
+﻿"""Регрессии по итогам аудита: частичный PUT, метки удаления, публичные поля, 400 вместо 500.
 
 Каждый тест соответствует конкретному исправлению в routes.py / settings.js.
 """
@@ -342,3 +342,78 @@ class TestSafeBackup:
             f.write(b'stale')
         db_module._cleanup_old_backups()
         assert not os.path.exists(old)
+
+
+class TestInputValidationHelpers:
+    """Хелперы разбора параметров запроса живут в utils.py."""
+
+    def test_parse_date_arg(self, app):
+        from utils import parse_date_arg
+        assert parse_date_arg('2026-09-07').isoformat() == '2026-09-07'
+        for bad in ('abc', '', None, '2026-13-01', '07.09.2026'):
+            assert parse_date_arg(bad) is None
+
+    def test_parse_int_arg(self, app):
+        from utils import parse_int_arg
+        assert parse_int_arg('42') == 42
+        for bad in ('abc', '', None, '1.5'):
+            assert parse_int_arg(bad) is None
+
+
+class TestBadInputMessages:
+    """Некорректные дата/ID → 400 с единым текстом, а не 500."""
+
+    MESSAGE = 'Некорректный формат даты или ID'
+
+    def test_teacher_schedule_bad_id(self, client, seed_refs):
+        resp = client.get('/api/teacher-schedule?teacher_id=abc')
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == self.MESSAGE
+
+    def test_teacher_schedule_table_bad_id(self, client, seed_refs):
+        resp = client.get('/api/teacher-schedule-table?teacher_id=abc&monday=2026-09-07')
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == self.MESSAGE
+
+    def test_teacher_schedule_table_bad_monday(self, client, seed_refs):
+        resp = client.get('/api/teacher-schedule-table?teacher_id=1&monday=abc')
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == self.MESSAGE
+
+    def test_classroom_schedule_table_bad_id(self, client, seed_refs):
+        resp = client.get('/api/classroom-schedule-table?classroom_id=xyz&monday=2026-09-07')
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == self.MESSAGE
+
+    def test_classroom_schedule_table_bad_monday(self, client, seed_refs):
+        resp = client.get('/api/classroom-schedule-table?classroom_id=1&monday=2026-99-99')
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == self.MESSAGE
+
+    def test_schedule_table_bad_monday(self, client, seed_refs):
+        resp = client.get('/api/schedule-table?group=Группа-1&monday=abc')
+        assert resp.status_code == 400
+        assert resp.get_json()['error'] == self.MESSAGE
+
+
+class TestPartialUpdatePreservesSubstitution:
+    """PUT с одним полем не должен затирать поля замены и подгруппу."""
+
+    def test_only_period_keeps_substitution_fields(self, client, seed_lessons, db, admin_csrf):
+        conn = db.get_db()
+        conn.execute("UPDATE lessons SET subgroup = 2, is_substitution = 1, "
+                     "substitution_reason = 'болезнь' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+        resp = client.put('/api/lessons/1', json={'period': 3},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200, resp.get_json()
+
+        conn = db.get_db()
+        row = conn.execute('SELECT period, subject_id, teacher_id, subgroup, is_substitution, '
+                           'substitution_reason FROM lessons WHERE id = 1').fetchone()
+        conn.close()
+        assert row['period'] == 3
+        assert (row['subject_id'], row['teacher_id']) == (1, 1)
+        assert (row['subgroup'], row['is_substitution'], row['substitution_reason']) == (2, 1, 'болезнь')

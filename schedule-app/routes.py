@@ -1,4 +1,4 @@
-# Изменение №4 (бэкенд-рефакторинг): выделены маршруты в routes.py
+﻿# Изменение №4 (бэкенд-рефакторинг): выделены маршруты в routes.py
 
 import sqlite3
 import os
@@ -24,7 +24,7 @@ from config import (
 )
 from db import create_backup, prepare_for_restore, verify_db_integrity, find_orphaned_records, cleanup_orphan_schedule_records, get_db, is_date_excluded
 from generator import generate_schedule
-from utils import _safe_filename, _validate_lesson_data, _validate_lesson_slot, LESSON_SELECT, LESSON_SELECT_WITH_DAY, parse_excel_import, EXCEL_IMPORT_SCHEMAS, EXCEL_IMPORT_TEMPLATE_HEADERS, EXCEL_IMPORT_TEMPLATE_EXAMPLES
+from utils import _safe_filename, _validate_lesson_data, _validate_lesson_slot, LESSON_SELECT, LESSON_SELECT_WITH_DAY, parse_excel_import, EXCEL_IMPORT_SCHEMAS, EXCEL_IMPORT_TEMPLATE_HEADERS, EXCEL_IMPORT_TEMPLATE_EXAMPLES, parse_date_arg, parse_int_arg
 from cache import refs_cache
 from schedule_balancer import weekly_pairs, validate_weekly_load
 
@@ -91,7 +91,7 @@ def _handle_bad_value(exc):
     `datetime.strptime`/`int()` и отдавали 500 Internal Server Error.
     """
     logger.warning("Bad request value: %s", exc)
-    return jsonify({"error": "Некорректное значение параметра запроса"}), 400
+    return jsonify({"error": "Некорректный формат даты или ID"}), 400
 
 
 def build_week_dates(monday_str):
@@ -101,25 +101,19 @@ def build_week_dates(monday_str):
 
 
 def _parse_date(value):
-    """Разобрать дату YYYY-MM-DD. Возвращает date или None вместо исключения."""
-    try:
-        return datetime.strptime(str(value), '%Y-%m-%d').date()
-    except (TypeError, ValueError):
-        return None
+    """Тонкая обёртка над utils.parse_date_arg (None вместо исключения)."""
+    return parse_date_arg(value)
 
 
 def _int_param(raw, default=None):
-    """Целое из параметра запроса; default, если значение не передано или не число."""
+    """Целое из параметра: default для пустого, None для нечислового."""
     if raw is None or raw == '':
         return default
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
+    return parse_int_arg(raw)
 
 
 def _bad_monday():
-    return jsonify({"error": "monday must be YYYY-MM-DD"}), 400
+    return jsonify({"error": "Некорректный формат даты или ID"}), 400
 
 
 def _public_ref(table, rows):
@@ -1299,7 +1293,7 @@ def get_teacher_schedule():
         return jsonify([])
     teacher_id = _int_param(raw_teacher_id)
     if teacher_id is None:
-        return jsonify({"error": "teacher_id must be an integer"}), 400
+        return jsonify({"error": "Некорректный формат даты или ID"}), 400
     conn = get_db()
     lessons = conn.execute(
         LESSON_SELECT_WITH_DAY + ' WHERE l.teacher_id = ? AND l.subject_id IS NOT NULL AND l.deleted_at IS NULL ORDER BY sd.sort_order, l.period',
@@ -2336,7 +2330,7 @@ def teacher_schedule_table():
         return jsonify({'days': [], 'periods': []})
     teacher_id = _int_param(teacher_id)
     if teacher_id is None:
-        return jsonify({"error": "teacher_id must be an integer"}), 400
+        return jsonify({"error": "Некорректный формат даты или ID"}), 400
     if _parse_date(monday) is None:
         return _bad_monday()
 
@@ -2370,7 +2364,7 @@ def classroom_schedule_table():
         return jsonify({'days': [], 'periods': []})
     classroom_id = _int_param(classroom_id)
     if classroom_id is None:
-        return jsonify({"error": "classroom_id must be an integer"}), 400
+        return jsonify({"error": "Некорректный формат даты или ID"}), 400
     if _parse_date(monday) is None:
         return _bad_monday()
 
