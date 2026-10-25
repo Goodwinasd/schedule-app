@@ -384,6 +384,29 @@ def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed
     return moved
 
 
+def _distribute_day_targets(total, day_offset=0):
+    """Сколько пар ставить в каждый день недели (Пн..Сб).
+
+    Ориентир — реальные расписания 1 курса: будни в среднем 3.2 пары (3–4),
+    суббота легче — 2 пары. Поздний старт и «окна» в будни не закладываем.
+    """
+    targets = [0] * 6
+    if total <= 0:
+        return targets
+    sat_target = 2 if total >= 17 else (1 if total >= 16 else 0)
+    weekday_total = min(5 * MAX_PAIRS_WEEKDAY, total - min(sat_target, MAX_PAIRS_SATURDAY))
+    per = min(MAX_PAIRS_WEEKDAY, weekday_total // 5)
+    targets = [per] * 5 + [0]
+    # Остаток раскидываем по одному дню, со сдвигом по неделе — иначе при малом
+    # плане все пары недели падают на понедельник.
+    remainder = weekday_total - 5 * per
+    offset = day_offset % 5
+    for i in range(remainder):
+        targets[(i + offset) % 5] += 1
+    targets[5] = max(0, min(MAX_PAIRS_SATURDAY, total - sum(targets[:5])))
+    return targets
+
+
 def generate_schedule(conn, group_id, group_name, semester, monday_str, week_count,
                       optimize=True, seed=None):
     curriculum = conn.execute('''
@@ -464,127 +487,99 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         rng = random.Random(seed_str)
         rng.shuffle(pool)
 
-        # Even/odd week rotation: flip day order for even weeks
-        is_even = (iso_week % 2 == 0)
-        if is_even:
-            # Reverse day priority — heavy subjects shift to later days
-            day_order = [5, 4, 3, 2, 1, 0]
-        else:
-            day_order = [0, 1, 2, 3, 4, 5]
-
-        # Round-robin: distribute pool across 6 days, respecting daily load limits
-        # (weekdays ≤ 4 pairs, Saturday ≤ 3 pairs); excess rolls over to days with free capacity
+        # Раскладка по дням: будни 3–4 пары со старта с 1-й пары, суббота — 2 пары.
+        # Реальные расписания (9 групп 1 курса): будни 3.2 в среднем, суббота 2, разрывов нет.
+        day_targets = _distribute_day_targets(len(pool), day_offset=iso_week % 5)
         day_lessons = [[] for _ in range(6)]
-        for i, (subj_id, teach_id, _prio) in enumerate(pool):
-            for offset in range(6):
-                day_idx = day_order[(i + offset) % 6]
-                if len(day_lessons[day_idx]) < _max_pairs_per_day(day_idx):
-                    day_lessons[day_idx].append((subj_id, teach_id, _prio))
+        day_cursor = 0
+        for item in pool:
+            for _ in range(6):
+                if len(day_lessons[day_cursor]) < day_targets[day_cursor]:
+                    day_lessons[day_cursor].append(item)
+                    day_cursor = (day_cursor + 1) % 6
                     break
+                day_cursor = (day_cursor + 1) % 6
             else:
+                subj_id = item[0]
                 errors.append(f"Неделя {week_dates[0]}: дневные лимиты нагрузки переполнены, пара ({subj_id}) не размещена")
-
-        # Controlled Shift Drift: choose start period per day (seeded, weighted)
-        def pick_start_period(day_idx):
-            d_seed = f"{iso_year}_{iso_week}_{group_id}_day{day_idx}"
-            drng = random.Random(d_seed)
-            roll = drng.random()
-            if is_first_course:
-                # 80% -> 1, 20% -> 2 (never evening)
-                return 1 if roll < 0.8 else 2
-            if roll < 0.7:
-                return 1
-            elif roll < 0.9:
-                return 2
-            else:
-                return drng.choice([4, 5])
 
         placed = []  # (date, period, subject, teacher, classroom, is_sub, original_teacher) for mirroring
         created_ids = []  # id только что созданных пар — их и оптимизируем
+        unplaced = []  # (subject_id, teacher_id): доберём в свободные слоты (top-up)
+
+        def try_place(date_str, day_id, period, subj_id, primary_tid):
+            """Поставить пару в конкретный слот; True при успехе (жёсткие ограничения соблюдены)."""
+            actual_tid, original_tid, is_sub = _resolve_teacher_substitution(
+                conn, subj_id, primary_tid, group_id, date_str, period
+            )
+            if actual_tid is None:
+                return False
+            classroom_id = _pick_classroom(conn, subj_id, actual_tid, date_str, period, None)
+            conflicts, blocking = _validate_slot_3d(
+                conn, date_str, period, group_id,
+                teacher_id=actual_tid, classroom_id=classroom_id,
+            )
+            if blocking:
+                return False
+            cur = conn.execute('''
+                INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, group_id,
+                                     is_substitution, original_teacher_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (day_id, period, subj_id, actual_tid, classroom_id, group_id,
+                  int(is_sub), original_tid))
+            created_ids.append(cur.lastrowid)
+            placed.append((date_str, period, subj_id, actual_tid, classroom_id, is_sub, original_tid))
+            return True
+
         for day_idx, lessons in enumerate(day_lessons):
             if not lessons:
                 continue
             date_str = week_dates[day_idx]
-            # 1 сентября — линейка/организационные мероприятия ТОЛЬКО для 1-го курса
-            if is_first_course and date_str.endswith('-09-01'):
-                continue
-            if _is_holiday(conn, date_str):
-                continue
+            if (is_first_course and date_str.endswith('-09-01')) or _is_holiday(conn, date_str):
+                continue  # праздник/линейка: пары этой недели не переносим
             day_id = _get_or_create_day(conn, date_str, group_name)
-            # Number of lessons to place in this day (a contiguous block)
-            block_count = len(lessons)
-            start_period = pick_start_period(day_idx)
-            last_classroom_id = None
-            # Sequential block from start_period (Fallback: drop to earlier/window-safe slots on collision)
-            period = start_period
-            placed_in_day = 0
-            # Защита от бесконечного цикла: если одна и та же пара не помещается
-            # после большого числа попыток (все периоды заняты), пропускаем её.
-            block_attempts = 0
-            while lessons and placed_in_day < block_count:
-                if period > 8:
-                    # Ran out of periods; fallback to earliest free slot 1..8
-                    # (continuity sacrificed only at day end near max load)
-                    if is_first_course:
-                        period = 1
-                        if any(p >= 5 for p in allowed_periods):
-                            period = allowed_periods[0]
-                    else:
-                        period = 1
-                subj_id, primary_tid, _prio = lessons[0]
-                actual_tid, original_tid, is_sub = _resolve_teacher_substitution(
-                    conn, subj_id, primary_tid, group_id, date_str, period
-                )
-                if actual_tid is None:
-                    subject_name = next((c['subject_name'] or f'#{subj_id}' for c in curriculum if c['subject_id'] == subj_id), f'#{subj_id}')
-                    teacher_name = next((c['teacher_name'] or f'#{primary_tid}' for c in curriculum if c['teacher_id'] == primary_tid), f'#{primary_tid}')
-                    errors.append(
-                        f"Неделя {week_dates[0]}, {date_str}: преподаватель «{teacher_name}» отсутствует, "
-                        f"замена по предмету «{subject_name}» не найдена — пара пропущена"
-                    )
-                    lessons.pop(0)  # no substitute — skip this pair
-                    placed_in_day += 1
-                    continue
-                classroom_id = _pick_classroom(conn, subj_id, actual_tid, date_str, period, last_classroom_id)
-                conflicts, blocking = _validate_slot_3d(
-                    conn, date_str, period, group_id,
-                    teacher_id=actual_tid, classroom_id=classroom_id
-                )
-                if not blocking:
-                    cur = conn.execute('''
-                        INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, group_id,
-                                             is_substitution, original_teacher_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (day_id, period, subj_id, actual_tid, classroom_id, group_id,
-                          int(is_sub), original_tid))
-                    created_ids.append(cur.lastrowid)
+            max_period = max(allowed_periods) if allowed_periods else 8
+            queue = list(lessons)
+            period = allowed_periods[0] if allowed_periods else 1
+            while queue and period <= max_period:
+                subj_id, primary_tid, _prio = queue[0]
+                if try_place(date_str, day_id, period, subj_id, primary_tid):
                     created += 1
-                    last_classroom_id = classroom_id
-                    placed.append((date_str, period, subj_id, actual_tid, classroom_id, is_sub, original_tid))
-                    lessons.pop(0)
-                    placed_in_day += 1
+                    queue.pop(0)
                     period += 1
                 else:
-                    # Fallback: try earliest free slot of the day (window-safe rollback)
-                    fallback_period = 1
-                    if is_first_course:
-                        fallback_period = allowed_periods[0]
-                    if fallback_period != period:
-                        period = fallback_period
-                    else:
-                        period += 1  # advance to avoid infinite loop
-                    # Если пара бьётся слишком долго — признак заполненного дня:
-                    # пропускаем её, а не зависаем в цикле (периоды 1<->2 не совпадают).
-                    block_attempts += 1
-                    if block_attempts > 40:
-                        subj_name_blocked = next((c['subject_name'] for c in curriculum if c['subject_id'] == subj_id), subj_id)
-                        errors.append(
-                            f"Неделя {week_dates[0]}, {date_str}: не удалось разместить пару "
-                            f"«{subj_name_blocked}» — все периоды дня заняты"
-                        )
-                        lessons.pop(0)
-                        placed_in_day += 1
-                        block_attempts = 0
+                    period += 1
+            # всё, что не влезло в день, досадим в другие дни (top-up), а не выбросим
+            unplaced.extend((s, t) for s, t, _ in queue)
+
+        # Шаг 2 (top-up): при коллизиях не теряем пары — ищем свободный слот в других
+        # днях (сначала недогруженные будни, затем суббота).
+        for subj_id, primary_tid in unplaced:
+            placed_ok = False
+            for day_idx in sorted(range(6), key=lambda d: (len(day_lessons[d]), d)):
+                date_str = week_dates[day_idx]
+                if (is_first_course and date_str.endswith('-09-01')) or _is_holiday(conn, date_str):
+                    continue
+                limit = _max_pairs_per_day(day_idx)
+                if len(day_lessons[day_idx]) >= limit:
+                    continue
+                day_id = _get_or_create_day(conn, date_str, group_name)
+                for period in range(1, min(limit, max(allowed_periods or [8])) + 1):
+                    if try_place(date_str, day_id, period, subj_id, primary_tid):
+                        created += 1
+                        day_lessons[day_idx].append((subj_id, primary_tid, 0))
+                        placed_ok = True
+                        break
+                if placed_ok:
+                    break
+            if not placed_ok:
+                subj_name = next((c['subject_name'] for c in curriculum if c['subject_id'] == subj_id), subj_id)
+                reason = 'все свободные слоты заняты (преподаватель/аудитория)'
+                if _is_teacher_on_absence(conn, primary_tid, week_dates[0]):
+                    reason = 'преподаватель отсутствует, замена не найдена'
+                errors.append(
+                    f"Неделя {week_dates[0]}: пара «{subj_name}» пропущена — {reason}"
+                )
 
         # Фаза 2: оптимизация недели (окна/перегруз). Ошибка оптимизации не валит генерацию.
         if optimize:

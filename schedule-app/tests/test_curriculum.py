@@ -485,8 +485,11 @@ class TestValidateWeeklyLoad:
         assert math_subj['status'] == 'success', f"status={math_subj['status']}"
 
     def test_generator_controlled_shift_drift(self, client, seed_refs, admin_csrf):
-        """Over several weeks, generated schedule must have varied start periods (1 and 2)
-        and NO windows (contiguous periods) inside any day."""
+        """Старт всегда с 1-й пары (по реальным расписаниям 1 курса), без разрывов.
+
+        Раньше здесь проверялся «дрейф» старта (1 и 2). Реальные расписания
+        начинаются с 1-й пары в 81% дней, а сдвиг к 4-5 создавал «дыру» в начале дня.
+        """
         import db as db_module
         h = {'X-CSRF-Token': admin_csrf}
         # Create a senior-course group (course=2) so evening shifts are allowed
@@ -515,10 +518,10 @@ class TestValidateWeeklyLoad:
         for l in lessons:
             periods_seen.add(l['period'])
             days.setdefault(l['date'], []).append(l['period'])
-        # Must have period 1 somewhere (morning standard)
+        # Каждый учебный день начинается с 1-й пары
         assert 1 in periods_seen, "No period 1 lessons generated"
-        # Must have period 2 somewhere (first-pair shift) — across 6 weeks highly likely
-        assert 2 in periods_seen, "No shifted start at period 2 — drift likely not applied"
+        for date_str, ps in days.items():
+            assert min(ps) == 1, f"День {date_str} начинается не с 1-й пары: {sorted(ps)}"
         # No windows: within each day periods must be contiguous starting from min
         for date_str, ps in days.items():
             ps = sorted(set(ps))

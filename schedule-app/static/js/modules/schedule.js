@@ -366,6 +366,15 @@ export function smartExportExcel() {
     const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
+/** Предупреждение о парах, которые не удалось разместить (коллизии/нет замены). */
+function _generationWarning(res) {
+    const errors = Array.isArray(res.errors) ? res.errors : [];
+    if (!errors.length) return '';
+    const shown = errors.slice(0, 3).map(e => `• ${e}`).join('\n');
+    const more = errors.length > 3 ? `\n…и ещё ${errors.length - 3}` : '';
+    return `\n\n⚠️ Не удалось разместить пар: ${errors.length}\n${shown}${more}`;
+}
+
 /** Галочка «Оптимизировать» в модалке генерации (по умолчанию включена). */
 function _generateOptimizeFlag() {
     const box = document.getElementById('generate-optimize');
@@ -398,7 +407,12 @@ export async function generateFromCurriculum() {
     });
     hideLoader();
     if (res.error) { await showKimiAlert(res.error); return; }
-    showToast(`Создано пар: ${res.created}`, 'success');
+    const warning = _generationWarning(res);
+    if (warning) {
+        await showKimiAlert(`✅ Создано пар: ${res.created}${warning}`);
+    } else {
+        showToast(`Создано пар: ${res.created}`, 'success');
+    }
     dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
 }
@@ -423,7 +437,7 @@ export async function generateMonth() {
         '✅ Месячный план успешно сгенерирован!\n\n' +
         `• Обработано недель: ${res.weeks_processed}\n` +
         `• Всего создано занятий: ${res.created}\n` +
-        '• Отстающие дисциплины сбалансированы'
+        '• Отстающие дисциплины сбалансированы' + _generationWarning(res)
     );
     dispatchEvent(SCHEDULE_UPDATED);
     loadScheduleTable();
