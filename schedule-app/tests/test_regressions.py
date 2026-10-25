@@ -3,6 +3,8 @@
 Каждый тест соответствует конкретному исправлению в routes.py / settings.js.
 """
 
+import pytest
+
 
 class TestPartialUpdate:
     """PUT урока не должен затирать поля, которых нет в теле запроса."""
@@ -162,3 +164,62 @@ class TestBadInputReturns400:
     def test_update_day_without_payload(self, client, seed_days, admin_csrf):
         resp = client.put('/api/days/1', json={}, headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
+
+
+class TestRestoreLessonIntoDeletedDay:
+    """Нельзя восстановить урок в удалённый день: он стал бы «невидимым»."""
+
+    def test_restore_lesson_blocked_when_day_deleted(self, client, seed_lessons, db, admin_csrf):
+        conn = db.get_db()
+        conn.execute("UPDATE lessons SET deleted_at = datetime('now') WHERE id = 1")
+        conn.execute("UPDATE schedule_days SET deleted_at = datetime('now') WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+        resp = client.post('/api/lessons/1/restore', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409, resp.get_json()
+        assert 'День' in resp.get_json()['error']
+
+        conn = db.get_db()
+        row = conn.execute('SELECT deleted_at FROM lessons WHERE id = 1').fetchone()
+        conn.close()
+        assert row['deleted_at'] is not None, 'урок не должен восстановиться'
+
+    def test_restore_lesson_ok_when_day_alive(self, client, seed_lessons, db, admin_csrf):
+        conn = db.get_db()
+        conn.execute("UPDATE lessons SET deleted_at = datetime('now') WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+        resp = client.post('/api/lessons/1/restore', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200, resp.get_json()
+
+
+class TestConfigValidation:
+    """Слабый пароль и дефолтный ключ: внятная ошибка вместо молчаливого sys.exit."""
+
+    def test_missing_password_raises(self):
+        import config
+        with pytest.raises(RuntimeError):
+            config._require_strong_password('')
+
+    def test_weak_passwords_raise(self):
+        import config
+        for bad in ('short1!', 'NoDigits!', 'NoSpecial1'):
+            with pytest.raises(RuntimeError):
+                config._require_strong_password(bad)
+
+    def test_strong_password_passes(self):
+        import config
+        config._require_strong_password('GoodPass123!')
+
+    def test_leaked_and_placeholder_secrets_detected(self):
+        import config
+        assert config._is_weak_secret('0384e0d154b345d12a37d51db9a846b11647ace477f27991')
+        assert config._is_weak_secret('change-me-please')
+        assert not config._is_weak_secret('5f2c9a1b7e4d3c8a0b6f1e9d2c7a4b3f')
+        assert not config._is_weak_secret('')
+
+    def test_config_error_is_runtime_error(self):
+        import config
+        assert issubclass(config.ConfigError, RuntimeError)

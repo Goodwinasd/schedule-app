@@ -2119,6 +2119,21 @@ def restore_lesson(lesson_id):
     group_id = lesson['group_id']
     subgroup = lesson['subgroup']
 
+    # День мог уехать в корзину: восстановленный урок стал бы «невидимым»
+    # (активен, но нигде не отображается). Требуем сначала восстановить день.
+    day_row = conn.execute(
+        'SELECT deleted_at FROM schedule_days WHERE id = ?', (day_id,)
+    ).fetchone()
+    if not day_row:
+        conn.close()
+        return jsonify({"error": "День урока не найден"}), 404
+    if day_row['deleted_at'] is not None:
+        conn.close()
+        return jsonify({
+            "error": "День этого урока удалён. Сначала восстановите день из корзины.",
+            "warnings": ["День урока находится в корзине"],
+        }), 409
+
     warnings, blocking = _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id=subject_id, group_id=group_id, subgroup=subgroup)
     if blocking:
         conn.close()

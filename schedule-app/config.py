@@ -2,10 +2,12 @@
 
 import os
 import os.path
-import sys
 import secrets
 import re
+import logging
 from werkzeug.security import generate_password_hash
+
+logger = logging.getLogger(__name__)
 
 
 def _load_env():
@@ -23,14 +25,37 @@ _load_env()
 
 # ---- Secrets ----
 
-PASSWORD = os.environ.get('SCHEDULE_PASSWORD')
-if not PASSWORD:
-    print("SCHEDULE_PASSWORD не задан в .env")
-    sys.exit(1)
+class ConfigError(RuntimeError):
+    """Ошибка конфигурации: приложение не может стартовать. Явно, а не молча."""
 
-if len(PASSWORD) < 8 or not re.search(r'\d', PASSWORD) or not re.search(r'[!@#$%^&*()_+\-=]', PASSWORD):
-    print("Пароль должен быть минимум 8 символов, содержать цифру и спецсимвол (!@#$%^&*()_+-=)")
-    sys.exit(1)
+
+# Ключ из старого .env.example: он засвечен в репозитории, подписывать им сессии нельзя.
+_LEAKED_SECRET_KEYS = {'0384e0d154b345d12a37d51db9a846b11647ace477f27991'}
+
+
+def _require_strong_password(password):
+    """Проверить пароль администратора; бросить ConfigError с понятным текстом."""
+    if not password:
+        raise ConfigError(
+            "SCHEDULE_PASSWORD не задан. Скопируйте .env.example в .env и укажите пароль "
+            "администратора (минимум 8 символов, цифра и спецсимвол)."
+        )
+    if len(password) < 8 or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*()_+\-=]', password):
+        raise ConfigError(
+            "SCHEDULE_PASSWORD слишком простой: нужно минимум 8 символов, цифра и спецсимвол "
+            "из набора !@#$%^&*()_+-="
+        )
+
+
+def _is_weak_secret(key):
+    """Похож ли ключ подписи сессий на дефолтный или засвеченный в репозитории."""
+    if not key:
+        return False
+    return key in _LEAKED_SECRET_KEYS or key.strip().lower().startswith('change-me')
+
+
+PASSWORD = os.environ.get('SCHEDULE_PASSWORD')
+_require_strong_password(PASSWORD)
 
 SECRET_KEY = os.environ.get('SCHEDULE_SECRET_KEY')
 if not SECRET_KEY:
@@ -38,6 +63,15 @@ if not SECRET_KEY:
     env_path = os.path.join(os.path.dirname(__file__), '.env')
     with open(env_path, 'a', encoding='utf-8') as f:
         f.write(f"\nSCHEDULE_SECRET_KEY={SECRET_KEY}\n")
+    logger.warning(
+        "SCHEDULE_SECRET_KEY не задан — сгенерирован новый и записан в .env. "
+        "Ключ подписи сессий общий для всех копий приложения: не коммитьте .env."
+    )
+elif _is_weak_secret(SECRET_KEY):
+    logger.warning(
+        "SCHEDULE_SECRET_KEY похож на дефолтный или засвеченный: подпись сессий можно "
+        "подделать. Смените ключ в .env — это разлогинит всех пользователей."
+    )
 
 ADMIN_PASSWORD_HASH = generate_password_hash(PASSWORD)
 
