@@ -1,4 +1,4 @@
-import state from './state.js';
+﻿import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getWeekNumber, getMonday, addDays, formatDateRange, formatChipRange, shiftLabel, populateSelect } from './utils.js';
 import { api } from './api.js';
@@ -366,19 +366,37 @@ export function smartExportExcel() {
     const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
+/** Галочка «Оптимизировать» в модалке генерации (по умолчанию включена). */
+function _generateOptimizeFlag() {
+    const box = document.getElementById('generate-optimize');
+    return box ? box.checked : true;
+}
+
+export function showGenerateModal() {
+    if (state.currentScheduleType !== 'group' || !state.currentScheduleId) {
+        showKimiAlert('Сначала откройте расписание группы');
+        return;
+    }
+    const box = document.getElementById('generate-optimize');
+    if (box) box.checked = true;   // каждый раз по умолчанию включена
+    openModal('generate-modal');
+}
+
 export async function generateFromCurriculum() {
     if (state.currentScheduleType !== 'group' || !state.currentScheduleId) {
         await showKimiAlert('Сначала откройте расписание группы');
         return;
     }
+    const optimize = _generateOptimizeFlag();
     const groupId = state.currentScheduleId;
     const monday = toISODate(state.currentMonday);
-    const semester = await confirmModal('Сгенерировать расписание для группы на основе учебного плана?');
-    if (!semester) return;
+    window.closeModals();
+    showLoader('Собираем расписание по учебному плану...');
     const res = await api('/api/schedule/generate', {
         method: 'POST',
-        body: JSON.stringify({ group_id: groupId, semester: 1, monday, week_count: 18 }),
+        body: JSON.stringify({ group_id: groupId, semester: 1, monday, week_count: 18, optimize }),
     });
+    hideLoader();
     if (res.error) { await showKimiAlert(res.error); return; }
     showToast(`Создано пар: ${res.created}`, 'success');
     dispatchEvent(SCHEDULE_UPDATED);
@@ -390,14 +408,14 @@ export async function generateMonth() {
         await showKimiAlert('Сначала откройте расписание группы');
         return;
     }
+    const optimize = _generateOptimizeFlag();
     const groupId = state.currentScheduleId;
     const monday = toISODate(state.currentMonday);
-    const ok = await confirmModal('Сгенерировать расписание для группы на ближайшие 4 недели по учебному плану?');
-    if (!ok) return;
+    window.closeModals();
     showLoader('Собираем расписание на 4 недели...');
     const res = await api('/api/schedule/generate', {
         method: 'POST',
-        body: JSON.stringify({ group_id: groupId, semester: 1, monday, weeks_count: 4 }),
+        body: JSON.stringify({ group_id: groupId, semester: 1, monday, weeks_count: 4, optimize }),
     });
     hideLoader();
     if (res.error) { await showKimiAlert(res.error); return; }

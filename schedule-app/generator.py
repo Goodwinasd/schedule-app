@@ -341,8 +341,13 @@ def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed
     """
     if not lesson_ids:
         return 0
-    if _mirror_target_groups(conn, group_name):
-        logger.info("Annealing skipped for %s: composite stream mirroring", group_name)
+    mirror_targets = _mirror_target_groups(conn, group_name)
+    if mirror_targets:
+        logger.info(
+            "Annealing skipped for %s %s: составной поток, зеркальные группы (%s) — "
+            "перестановка одной стороны рассинхронизировала бы дубли",
+            group_name, week_dates[0], ', '.join(t['name'] for t in mirror_targets),
+        )
         return 0
     placeholders = ','.join('?' * len(week_dates))
     ids_clause = ','.join('?' * len(lesson_ids))

@@ -10,7 +10,7 @@
     <meta name="description" content="Расписание занятий: группы, преподаватели, аудитории, свободные окна">
     <!-- Пустая data:-иконка убирает 404 на /favicon.ico из каждой загрузки страницы -->
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="/static/css/style.css?v=31">
+    <link rel="stylesheet" href="/static/css/style.css?v=32">
     <!-- Версия закреплена: без неё CDN отдавал «последнюю», и графики могли
          перестать рисоваться после мажорного обновления Chart.js -->
     <script defer crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -62,8 +62,7 @@
                                 <button class="btn btn-ghost btn-block" data-action="restoreWeek">🔄 Восстановить неделю</button>
                                 <button class="btn btn-danger btn-block" data-action="deleteWeek">🗑️ Удалить неделю</button>
                                 <div class="dropdown-separator"></div>
-                                <button class="btn btn-ghost btn-block" data-action="generateFromCurriculum">🪄 Сгенерировать по плану</button>
-                                <button class="btn btn-ghost btn-block" data-action="generateMonth">🪄 Сгенерировать на месяц (4 недели)</button>
+                                <button class="btn btn-ghost btn-block" data-action="showGenerateModal">🪄 Сгенерировать…</button>
                             </div>
                         </div>
                     </div>
@@ -239,6 +238,22 @@
             </div>
         </div>
     </div>
+    <div id="generate-modal" class="modal" style="display:none">
+        <div class="modal-content">
+            <h2>Генерация расписания</h2>
+            <p class="hint-text">Расписание строится по учебному плану группы. Оптимизация переставляет пары,
+                чтобы убрать «окна» у преподавателей и групп; занимает до 3 секунд.</p>
+            <label class="checkbox-row">
+                <input type="checkbox" id="generate-optimize" checked>
+                Оптимизировать расписание (убирает окна)
+            </label>
+            <div class="modal-actions">
+                <button class="btn btn-primary" data-action="generateFromCurriculum">По плану (18 недель)</button>
+                <button class="btn btn-ghost" data-action="generateMonth">На месяц (4 недели)</button>
+                <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
+            </div>
+        </div>
+    </div>
     <div id="references-modal" class="modal modal-wide modal-admin" style="display:none">
         <div class="modal-content modal-wide t-modal t-resize">
             <div class="ref-header">
@@ -376,6 +391,6 @@
         <h1 id="print-title"></h1>
         <p id="print-subtitle"></p>
     </div>
-    <script type="module" src="/static/js/modules/main.js?v=4"></script>
+    <script type="module" src="/static/js/modules/main.js?v=5"></script>
 </body>
 </html>

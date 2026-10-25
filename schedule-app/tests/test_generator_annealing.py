@@ -3,6 +3,7 @@
 Проверяем чистые функции: они не ходят в БД и работают со списком занятий.
 """
 
+import logging
 import time
 
 import generator
@@ -93,3 +94,37 @@ def test_calculate_cost_penalises_overload(app):
     normal = [_lesson('2026-09-07', p) for p in (1, 2, 3, 4)]
     overloaded = [_lesson('2026-09-07', p) for p in (1, 2, 3, 4, 5)]
     assert generator._calculate_cost(overloaded) > generator._calculate_cost(normal)
+
+
+def test_composite_stream_skipped_and_logged(app, db):
+    """Зеркальные группы не двигают пары — и причина видна в логе."""
+    conn = db.get_db()
+    # _mirror_target_groups ищет группы-части потока («02-0923+11/24»)
+    conn.execute("INSERT INTO groups_list (name) VALUES ('02-0923')")
+    conn.execute("INSERT INTO groups_list (name) VALUES ('11/24')")
+    conn.commit()
+
+    records = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    handler = _Capture()
+    logger = generator.logger
+    old_level, old_disabled = logger.level, logger.disabled
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.disabled = False  # pytest может выставлять disabled для логгеров
+    try:
+        moved = generator._optimize_week(
+            conn, 1, '02-0923+11/24', ['2026-09-07'], [1, 2, 3, 4], seed='x', lesson_ids=[1])
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(old_level)
+        logger.disabled = old_disabled
+        conn.close()
+
+    assert moved == 0
+    messages = [r.getMessage() for r in records]
+    assert any('составной поток' in m and '02-0923' in m for m in messages), messages
