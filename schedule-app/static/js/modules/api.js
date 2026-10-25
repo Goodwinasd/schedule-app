@@ -83,7 +83,11 @@ export async function api(url, options = {}) {
 
     if (!res.ok) {
         const message = messageFor(res, data);
-        if (!options.silent) showToast(message, 'error');
+        // 401 на фоновом GET — норма: публичная страница обращается к админским
+        // эндпоинтам (например, /api/curriculum для прогресса плана). Тост здесь
+        // превращался в красную плашку «Unauthorized» у обычного посетителя.
+        const silentError = res.status === 401 && method === 'GET';
+        if (!options.silent && !silentError) showToast(message, 'error');
         return { error: message, status: res.status };
     }
 
