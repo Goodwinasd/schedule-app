@@ -29,7 +29,6 @@ function renderScheduleTable(data) {
     const { days, periods } = data;
     Object.keys(state.lessonsMap).forEach(k => delete state.lessonsMap[k]);
     const canEdit = state.isAdmin && (state.currentScheduleType === 'group' || state.currentScheduleType === 'teacher');
-
     // Build excluded dates lookup
     const excludedByDate = {};
     if (data._excluded) {
@@ -66,8 +65,8 @@ function renderScheduleTable(data) {
     let lastShift = 0;
     for (const p of periods) {
         if (p.shift !== lastShift) { lastShift = p.shift; html += `<tr class="shift-row"><td colspan="${days.length + 1}">${shiftLabel(p.shift)}</td></tr>`; }
-        html += '<tr>';
-        html += `<td class="time-cell"><span class="period-num">${p.period}</span>${p.start} – ${p.end}</td>`;
+        html += '<tr data-period-row="' + p.period + '">';
+        html += `<td class="time-cell"><span class="period-num">${p.period}</span>${escapeHtml(p.start)} – ${escapeHtml(p.end)}</td>`;
         for (const day of days) {
             const isExcluded = excludedByDate[day.date];
             if (isExcluded) {
@@ -87,19 +86,22 @@ function renderScheduleTable(data) {
                         let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
                         if (isSub) meta += ' 🔄 замена';
                         const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
+                        const drag = canEdit ? ` draggable="true" data-lesson-id="${l.id}" data-day-id="${l.day_id || ''}" data-period="${p.period}"` : '';
                         const conflict = checkConflictsForLesson(l, day.date, p.period);
                         const cCls = conflict ? ' ' + conflict.cls : '';
                         const tip = conflict ? ` title="${escapeHtml(conflict.tooltip)}"` : '';
-                        return `<div class="lesson-content${cCls}${subCls}"${oc}${tip} style="${isSub ? 'background:var(--warning-bg);color:var(--warning-text)' : ''}"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
+                        return `<div class="lesson-content${cCls}${subCls}"${oc}${drag}${tip} style="${isSub ? 'background:var(--warning-bg);color:var(--warning-text)' : ''}"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
                     }).join('');
-                    html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}">${inner}</td>`;
+                    html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}" data-day-id="${day.day_id || ''}" data-date="${day.date}" data-period="${p.period}">${inner}</td>`;
                 } else {
                     const di = day.day_id;
                     let oc = '';
                     if (canEdit && (di || state.currentScheduleType === 'teacher')) {
-                        oc = state.currentScheduleType === 'teacher' ? ` onclick="showAddLessonModal(${di || 'null'}, ${p.period}, '${day.date}', null, ${state.currentScheduleId})"` : ` onclick="showAddLessonModal(${di}, ${p.period}, ${state.currentScheduleId})"`;
+                        // Порядок параметров: (dayId, period, dayGroup, dateStr, teacherId).
+                        // Раньше дата попадала в dayGroup и терялся dateStr — день не определялся.
+                        oc = state.currentScheduleType === 'teacher' ? ` onclick="showAddLessonModal(${di || 'null'}, ${p.period}, null, '${day.date}', ${state.currentScheduleId})"` : ` onclick="showAddLessonModal(${di}, ${p.period}, ${state.currentScheduleId})"`;
                     }
-                    html += `<td class="day-cell empty-cell${canEdit && (di || state.currentScheduleType === 'teacher') ? ' addable-cell' : ''}"${oc}></td>`;
+                    html += `<td class="day-cell empty-cell${canEdit && (di || state.currentScheduleType === 'teacher') ? ' addable-cell' : ''}" data-day-id="${di || ''}" data-date="${day.date}" data-period="${p.period}"${oc}></td>`;
                 }
             }
         }
@@ -108,28 +110,106 @@ function renderScheduleTable(data) {
     return html + '</tbody></table></div>';
 }
 
+function skeletonScheduleGrid() {
+    let html = '<div class="schedule-table-wrap"><table class="skeleton-table"><thead><tr><th class="col-time"><span class="skeleton skeleton-text" style="width:70%"></span></th>';
+    for (let d = 0; d < 6; d++) {
+        html += '<th class="col-day"><span class="skeleton skeleton-text" style="width:75%"></span></th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (let p = 0; p < 8; p++) {
+        html += '<tr><td class="time-cell"><span class="skeleton skeleton-text" style="width:55%;margin:2px auto"></span></td>';
+        for (let d = 0; d < 6; d++) {
+            html += '<td class="day-cell"><div class="skeleton skeleton-card"></div></td>';
+        }
+        html += '</tr>';
+    }
+    return html + '</tbody></table></div>';
+}
+
+// Токен запроса: ответ на старый клик по неделе не должен перерисовать таблицу поверх нового.
+let _loadSeq = 0;
+
 export async function loadScheduleTable() {
-    showLoader('Загрузка расписания');
+    const seq = ++_loadSeq;
     const cont = document.getElementById('schedule-table-container');
-    cont.innerHTML = '';
+    cont.innerHTML = skeletonScheduleGrid();
     const ms = toISODate(state.currentMonday);
     let data;
     if (state.currentScheduleType === 'group') data = await api(`/api/schedule-table?group=${encodeURIComponent(state.currentScheduleName)}&monday=${ms}`);
     else if (state.currentScheduleType === 'teacher') data = await api(`/api/teacher-schedule-table?teacher_id=${state.currentScheduleId}&monday=${ms}`);
     else if (state.currentScheduleType === 'classroom') data = await api(`/api/classroom-schedule-table?classroom_id=${state.currentScheduleId}&monday=${ms}`);
+    // Пока ждали ответ, пользователь мог выбрать другую неделю — устаревший ответ отбрасываем.
+    if (seq !== _loadSeq) return;
     if (!data || !data.periods || !data.periods.length || data.week_exists === false) {
-        hideLoader();
+        const bar = document.getElementById('schedule-status-bar');
+        if (bar) bar.style.display = 'none';
         cont.innerHTML = '<div class="no-schedule"><span class="emoji">📅</span><p>Нет расписания на эту неделю</p></div>';
         return;
     }
     // Check excluded dates for this week
     const excluded = await api('/api/excluded-dates');
+    if (seq !== _loadSeq) return;
     if (excluded && !excluded.error && excluded.length) {
         data._excluded = excluded;
     }
+    lastScheduleData = data;
     cont.innerHTML = renderScheduleTable(data);
-    hideLoader();
+    renderPublishStatus(data);
     loadPlanProgress();
+}
+
+function renderPublishStatus(data) {
+    const bar = document.getElementById('schedule-status-bar');
+    if (!bar) return;
+    if (state.currentScheduleType !== 'group' || !data || !Array.isArray(data.days)) {
+        bar.style.display = 'none';
+        return;
+    }
+    const days = data.days;
+    const published = days.every(d => d.is_published !== false);
+    const anyDay = days.some(d => d.day_id != null);
+    if (!anyDay) {
+        bar.style.display = 'none';
+        return;
+    }
+    const editable = state.isAdmin;
+    const pubCls = published ? 'btn-success active' : 'btn-outline-secondary';
+    const draftCls = published ? 'btn-outline-secondary' : 'btn-warning active';
+    const actionAttr = editable
+        ? 'data-action="toggleWeekPublish"'
+        : 'disabled';
+    const group = `
+        <div class="publish-group" role="group" aria-label="Статус публикации недели">
+            <button type="button" class="btn btn-sm ${pubCls}" ${actionAttr} data-params='[1]' title="Опубликовать неделю">Опубликовано</button>
+            <button type="button" class="btn btn-sm ${draftCls}" ${actionAttr} data-params='[0]' title="Перевести неделю в черновик">В черновик</button>
+        </div>`;
+    bar.innerHTML = `<div class="schedule-status-wrap">${group}</div>`;
+    bar.style.display = '';
+}
+
+export async function toggleWeekPublish(publish) {
+    if (state.currentScheduleType !== 'group' || !state.currentScheduleName || !state.currentMonday) {
+        showToast('Сначала откройте расписание группы', 'info');
+        return;
+    }
+    const bar = document.getElementById('schedule-status-bar');
+    const activeBtn = bar && bar.querySelector('[data-action="toggleWeekPublish"].active');
+    if (activeBtn) {
+        const current = JSON.parse(activeBtn.dataset.params)[0];
+        if (current === publish) {
+            showToast(publish ? 'Неделя уже опубликована' : 'Неделя уже в черновике', 'info');
+            return;
+        }
+    }
+    const monday = toISODate(state.currentMonday);
+    const res = await api('/api/week/publish', {
+        method: 'POST',
+        body: JSON.stringify({ group_name: state.currentScheduleName, monday, is_published: publish ? 1 : 0 }),
+    });
+    if (res.error) { await showKimiAlert(res.error); return; }
+    showToast(res.message || (res.is_published ? 'Неделя опубликована' : 'Неделя переведена в черновик'), 'success');
+    dispatchEvent(SCHEDULE_UPDATED);
+    loadScheduleTable();
 }
 
 export async function loadPlanProgress() {
@@ -216,8 +296,8 @@ export function exportSchedule(format) {
     }
     const monday = toISODate(state.currentMonday);
     const url = `/api/export?type=${encodeURIComponent(state.currentScheduleType)}&name=${encodeURIComponent(state.currentScheduleName)}&id=${encodeURIComponent(state.currentScheduleId)}&monday=${monday}&format=${format}`;
+    // Ссылка удаляется сразу; повторный removeChild в таймере падал с NotFoundError на каждом экспорте.
     const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => document.body.removeChild(a), 1000);
 }
 
 export function smartExportExcel() {
@@ -227,12 +307,12 @@ export function smartExportExcel() {
     }
     const monday = toISODate(state.currentMonday);
     const url = `/api/schedule/export/excel?type=${encodeURIComponent(state.currentScheduleType)}&id=${state.currentScheduleId}&start_date=${monday}`;
+    // Ссылка удаляется сразу; повторный removeChild в таймере падал с NotFoundError на каждом экспорте.
     const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => document.body.removeChild(a), 1000);
 }
 
 export async function generateFromCurriculum() {
-    if (!state.currentScheduleType === 'group' || !state.currentScheduleId) {
+    if (state.currentScheduleType !== 'group' || !state.currentScheduleId) {
         await showKimiAlert('Сначала откройте расписание группы');
         return;
     }
@@ -251,7 +331,7 @@ export async function generateFromCurriculum() {
 }
 
 export async function generateMonth() {
-    if (!state.currentScheduleType === 'group' || !state.currentScheduleId) {
+    if (state.currentScheduleType !== 'group' || !state.currentScheduleId) {
         await showKimiAlert('Сначала откройте расписание группы');
         return;
     }
@@ -289,7 +369,7 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     document.getElementById('btn-delete-lesson').style.display = 'none';
     document.getElementById('btn-add-subgroup').style.display = 'none';
     const sel = document.getElementById('lesson-period');
-    sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${period && b.period === period ? 'selected' : ''}>${b.period}-я пара (${b.start} - ${b.end})</option>`).join('');
+    sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${period && b.period === period ? 'selected' : ''}>${b.period}-я пара (${escapeHtml(b.start)} - ${escapeHtml(b.end)})</option>`).join('');
     sel.onchange = () => validateLesson();
     populateSelect('lesson-subject', state.subjectsList, '— выбрать —');
     populateSelect('lesson-teacher', state.teachersList, '— выбрать —');
@@ -310,6 +390,10 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     document.getElementById('substitution-fields').style.display = 'none';
     document.getElementById('lesson-substitution-reason').value = '';
     populateSelect('lesson-original-teacher', state.teachersList, '— не указан —');
+    const subSel = document.getElementById('lesson-substitution-select');
+    if (subSel) { subSel.innerHTML = '<option value="">— выберите заменяющего —</option>'; }
+    const subNote = document.getElementById('substitution-note');
+    if (subNote) subNote.textContent = '';
 }
 
 async function collectLessonData() {
@@ -363,7 +447,7 @@ export function editLesson(lesson) {
     document.getElementById('btn-delete-lesson').style.display = '';
     document.getElementById('btn-add-subgroup').style.display = '';
     const sel = document.getElementById('lesson-period');
-    sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${b.period === lesson.period ? 'selected' : ''}>${b.period}-я пара (${b.start} - ${b.end})</option>`).join('');
+    sel.innerHTML = state.bellSchedule.map(b => `<option value="${b.period}" ${b.period === lesson.period ? 'selected' : ''}>${b.period}-я пара (${escapeHtml(b.start)} - ${escapeHtml(b.end)})</option>`).join('');
     populateSelect('lesson-subject', state.subjectsList, '— выбрать —');
     populateSelect('lesson-teacher', state.teachersList, '— выбрать —');
     populateSelect('lesson-group', state.groupsList, '— выбрать —');
@@ -377,6 +461,9 @@ export function editLesson(lesson) {
     document.getElementById('substitution-fields').style.display = isSub ? '' : 'none';
     document.getElementById('lesson-substitution-reason').value = lesson.substitution_reason || '';
     document.getElementById('lesson-original-teacher').value = lesson.original_teacher_id || '';
+    const subSel = document.getElementById('lesson-substitution-select');
+    if (subSel) subSel.innerHTML = '<option value="">— выберите заменяющего —</option>';
+    if (isSub) refreshSubstitutionSuggest();
     document.getElementById('btn-save-lesson').onclick = () => saveLesson(lesson.id);
 }
 
@@ -411,6 +498,61 @@ export async function deleteCurrentLesson() {
     loadScheduleTable();
 }
 
+export async function refreshSubstitutionSuggest() {
+    const sel = document.getElementById('lesson-substitution-select');
+    if (!sel) return;
+    const note = document.getElementById('substitution-note');
+    if (note) note.textContent = '';
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— выберите заменяющего —</option>';
+    const dayId = state.currentLessonDayId;
+    const dateStr = state.currentLessonDate || null;
+    const periodEl = document.getElementById('lesson-period');
+    const period = periodEl ? parseInt(periodEl.value) : null;
+    const teacherEl = document.getElementById('lesson-teacher');
+    const excludeTeacherId = teacherEl && teacherEl.value ? parseInt(teacherEl.value) : undefined;
+    const canResolve = (dayId || dateStr) && period;
+    if (!canResolve) {
+        if (note) note.textContent = 'Выберите день и пару, чтобы подобрать замену';
+        return;
+    }
+    const params = new URLSearchParams();
+    if (dateStr) params.set('date', dateStr);
+    else params.set('day_id', dayId);
+    if (period) params.set('period', period);
+    if (excludeTeacherId) params.set('exclude_teacher_id', excludeTeacherId);
+    const res = await api(`/api/schedule/substitutions-suggest?${params}`);
+    const available = (res && !res.error && Array.isArray(res.available)) ? res.available : [];
+    if (!available.length) {
+        if (note) note.textContent = 'Свободных преподавателей на эту пару нет';
+        return;
+    }
+    available.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.id;
+        o.textContent = t.name;
+        sel.appendChild(o);
+    });
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
+export function pickSubstituteTeacher(teacherId) {
+    const id = parseInt(teacherId);
+    const tf = document.getElementById('lesson-teacher');
+    const origSel = document.getElementById('lesson-original-teacher');
+    if (!id) { if (tf) tf.value = ''; if (origSel) origSel.value = ''; validateLesson(); return; }
+    if (tf) {
+        const prevId = parseInt(tf.value);
+        tf.value = id;
+        tf.disabled = false;
+        // Если основной (заменяемый) преподаватель ещё не выбран — им становится тот, кто был в поле до переключения
+        if (origSel && !parseInt(origSel.value) && prevId && prevId !== id) origSel.value = prevId;
+    }
+    const reason = document.getElementById('lesson-substitution-reason');
+    if (reason && !reason.value.trim()) reason.value = 'Замена';
+    validateLesson();
+}
+
 function renderWarnings(el, warnings) {
     el.style.display = '';
     el.innerHTML = '<div class="validation-warnings">' + warnings.map(w => `<div class="validation-warning ${w.type === 'duplicate' ? 'warning' : 'error'}"><span class="validation-warning-icon">${w.type === 'duplicate' ? '!' : '!!'}</span><span>${escapeHtml(w.message)}</span></div>`).join('') + '</div>';
@@ -422,7 +564,8 @@ export function validateLesson() {
         const dayId = state.currentLessonDayId;
         const d = await collectLessonData();
         if (!dayId || !d.period) return;
-        const data = await api('/api/validate', { method: 'POST', body: JSON.stringify({ day_id: dayId, ...d, exclude_lesson_id: state.currentEditLessonId }) });
+        // silent: проверка идёт на каждое нажатие клавиши — тост «Успешно сохранено» был бы спамом.
+        const data = await api('/api/validate', { method: 'POST', body: JSON.stringify({ day_id: dayId, ...d, exclude_lesson_id: state.currentEditLessonId }), silent: true });
         const el = document.getElementById('validation-warnings');
         const btn = document.getElementById('btn-save-lesson');
         if (data.warnings && data.warnings.length) {
@@ -444,3 +587,166 @@ onEvent(DATA_MUTATED, (e) => {
         }
     }
 });
+
+/* ---------- Drag-and-Drop (перетаскивание пар мышкой) ---------- */
+
+let lastScheduleData = null;
+let activeDrag = null;
+
+function bindScheduleDragAndDrop() {
+    const cont = document.getElementById('schedule-table-container');
+    if (!cont || cont.dataset.dndBound) return;
+    cont.dataset.dndBound = '1';
+    cont.addEventListener('dragstart', onCardDragStart);
+    cont.addEventListener('dragend', onCardDragEnd);
+    cont.addEventListener('dragover', onCellDragOver);
+    cont.addEventListener('dragenter', onCellDragEnter);
+    cont.addEventListener('dragleave', onCellDragLeave);
+    cont.addEventListener('drop', onCellDrop);
+}
+
+function isLessonCard(el) {
+    return el && el.classList && el.classList.contains('lesson-content') && el.getAttribute('draggable') === 'true';
+}
+
+function closestCell(el) {
+    return el && el.closest ? el.closest('td.day-cell') : null;
+}
+
+function onCardDragStart(e) {
+    const card = e.target.closest ? e.target.closest('.lesson-content[draggable="true"]') : null;
+    if (!card) return;
+    const payload = {
+        lesson_id: parseInt(card.dataset.lessonId),
+        source_day_id: parseInt(card.dataset.dayId) || null,
+        source_period: parseInt(card.dataset.period) || null,
+    };
+    activeDrag = { card, payload };
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', JSON.stringify(payload)); } catch (_) { /* noop */ }
+    card.classList.add('dragging');
+}
+
+function clearDragHover() {
+    document.querySelectorAll('#schedule-table-container td.day-cell.drag-hover').forEach(c => c.classList.remove('drag-hover'));
+}
+
+function onCardDragEnd() {
+    const card = activeDrag && activeDrag.card;
+    if (card) card.classList.remove('dragging');
+    activeDrag = null;
+    clearDragHover();
+}
+
+function onCellDragOver(e) {
+    if (!activeDrag) return;
+    const cell = closestCell(e.target);
+    if (!cell || !cell.dataset.dayId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    cell.classList.add('drag-hover');
+}
+
+function onCellDragEnter(e) {
+    if (!activeDrag) return;
+    const cell = closestCell(e.target);
+    if (!cell || !cell.dataset.dayId) return;
+    e.preventDefault();
+    cell.classList.add('drag-hover');
+}
+
+function onCellDragLeave(e) {
+    const cell = closestCell(e.target);
+    if (!cell || !activeDrag) return;
+    if (e.relatedTarget && cell.contains(e.relatedTarget)) return;
+    cell.classList.remove('drag-hover');
+}
+
+function onCellDrop(e) {
+    if (!activeDrag) return;
+    const cell = closestCell(e.target);
+    clearDragHover();
+    if (!cell || !cell.dataset.dayId) return;
+    e.preventDefault();
+
+    let payload = activeDrag.payload;
+    try {
+        const raw = e.dataTransfer && e.dataTransfer.getData('text/plain');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.lesson_id) payload = parsed;
+        }
+    } catch (_) { /* keep stored payload */ }
+
+    const targetDayId = parseInt(cell.dataset.dayId) || null;
+    const targetPeriod = parseInt(cell.dataset.period) || null;
+    if (!payload.lesson_id || !targetDayId || !targetPeriod) return;
+    if (payload.source_day_id === targetDayId && payload.source_period === targetPeriod) return;
+
+    const card = activeDrag.card;
+    activeDrag = null;
+    if (card) card.classList.remove('dragging');
+    moveLesson(payload.lesson_id, payload.source_period, targetDayId, targetPeriod, cell.dataset.date);
+}
+
+async function moveLesson(lessonId, sourcePeriod, targetDayId, targetPeriod, targetDate) {
+    if (!lastScheduleData) return;
+    const backup = JSON.parse(JSON.stringify(lastScheduleData));
+
+    let moved = null;
+    for (const p of lastScheduleData.periods) {
+        if (p.period !== sourcePeriod) continue;
+        for (const date of Object.keys(p.lessons)) {
+            const arr = p.lessons[date];
+            const idx = arr.findIndex(l => l.id === lessonId);
+            if (idx !== -1) {
+                moved = arr.splice(idx, 1)[0];
+                break;
+            }
+        }
+    }
+    if (!moved) return;
+
+    const targetPeriodObj = lastScheduleData.periods.find(p => p.period === targetPeriod);
+    if (!targetPeriodObj) return;
+    if (!targetPeriodObj.lessons[targetDate]) targetPeriodObj.lessons[targetDate] = [];
+    moved.day_id = targetDayId;
+    moved.period = targetPeriod;
+    targetPeriodObj.lessons[targetDate].push(moved);
+
+    const cont = document.getElementById('schedule-table-container');
+    cont.innerHTML = renderScheduleTable(lastScheduleData);
+
+    const res = await api(`/api/lessons/${lessonId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ day_id: targetDayId, period: targetPeriod }),
+        silent: true,
+    });
+    if (res.error) {
+        lastScheduleData = backup;
+        cont.innerHTML = renderScheduleTable(backup);
+        const cell = cont.querySelector(`td.day-cell[data-day-id="${targetDayId}"][data-period="${targetPeriod}"]`);
+        if (cell) {
+            cell.classList.add('drop-error');
+            setTimeout(() => cell.classList.remove('drop-error'), 1200);
+        }
+        showToast((res.warnings && res.warnings.length ? res.warnings.join('; ') : res.error), 'warning');
+        return;
+    }
+    showToast('Пара перемещена', 'success');
+}
+
+export function refreshScheduleTimeline() {
+    const rows = document.querySelectorAll('tr[data-period-row]');
+    const byPeriod = {};
+    for (const s of (state.bellSchedule || [])) byPeriod[s.period] = s;
+    for (const tr of rows) {
+        const p = parseInt(tr.getAttribute('data-period-row'));
+        const s = byPeriod[p];
+        const cell = tr.querySelector('.time-cell');
+        if (!cell || !s) continue;
+        cell.innerHTML = `<span class="period-num">${s.period}</span>${escapeHtml(s.start)} – ${escapeHtml(s.end)}`;
+    }
+}
+
+bindScheduleDragAndDrop();

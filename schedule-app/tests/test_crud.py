@@ -261,6 +261,37 @@ class TestGroups:
         assert remaining[0]['name'] == '1к-1'
         assert remaining[0]['course'] == 2
 
+    def test_advance_courses_soft_deletes_group_with_lessons(self, client, seed_refs, admin_csrf):
+        """Course-4 groups that have lessons must be soft-deleted, not hard-deleted."""
+        import db as db_module
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.post(self.ENDPOINT, json={'name': '4к-1', 'course': 4}, headers=h)
+        assert resp.status_code in (200, 201)
+        gid = resp.get_json()['id']
+        # Attach a lesson to the 4th-course group so hard DELETE would violate FK
+        resp = client.post('/api/days', json={
+            'day_name': 'Понедельник', 'date': '2026-09-07', 'group_name': '4к-1'
+        }, headers=h)
+        assert resp.status_code == 201
+        day_id = resp.get_json()['id']
+        resp = client.post(f'/api/days/{day_id}/lessons', json={
+            'period': 1, 'subject_id': 1, 'teacher_id': 1, 'group_id': gid,
+        }, headers=h)
+        assert resp.status_code == 201
+
+        resp = client.post(f'{self.ENDPOINT}/advance-courses', headers=h)
+        assert resp.status_code == 200
+        assert resp.get_json()['deleted'] == 1
+        # The group row stays present, marked soft-deleted
+        conn = db_module.get_db()
+        row = conn.execute('SELECT id, deleted_at FROM groups_list WHERE id = ?', (gid,)).fetchone()
+        conn.close()
+        assert row is not None, '4th-course group must remain in DB (soft delete)'
+        assert row['deleted_at'] is not None, '4th-course group must be soft-deleted'
+        # And it no longer shows up in the active list
+        remaining = client.get(self.ENDPOINT).get_json()
+        assert all(i['id'] != gid for i in remaining)
+
 
 class TestDays:
     def test_create_day(self, client, admin_csrf):
@@ -269,6 +300,20 @@ class TestDays:
         }, headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 201
         assert resp.get_json()['id'] > 0
+
+    def test_create_day_defaults_to_draft(self, client, admin_csrf):
+        """Свежесозданный день должен сохраняться как Черновик (is_published = 0)."""
+        import db as db_module
+        resp = client.post('/api/days', json={
+            'day_name': 'Понедельник', 'date': '2026-09-21', 'group_name': 'Группа-1'
+        }, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+        day_id = resp.get_json()['id']
+        conn = db_module.get_db()
+        row = conn.execute('SELECT is_published FROM schedule_days WHERE id = ?', (day_id,)).fetchone()
+        conn.close()
+        assert row is not None
+        assert row['is_published'] == 0, 'Новый день должен быть в Черновике по умолчанию'
 
     def test_create_batch(self, client, admin_csrf):
         days = [
@@ -279,6 +324,22 @@ class TestDays:
                            headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 201
         assert len(resp.get_json()['ids']) == 2
+
+    def test_create_batch_defaults_to_draft(self, client, admin_csrf):
+        """Дни, созданные батчом, также сохраняются как Черновик (is_published = 0)."""
+        import db as db_module
+        days = [
+            {'day_name': 'Понедельник', 'date': '2026-09-21', 'group_name': 'Гр'},
+            {'day_name': 'Вторник', 'date': '2026-09-22', 'group_name': 'Гр'},
+        ]
+        resp = client.post('/api/days/batch', json={'days': days},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 201
+        conn = db_module.get_db()
+        rows = conn.execute('SELECT is_published FROM schedule_days WHERE group_name = ?', ('Гр',)).fetchall()
+        conn.close()
+        assert len(rows) == 2
+        assert all(r['is_published'] == 0 for r in rows), 'Дни из batch должны быть в Черновике по умолчанию'
 
     def test_create_batch_duplicate(self, client, admin_csrf):
         days = [
@@ -348,6 +409,43 @@ class TestLessons:
         }, headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
 
+    def test_move_lesson_to_another_day(self, client, seed_lessons, db, admin_csrf):
+        """PUT с новым day_id/period перемещает урок (drag-and-drop)."""
+        resp = client.put('/api/lessons/1', json={
+            'day_id': 2, 'period': 3, 'subject_id': 1, 'teacher_id': 1,
+            'classroom_id': 1, 'group_id': 1
+        }, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200, resp.get_json()
+        row = db.get_db().execute(
+            'SELECT day_id, period FROM lessons WHERE id = 1').fetchone()
+        assert row['day_id'] == 2
+        assert row['period'] == 3
+
+    def test_move_lesson_conflict_rolls_back(self, client, seed_lessons, db, admin_csrf):
+        """Перемещение в занятый слот учителя — 409, урок не тронут."""
+        conn = db.get_db()
+        conn.execute(
+            'INSERT INTO lessons (id, day_id, period, subject_id, teacher_id, classroom_id, group_id) '
+            'VALUES (9, 2, 1, 1, 1, 1, 1)')
+        conn.commit()
+        resp = client.put('/api/lessons/1', json={
+            'day_id': 2, 'period': 1, 'subject_id': 1, 'teacher_id': 1,
+            'classroom_id': 1, 'group_id': 1
+        }, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 409
+        row = db.get_db().execute(
+            'SELECT day_id, period FROM lessons WHERE id = 1').fetchone()
+        assert (row['day_id'], row['period']) == (1, 1)
+
+    def test_move_lesson_invalid_day(self, client, seed_lessons, db, admin_csrf):
+        resp = client.put('/api/lessons/1', json={
+            'day_id': 999, 'period': 1, 'subject_id': 1
+        }, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 404
+        row = db.get_db().execute(
+            'SELECT day_id, period FROM lessons WHERE id = 1').fetchone()
+        assert (row['day_id'], row['period']) == (1, 1)
+
     def test_update_lesson_not_found(self, client, admin_csrf):
         resp = client.put('/api/lessons/999', json={'group_id': 1},
                           headers={'X-CSRF-Token': admin_csrf})
@@ -356,6 +454,25 @@ class TestLessons:
     def test_delete_lesson_soft(self, client, seed_lessons, admin_csrf):
         resp = client.delete('/api/lessons/1', headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
+
+    def test_delete_lesson_writes_history(self, client, seed_lessons, admin_csrf):
+        client.delete('/api/lessons/1', headers={'X-CSRF-Token': admin_csrf})
+        import db as db_module
+        conn = db_module.get_db()
+        row = conn.execute(
+            'SELECT * FROM lesson_history WHERE lesson_id = 1 ORDER BY id DESC LIMIT 1'
+        ).fetchone()
+        conn.close()
+        assert row is not None
+        assert row['old_subject_id'] == 1
+        assert row['old_teacher_id'] == 1
+        assert row['old_classroom_id'] == 1
+        assert row['old_group_id'] == 1
+
+    def test_delete_lesson_already_deleted_returns_404(self, client, seed_lessons, admin_csrf):
+        client.delete('/api/lessons/1', headers={'X-CSRF-Token': admin_csrf})
+        resp = client.delete('/api/lessons/1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 404
 
     def test_restore_lesson(self, client, seed_lessons, admin_csrf):
         client.delete('/api/lessons/1', headers={'X-CSRF-Token': admin_csrf})
@@ -488,3 +605,52 @@ class TestSettings:
                           json={'value': 'abc'},
                           headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 400
+
+    def test_update_session_lifetime_clamped_to_minimum(self, client, admin_csrf):
+        resp = client.put(f'{self.ENDPOINT}/session_lifetime',
+                          json={'value': '1'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.get_json()['session_lifetime'] == '3600'
+
+    def test_update_session_lifetime_valid_minimum(self, client, admin_csrf):
+        resp = client.put(f'{self.ENDPOINT}/session_lifetime',
+                          json={'value': '120'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.get_json()['session_lifetime'] == '120'
+
+    def test_update_setting_syncs_config_store(self, client, admin_csrf):
+        """PUT must update the single in-memory config source, not just the DB row."""
+        import config
+        assert config.SETTINGS['login_rate_limit'] == 5
+        resp = client.put(f'{self.ENDPOINT}/login_rate_limit',
+                          json={'value': '12'},
+                          headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        assert config.SETTINGS['login_rate_limit'] == 12
+        # And the DB reflects it too (single source of truth)
+        conn = __import__('db', fromlist=['get_db']).get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key = 'login_rate_limit'").fetchone()
+        conn.close()
+        assert row['value'] == '12'
+
+
+class TestBackupDownload:
+    ENDPOINT = '/api/admin/backup/download'
+
+    def test_download_backup(self, client, admin_csrf):
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        assert 'schedule_backup_' in resp.headers.get('Content-Disposition', '')
+        assert len(resp.data) > 0
+
+    def test_download_backup_missing_db(self, client, admin_csrf, monkeypatch):
+        monkeypatch.setattr('routes.DB_PATH', 'C:/nonexistent/nope.db')
+        resp = client.get(self.ENDPOINT, headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 404
+        assert 'не найден' in resp.get_json()['error']

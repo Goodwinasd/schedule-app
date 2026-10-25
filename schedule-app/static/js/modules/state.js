@@ -1,4 +1,4 @@
-/** @type {import('./types').AppState} */
+/** Единое мутабельное состояние SPA. */
 const state = {
     isAdmin: false,
     csrfToken: '',
@@ -18,6 +18,7 @@ const state = {
     currentScheduleId: null,
     currentScheduleName: '',
     currentMonday: null,
+    currentYear: new Date().getFullYear(),
     lessonsMap: {},
     availMode: 'teacher',
     availMonday: null,

@@ -5,7 +5,7 @@ import shutil
 import logging
 from datetime import datetime, timedelta
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flasgger import Swagger
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -14,7 +14,7 @@ from config import (
     SECRET_KEY, PERMANENT_SESSION_LIFETIME, BACKUPS_DIR, DB_PATH, DATA_DIR, DEBUG, HOST, PORT,
     TRASH_RETENTION_DAYS,
 )
-from db import create_backup, get_db, run_alembic_upgrade, ensure_curriculum_table, cleanup_orphan_schedule_records
+from db import create_backup, get_db, run_alembic_upgrade, ensure_curriculum_table, seed_specialties, cleanup_orphan_schedule_records
 from routes import bp
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,19 @@ app.secret_key = SECRET_KEY
 app.permanent_session_lifetime = PERMANENT_SESSION_LIFETIME
 CORS(app)
 app.register_blueprint(bp)
+
+# Не кэшировать статику (JS-модули, CSS, иконки): браузер всегда
+# запрашивает актуальную версию файлов, чтобы правки в ui.js и др.
+# отражались без ручной очистки кэша
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+@app.after_request
+def _no_cache_static(resp):
+    if request.path.startswith('/static/'):
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+    return resp
 
 Swagger(app)
 
@@ -92,6 +105,7 @@ if __name__ == '__main__':
     create_backup()
     run_alembic_upgrade()
     ensure_curriculum_table()
+    seed_specialties()
     cleanup_orphan_schedule_records()  # audit-only at startup (force_delete=False)
     _cleanup_old_deleted()
     app.run(debug=DEBUG, host=HOST, port=PORT)

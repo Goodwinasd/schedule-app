@@ -59,7 +59,8 @@ def get_db():
 
 
 def ensure_curriculum_table():
-    """Create the curriculum table if it doesn't exist."""
+    """Create the curriculum table if it doesn't exist (idempotent).
+    Also adds specialty_id / cycle / control_form columns to pre-existing tables."""
     conn = get_db()
     conn.execute('''CREATE TABLE IF NOT EXISTS curriculum (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,10 +70,71 @@ def ensure_curriculum_table():
         semester INTEGER NOT NULL DEFAULT 1,
         total_hours INTEGER NOT NULL DEFAULT 72,
         weeks_in_semester INTEGER NOT NULL DEFAULT 18,
+        specialty_id INTEGER,
+        cycle TEXT,
+        control_form TEXT,
         UNIQUE(group_id, subject_id, semester)
     )''')
+    cols = {r[1] for r in conn.execute('PRAGMA table_info(curriculum)').fetchall()}
+    for col, decl in (('specialty_id', 'specialty_id INTEGER'),
+                      ('cycle', 'cycle TEXT'),
+                      ('control_form', 'control_form TEXT')):
+        if col not in cols:
+            conn.execute(f'ALTER TABLE curriculum ADD COLUMN {decl}')
     conn.commit()
     conn.close()
+
+
+DEFAULT_SPECIALTIES = [
+    {'code': '40.02.02', 'name': 'Правоохранительная деятельность', 'qualification': 'Юрист'},
+    {'code': '40.02.04', 'name': 'Юриспруденция', 'qualification': 'Юрист в сфере социального обеспечения'},
+    {'code': '40.02.04', 'name': 'Юриспруденция', 'qualification': 'Юрист в сфере судебного администрирования'},
+    {'code': '40.02.04', 'name': 'Юриспруденция', 'qualification': 'Юрист в сфере правового обеспечения организаций и граждан'},
+    {'code': '38.02.01', 'name': 'Экономика и бухгалтерский учет (по отраслям)', 'qualification': 'Бухгалтер'},
+    {'code': '38.02.03', 'name': 'Операционная деятельность в логистике', 'qualification': 'Операционный логист'},
+]
+
+
+def seed_specialties():
+    """Добавить базовый набор специальностей техникума при старте (если таблица пуста)."""
+    try:
+        conn = get_db()
+        count = conn.execute("SELECT COUNT(*) FROM specialties WHERE deleted_at IS NULL").fetchone()[0]
+        if count > 0:
+            conn.close()
+            return
+        for spec in DEFAULT_SPECIALTIES:
+            conn.execute(
+                "INSERT INTO specialties (code, name, qualification) VALUES (?, ?, ?)",
+                (spec['code'], spec['name'], spec['qualification'])
+            )
+        conn.commit()
+        conn.close()
+        logger.info("Seeded %d default specialties", len(DEFAULT_SPECIALTIES))
+    except Exception as exc:
+        logger.warning("Could not seed specialties: %s", exc)
+
+
+def fix_lessons_group_id():
+    """Reconcile lessons.group_id from the real schedule_days.group_name -> groups_list mapping.
+    Ensures data integrity so group_id is always authoritative."""
+    try:
+        conn = get_db()
+        conn.execute('BEGIN')
+        conn.execute("""
+            UPDATE lessons
+            SET group_id = COALESCE(
+                (SELECT gl.id FROM schedule_days sd
+                 JOIN groups_list gl ON sd.group_name = gl.name AND gl.deleted_at IS NULL
+                 WHERE sd.id = lessons.day_id),
+                lessons.group_id
+            )
+        """)
+        conn.commit()
+        conn.close()
+        logger.info("Reconciled lessons.group_id with schedule_days/group_name mapping")
+    except Exception as exc:
+        logger.warning("Could not reconcile lessons.group_id: %s", exc)
 
 
 def ensure_teacher_tables():
@@ -99,7 +161,6 @@ def run_alembic_upgrade():
     Используется в production (app.py) и в тестах (conftest.py)."""
     from alembic.config import Config
     from alembic.command import upgrade
-    from sqlalchemy.pool import NullPool
     base = os.path.dirname(os.path.abspath(__file__))
     ini_path = os.path.join(base, 'alembic.ini')
     if not os.path.exists(ini_path):

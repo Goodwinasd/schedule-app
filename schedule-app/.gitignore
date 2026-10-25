@@ -36,3 +36,4 @@ yarn.lock
 # Build
 dist/
 build/
+*.db.bak_*

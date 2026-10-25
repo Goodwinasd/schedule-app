@@ -7,7 +7,13 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Расписание</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=29">
+    <meta name="description" content="Расписание занятий: группы, преподаватели, аудитории, свободные окна">
+    <!-- Пустая data:-иконка убирает 404 на /favicon.ico из каждой загрузки страницы -->
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/css/style.css?v=30">
+    <!-- Версия закреплена: без неё CDN отдавал «последнюю», и графики могли
+         перестать рисоваться после мажорного обновления Chart.js -->
+    <script defer crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -43,31 +49,41 @@
             </div>
             <div id="schedule-view" style="display:none">
                 <div id="week-carousel" class="week-carousel"></div>
+                <div class="schedule-actions">
+                    <div id="admin-panel" class="admin-panel" style="display:none">
+                        <button class="btn btn-primary btn-add-day" data-action="showAddWeekModal">
+                            ➕ Добавить неделю
+                        </button>
+                        <div class="dropdown" id="week-actions-dropdown">
+                            <button class="btn btn-ghost dropdown-toggle" type="button" data-dropdown-toggle="week-actions-dropdown">
+                                Управление неделей ▾
+                            </button>
+                            <div class="dropdown-menu">
+                                <button class="btn btn-ghost btn-block" data-action="restoreWeek">🔄 Восстановить неделю</button>
+                                <button class="btn btn-danger btn-block" data-action="deleteWeek">🗑️ Удалить неделю</button>
+                                <div class="dropdown-separator"></div>
+                                <button class="btn btn-ghost btn-block" data-action="generateFromCurriculum">🪄 Сгенерировать по плану</button>
+                                <button class="btn btn-ghost btn-block" data-action="generateMonth">🪄 Сгенерировать на месяц (4 недели)</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="print-panel" class="print-panel">
+                        <div class="dropdown" id="export-dropdown">
+                            <button class="btn btn-ghost dropdown-toggle" type="button" data-dropdown-toggle="export-dropdown">
+                                Экспорт ▾
+                            </button>
+                            <div class="dropdown-menu">
+                                <button class="btn btn-ghost btn-block" data-action="printSchedule">🖨 Печать</button>
+                                <button class="btn btn-ghost btn-block" data-action="smartExportExcel">📊 Excel</button>
+                                <button class="btn btn-ghost btn-block" data-action="exportSchedule" data-params='["docx"]'>📝 Word</button>
+                                <button class="btn btn-ghost btn-block" data-action="exportSchedule" data-params='["pdf"]'>📄 PDF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="schedule-status-bar" class="schedule-status-bar" style="display:none"></div>
                 <div id="schedule-table-container"></div>
                 <div id="plan-progress-box" class="plan-progress-box" style="display:none"></div>
-                <div id="admin-panel" class="admin-panel" style="display:none">
-                    <button class="btn btn-primary btn-add-day" data-action="showAddWeekModal">
-                        ➕ Добавить неделю
-                    </button>
-                    <button class="btn btn-ghost btn-restore-week" data-action="restoreWeek" style="margin-left:8px">
-                        🔄 Восстановить неделю
-                    </button>
-                    <button class="btn btn-danger btn-restore-week" data-action="deleteWeek" style="margin-left:8px">
-                        🗑️ Удалить неделю
-                    </button>
-                    <button class="btn btn-ghost" data-action="generateFromCurriculum" style="margin-left:8px">
-                        🪄 Сгенерировать по плану
-                    </button>
-                    <button class="btn btn-ghost" data-action="generateMonth" style="margin-left:8px">
-                        🪄 Сгенерировать на месяц (4 недели)
-                    </button>
-                </div>
-                <div id="print-panel" class="print-panel">
-                    <button class="btn btn-ghost btn-print" data-action="printSchedule">🖨 Печать</button>
-                    <button class="btn btn-ghost btn-print" data-action="smartExportExcel">📊 Excel</button>
-                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["docx"]'>📝 Word</button>
-                    <button class="btn btn-ghost btn-print" data-action="exportSchedule" data-params='["pdf"]'>📄 PDF</button>
-                </div>
             </div>
             <div id="availability-view" style="display:none">
                 <div class="avail-head">
@@ -97,14 +113,24 @@
                     </div>
                 </div>
                 <div id="avail-analytics"></div>
+                <div id="avail-charts" class="avail-charts">
+                    <div class="chart-card">
+                        <div class="chart-card-header">👨‍🏫 Загрузка преподавателей</div>
+                        <div class="chart-card-body"><canvas id="teachers-load-chart" role="img" aria-label="Загрузка преподавателей"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-card-header">🏫 Занятость аудиторий</div>
+                        <div class="chart-card-body"><canvas id="classrooms-load-chart" role="img" aria-label="Занятость аудиторий"></canvas></div>
+                    </div>
+                </div>
                 <div id="avail-table-container"></div>
             </div>
         </main>
     </div>
-    <div id="modal-overlay" class="modal-overlay" data-action="closeModals"></div>
-    <div id="confirm-modal" class="modal" style="display:none">
+    <div id="modal-overlay" class="modal-overlay" data-action="closeModals" role="presentation"></div>
+    <div id="confirm-modal" class="modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <div class="modal-content">
-            <h2>Подтверждение</h2>
+            <h2 id="confirm-modal-title">Подтверждение</h2>
             <p id="confirm-modal-message" class="modal-confirm-msg"></p>
             <div class="modal-actions">
                 <button class="btn btn-ghost" id="confirm-modal-cancel">Отмена</button>
@@ -112,10 +138,11 @@
             </div>
         </div>
     </div>
-    <div id="login-modal" class="modal" style="display:none">
+    <div id="login-modal" class="modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
         <div class="modal-content">
-            <h2>Вход</h2>
-            <input type="password" id="login-password" placeholder="Пароль" class="input">
+            <h2 id="login-modal-title">Вход</h2>
+            <label class="field-label" for="login-password">Пароль администратора</label>
+            <input type="password" id="login-password" placeholder="Пароль" class="input" autocomplete="current-password">
             <div class="modal-actions">
                 <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
                 <button class="btn btn-primary" data-action="login">🔒 Войти</button>
@@ -172,14 +199,24 @@
             </select>
             <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-                <input type="checkbox" id="lesson-is-substitution" onchange="document.getElementById('substitution-fields').style.display=this.checked?'':'none'">
-                Это замена (больничный)
+                <input type="checkbox" id="lesson-is-substitution" onchange="document.getElementById('substitution-fields').style.display=this.checked?'':'none'; if(this.checked) refreshSubstitutionSuggest()">
+                Назначить замену
             </label>
             <div id="substitution-fields" style="display:none;margin-top:8px">
                 <label class="field-label">Причина замены</label>
                 <input type="text" id="lesson-substitution-reason" class="input" placeholder="Например: больничный, отпуск" style="max-width:300px">
-                <label class="field-label">Исходный преподаватель</label>
+                <label class="field-label">Основной преподаватель (болеет)</label>
                 <select id="lesson-original-teacher" class="input" style="max-width:250px"><option value="">— не указан —</option></select>
+                <div id="substitution-suggest-block" style="margin-top:10px">
+                    <label class="field-label" for="lesson-substitution-select">Свободные преподаватели на эту пару</label>
+                    <div class="field-row" style="margin-bottom:4px">
+                        <select id="lesson-substitution-select" class="input" onchange="pickSubstituteTeacher(this.value)">
+                            <option value="">— выберите заменяющего —</option>
+                        </select>
+                        <button class="btn btn-ghost btn-sm" type="button" data-action="refreshSubstitutionSuggest">💡 Обновить</button>
+                    </div>
+                    <div class="field-note" id="substitution-note"></div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" data-action="deleteCurrentLesson">Удалить</button>
@@ -204,8 +241,13 @@
                 <button class="admin-tab" draggable="true" data-tab="trash" data-tooltip="Восстановление удалённых записей" data-action="switchAdminTab" data-params='["trash"]'><span class="tab-grip">⠿</span> Корзина</button>
                 <button class="admin-tab" draggable="true" data-tab="system" data-tooltip="Настройки и диагностика БД" data-action="switchAdminTab" data-params='["system"]'><span class="tab-grip">⠿</span> Система</button>
                 <button class="admin-tab" draggable="true" data-tab="curriculum" data-tooltip="Учебные планы групп" data-action="switchAdminTab" data-params='["curriculum"]'><span class="tab-grip">⠿</span> 📚 Планы</button>
+                <button class="admin-tab" draggable="true" data-tab="specialties" data-tooltip="Специальности и квалификации" data-action="switchAdminTab" data-params='["specialties"]'><span class="tab-grip">⠿</span> 🎓 Специальности</button>
             </div>
             <div id="admin-tab-refs" class="admin-tab-content tab-content active">
+                <div class="ref-import-bar">
+                    <button type="button" class="btn btn-primary" id="btn-import-excel" data-action="openImportModal">📥 Импорт из Excel</button>
+                    <span class="ref-import-hint">Загрузите справочники (преподаватели, кабинеты, группы, предметы) из файла .xlsx</span>
+                </div>
                 <div class="ref-grid">
                 <div class="ref-section">
                     <h3>Предметы</h3>
@@ -226,7 +268,10 @@
                     </div>
                 </div>
                 <div class="ref-section">
-                    <h3>Группы</h3>
+                    <h3 class="ref-section-head">
+                        <span>Группы</span>
+                        <button type="button" class="btn btn-ghost btn-xs" data-action="advanceCourses" title="Перевести все курсы на следующий (+1); группы 4 курса будут удалены">Перевести курсы →</button>
+                    </h3>
                     <div class="ref-list" id="ref-groups"></div>
                     <div class="field-row">
                         <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input" style="max-width:140px">
@@ -236,10 +281,10 @@
                             <option value="3">3 курс</option>
                             <option value="4">4 курс</option>
                         </select>
+                        <select id="ref-groups-specialty" class="input ref-specialty-select"><option value="">Без специальности</option></select>
                         <label class="checkbox-label"><input type="checkbox" id="ref-groups-distance"> Заочн.</label>
                         <button class="btn btn-primary btn-sm" data-action="addGroup">Добавить</button>
                     </div>
-                    <button class="btn btn-ghost btn-sm" style="margin-top:8px;color:var(--accent)" data-action="advanceCourses">Перевести курсы →</button>
                 </div>
                 <div class="ref-section">
                     <h3>Аудитории</h3>
@@ -249,6 +294,18 @@
                         <button class="btn btn-primary btn-sm" data-action="addRefItem" data-params='["classrooms", "ref-classrooms-input", "ref-classrooms"]'>Добавить</button>
                     </div>
                 </div>
+                </div>
+            </div>
+            <div id="admin-tab-specialties" class="admin-tab-content tab-content">
+                <div class="ref-section">
+                    <h3>Специальности</h3>
+                    <div class="ref-list" id="ref-specialties"></div>
+                    <div class="field-row">
+                        <input type="text" id="ref-specialties-code" placeholder="Код (напр. 40.02.04)" class="input" style="max-width:130px">
+                        <input type="text" id="ref-specialties-name" placeholder="Название специальности" class="input">
+                        <input type="text" id="ref-specialties-qualification" placeholder="Направленность / квалификация" class="input" style="max-width:230px">
+                        <button class="btn btn-primary btn-sm" data-action="addSpecialty">Добавить</button>
+                    </div>
                 </div>
             </div>
             <div id="admin-tab-trash" class="admin-tab-content tab-content">
@@ -265,6 +322,8 @@
                 <h3>Настройки</h3>
                 <div id="settings-content"></div>
                 <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+                <div id="bell-schedule-content"></div>
+                <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
                 <div id="excluded-dates-content"></div>
             </div>
             <div id="admin-tab-curriculum" class="admin-tab-content tab-content">
@@ -273,10 +332,38 @@
             </div>
         </div>
     </div>
+    <div id="import-modal" class="modal modal-wide modal-admin hidden" style="display:none">
+        <div class="modal-content modal-wide t-modal">
+            <div class="ref-header">
+                <h2>📥 Импорт из Excel</h2>
+                <button type="button" class="ref-done" data-action="closeImportModal">Закрыть</button>
+            </div>
+            <div style="padding:16px 20px">
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Выберите тип данных, скачайте шаблон, заполните его и загрузите файл (.xlsx). Пустые строки и дубликаты будут пропущены.</div>
+                <div class="field-row" style="margin-bottom:12px">
+                    <select id="import-entity-type" class="input" style="max-width:200px">
+                        <option value="teachers">Преподаватели</option>
+                        <option value="classrooms">Кабинеты</option>
+                        <option value="groups">Группы</option>
+                        <option value="subjects">Предметы</option>
+                    </select>
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="downloadImportTemplate">📥 Скачать шаблон Excel</button>
+                </div>
+                <div class="field-row">
+                    <input type="file" id="import-file" accept=".xlsx" class="input" style="max-width:320px">
+                    <button type="button" class="btn btn-primary btn-sm" data-action="uploadImportExcel">Загрузить</button>
+                </div>
+                <div id="import-result" style="margin-top:12px;font-size:13px"></div>
+                <div class="modal-actions" style="justify-content:flex-end;margin-top:4px">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="closeImportModal">Отмена</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div id="print-header" class="print-header">
         <h1 id="print-title"></h1>
         <p id="print-subtitle"></p>
     </div>
-    <script type="module" src="/static/js/modules/main.js?v=2"></script>
+    <script type="module" src="/static/js/modules/main.js?v=3"></script>
 </body>
 </html>

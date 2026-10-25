@@ -1,20 +1,66 @@
-# schedule-app — project context for agents
+# AGENTS.md — правила работы агента с проектом `schedule-app`
 
-DO NOT re-scan or re-discover the codebase on session start. Use the `schedule-app` skill instead.
+Этот файл читается агентом перед каждой задачей. Если правило противоречит
+пользовательскому запросу — **побеждает правило**, агент обязан спросить.
 
-## Token rules
-- Return diffs only — never full files.
-- Read only the lines you need, not whole files.
-- Do NOT glob/grep for structure; use the skill's file table.
+---
 
-## Execution
-- After any Python edit: `pytest tests/ -v` (144 must pass).
-- Never commit unless told.
-- Use `graphify` skill for architecture questions.
+## 1. Что это за проект (минимум контекста)
 
-## Key facts
-- Flask + SQLite, 144 tests, 5 commits, last = `5e5aae5`
-- Migration head: `a1b2c3d4e5f6` (substitution fields), linear chain
-- Event bus: `DATA_MUTATED` → all UI refreshes
-- CSRF on write endpoints, soft-delete via `deleted_at`
-- Recent feature: auto-generator (`generator.py`) + substitutions (is_substitution/original_teacher_id/substitution_reason on lessons)
+- Flask + SQLite (WAL) + Alembic, ванильный JS SPA (ES-модули, без сборщика).
+- Однопользовательское приложение: один администратор, вход по паролю из `.env`.
+- ~8 тыс. строк: `routes.py` (~3.6k, god-модуль), 16 JS-модулей (~3.6k), `style.css` (~3k).
+- Платформа разработки: **Windows** (`.bat`-скрипты, пути `C:\...`). Шелл — PowerShell/cmd, не bash.
+- Полный аудит проекта — в `docs/analysis.md`. Перед крупной задачей прочитать
+  раздел, относящийся к задаче, а не весь файл.
+
+---
+
+## 2. Жёсткие запреты (нарушение = стоп, доложить пользователю)
+
+1. **Не трогать `.env`.** Ни читать в вывод, ни редактировать, ни коммитить.
+   Если задача требует изменения `.env` — остановиться и попросить пользователя.
+2. **Не трогать `data/` и `backups/`.** Это боевая БД и её бэкапы.
+   - Никогда не вызывать `POST /api/admin/backup/restore` против `data/schedule.db`.
+   - Тесты restore — только против временной копии во временной папке.
+3. **Не выполнять разрушительные git-команды:**
+   `git reset --hard`, `git clean -fd`, `git push --force`, `git checkout .`,
+   `git branch -D` для чужих веток, `git rebase` без явного разрешения.
+4. **Не коммитить самовольно.** Порядок: правка → `git diff` → тесты →
+   показать пользователю → дождаться «ок» → коммит.
+5. **Не запускать `restart.bat`** — там `taskkill /f /im python.exe`, он убивает
+   все Python-процессы на машине, включая чужие.
+6. **Не менять схему БД** (миграции, `ensure_*`, `CREATE TABLE`) без отдельной
+   задачи и без прогона `alembic upgrade head` на пустой БД.
+7. **Не рефакторить «по пути».** Чинишь CSRF-токен — не разбивай `routes.py`
+   на blueprint'ы. Рефакторинг — только отдельная задача.
+8. **Не устанавливать зависимости** и не менять `requirements.txt` без разрешения.
+
+---
+
+## 3. Рабочий процесс (одна задача = одна ветка = один коммит)
+
+```bat
+:: 1. старт задачи
+git status
+git checkout main
+git checkout -b fix/<кратко-о-задаче>
+
+:: 2. работа (агент правит, пользователь смотрит diff)
+
+:: 3. проверка
+git diff
+pytest tests/ -k <релевантное> -q
+
+:: 4. после «ок» от пользователя
+git add -A
+git commit -m "fix: <что и зачем>"
+
+:: 5. работает — влить
+git checkout main
+git merge --no-ff fix/<кратко-о-задаче>
+git tag working-YYYY-MM-DD
+
+:: 6. не работает — выбросить
+git checkout main
+git branch -D fix/<кратко-о-задаче>

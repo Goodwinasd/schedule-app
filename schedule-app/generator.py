@@ -1,13 +1,20 @@
 import logging
 import random
 from datetime import datetime, timedelta
-from db import get_db
-from utils import _validate_lesson_data, _validate_slot_3d
+from utils import _validate_slot_3d
 
 logger = logging.getLogger(__name__)
 
 DAY_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
 BELL_SCHEDULE = list(range(1, 9))
+
+MAX_PAIRS_WEEKDAY = 4
+MAX_PAIRS_SATURDAY = 3
+
+
+def _max_pairs_per_day(day_idx):
+    """Дневной лимит нагрузки группы: будни — до 4 пар, суббота — облегчённый режим до 3 пар."""
+    return MAX_PAIRS_SATURDAY if day_idx == 5 else MAX_PAIRS_WEEKDAY
 
 
 def _build_week_dates(monday_str):
@@ -24,7 +31,7 @@ def _get_or_create_day(conn, date_str, group_name):
         return row['id']
     day_name = DAY_ORDER[datetime.strptime(date_str, '%Y-%m-%d').weekday()]
     cur = conn.execute(
-        "INSERT INTO schedule_days (day_name, date, group_name) VALUES (?, ?, ?)",
+        "INSERT INTO schedule_days (day_name, date, group_name, is_published) VALUES (?, ?, ?, 0)",
         (day_name, date_str, group_name)
     )
     return cur.lastrowid
@@ -117,6 +124,46 @@ def _resolve_teacher_substitution(conn, subject_id, primary_teacher_id, group_id
     return None, None, False
 
 
+def _mirror_target_groups(conn, group_name):
+    """Связанные группы-дублёры для составного потока (маркер '+', например '02-0923+11/24')."""
+    if '+' not in group_name:
+        return []
+    targets = []
+    for part in group_name.split('+'):
+        part = part.strip()
+        if not part or part == group_name:
+            continue
+        row = conn.execute(
+            "SELECT id, name FROM groups_list WHERE name = ? AND deleted_at IS NULL LIMIT 1",
+            (part,)
+        ).fetchone()
+        if row:
+            targets.append(row)
+    return targets
+
+
+def _mirror_week_lessons(conn, group_name, placed):
+    """Дублирует созданные пары в группы-дублёры составного потока
+    с теми же датами, периодами, преподавателями и аудиториями."""
+    targets = _mirror_target_groups(conn, group_name)
+    if not targets or not placed:
+        return 0
+    mirrored = 0
+    for target in targets:
+        for date_str, period, subj_id, teacher_id, classroom_id, is_sub, original_tid in placed:
+            conflicts, blocking = _validate_slot_3d(conn, date_str, period, target['id'])
+            if blocking:
+                continue
+            day_id = _get_or_create_day(conn, date_str, target['name'])
+            conn.execute('''
+                INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, group_id,
+                                     is_substitution, original_teacher_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (day_id, period, subj_id, teacher_id, classroom_id, target['id'], int(is_sub), original_tid))
+            mirrored += 1
+    return mirrored
+
+
 def generate_schedule(conn, group_id, group_name, semester, monday_str, week_count):
     curriculum = conn.execute('''
         SELECT c.*, s.name AS subject_name, t.name AS teacher_name
@@ -130,8 +177,8 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         return {'created': 0, 'errors': ['No curriculum found for this group/semester']}
 
     created = 0
+    mirrored = 0
     errors = []
-    from math import ceil
 
     # Determine course to clamp allowed periods
     group_row = conn.execute(
@@ -146,7 +193,6 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
 
     # Build a flat pool of (subject_id, teacher_id, priority) pairs to place each week.
     # priority = pace delta (lower = more behind → scheduled first).
-    from math import ceil as _ceil
     for wi, week_dates in enumerate(weeks_dates):
         pool = []
         # Compute total semester load for the plan to derive expected pace
@@ -204,11 +250,17 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         else:
             day_order = [0, 1, 2, 3, 4, 5]
 
-        # Round-robin: distribute pool across 6 days
-        # Day assignment cycles through day_order, wrapping by modulo 6
+        # Round-robin: distribute pool across 6 days, respecting daily load limits
+        # (weekdays ≤ 4 pairs, Saturday ≤ 3 pairs); excess rolls over to days with free capacity
         day_lessons = [[] for _ in range(6)]
         for i, (subj_id, teach_id, _prio) in enumerate(pool):
-            day_lessons[day_order[i % 6]].append((subj_id, teach_id, _prio))
+            for offset in range(6):
+                day_idx = day_order[(i + offset) % 6]
+                if len(day_lessons[day_idx]) < _max_pairs_per_day(day_idx):
+                    day_lessons[day_idx].append((subj_id, teach_id, _prio))
+                    break
+            else:
+                errors.append(f"Неделя {week_dates[0]}: дневные лимиты нагрузки переполнены, пара ({subj_id}) не размещена")
 
         # Controlled Shift Drift: choose start period per day (seeded, weighted)
         def pick_start_period(day_idx):
@@ -225,10 +277,14 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             else:
                 return drng.choice([4, 5])
 
+        placed = []  # (date, period, subject, teacher, classroom, is_sub, original_teacher) for mirroring
         for day_idx, lessons in enumerate(day_lessons):
             if not lessons:
                 continue
             date_str = week_dates[day_idx]
+            # 1 сентября — линейка/организационные мероприятия ТОЛЬКО для 1-го курса
+            if is_first_course and date_str.endswith('-09-01'):
+                continue
             if _is_holiday(conn, date_str):
                 continue
             day_id = _get_or_create_day(conn, date_str, group_name)
@@ -239,6 +295,9 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             # Sequential block from start_period (Fallback: drop to earlier/window-safe slots on collision)
             period = start_period
             placed_in_day = 0
+            # Защита от бесконечного цикла: если одна и та же пара не помещается
+            # после большого числа попыток (все периоды заняты), пропускаем её.
+            block_attempts = 0
             while lessons and placed_in_day < block_count:
                 if period > 8:
                     # Ran out of periods; fallback to earliest free slot 1..8
@@ -254,6 +313,12 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                     conn, subj_id, primary_tid, group_id, date_str, period
                 )
                 if actual_tid is None:
+                    subject_name = next((c['subject_name'] or f'#{subj_id}' for c in curriculum if c['subject_id'] == subj_id), f'#{subj_id}')
+                    teacher_name = next((c['teacher_name'] or f'#{primary_tid}' for c in curriculum if c['teacher_id'] == primary_tid), f'#{primary_tid}')
+                    errors.append(
+                        f"Неделя {week_dates[0]}, {date_str}: преподаватель «{teacher_name}» отсутствует, "
+                        f"замена по предмету «{subject_name}» не найдена — пара пропущена"
+                    )
                     lessons.pop(0)  # no substitute — skip this pair
                     placed_in_day += 1
                     continue
@@ -271,6 +336,7 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                           int(is_sub), original_tid))
                     created += 1
                     last_classroom_id = classroom_id
+                    placed.append((date_str, period, subj_id, actual_tid, classroom_id, is_sub, original_tid))
                     lessons.pop(0)
                     placed_in_day += 1
                     period += 1
@@ -283,5 +349,20 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                         period = fallback_period
                     else:
                         period += 1  # advance to avoid infinite loop
+                    # Если пара бьётся слишком долго — признак заполненного дня:
+                    # пропускаем её, а не зависаем в цикле (периоды 1<->2 не совпадают).
+                    block_attempts += 1
+                    if block_attempts > 40:
+                        subj_name_blocked = next((c['subject_name'] for c in curriculum if c['subject_id'] == subj_id), subj_id)
+                        errors.append(
+                            f"Неделя {week_dates[0]}, {date_str}: не удалось разместить пару "
+                            f"«{subj_name_blocked}» — все периоды дня заняты"
+                        )
+                        lessons.pop(0)
+                        placed_in_day += 1
+                        block_attempts = 0
 
-    return {'created': created, 'errors': errors}
+        # Post-processing: mirror week's pairs to linked groups of a composite stream (e.g. '02-0923+11/24')
+        mirrored += _mirror_week_lessons(conn, group_name, placed)
+
+    return {'created': created, 'mirrored': mirrored, 'errors': errors}

@@ -26,6 +26,7 @@ def app():
     db_module.run_alembic_upgrade()
     db_module.ensure_curriculum_table()
     db_module.ensure_teacher_tables()
+    db_module.fix_lessons_group_id()
 
     from app import app as flask_app
     flask_app.testing = True
@@ -49,7 +50,13 @@ def app():
 
 
 @pytest.fixture(autouse=True)
-def clean_db_before_test():
+def clean_db_before_test(request):
+    if 'e2e' in request.keywords:
+        yield
+        return
+    if 'bell_db' in request.fixturenames:
+        yield
+        return
     _clean_tables()
     yield
 
@@ -75,11 +82,17 @@ def db():
 
 def _clean_tables():
     import sqlite3
+    # ЗАЩИТА: тестовая очистка разрешена только для временного файла БД.
+    # Если config.DB_PATH не находится в системном temp-каталоге — это основная
+    # рабочая БД разработки, её трогать нельзя (иначе можно потерять все данные).
+    if not os.path.abspath(config.DB_PATH).startswith(os.path.abspath(tempfile.gettempdir())):
+        raise RuntimeError(f"Refusing to clean non-temp DB: {config.DB_PATH}")
     try:
         conn = db_module.get_db()
         tables = ['lesson_history', 'lessons', 'schedule_days', 'groups_list',
                   'classrooms_list', 'subjects', 'teachers', 'excluded_dates',
-                  'settings', 'curriculum', 'teacher_absences', 'teacher_subjects']
+                  'settings', 'curriculum', 'teacher_absences', 'teacher_subjects',
+                  'specialties']
         for t in tables:
             conn.execute(f'DELETE FROM {t}')
         conn.execute("INSERT INTO settings (key, value) VALUES ('session_lifetime', '3600')")
@@ -88,6 +101,11 @@ def _clean_tables():
         conn.execute("INSERT INTO settings (key, value) VALUES ('backup_retention_days', '30')")
         conn.commit()
         conn.close()
+        config.sync_settings_from_db()
+        # Кэш справочников живёт в памяти процесса: без сброса следующий тест
+        # получал список из предыдущего (пустой или с чужими id).
+        from cache import refs_cache
+        refs_cache.invalidate()
     except sqlite3.OperationalError:
         pass
 
@@ -108,9 +126,9 @@ def _seed_refs():
 
 def _seed_days():
     conn = db_module.get_db()
-    conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name) VALUES (1, 'Понедельник', '2026-09-07', 0, 'Группа-1')")
-    conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name) VALUES (2, 'Вторник', '2026-09-08', 1, 'Группа-1')")
-    conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name) VALUES (3, 'Понедельник', '2026-09-14', 2, 'Группа-1')")
+    conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name, is_published) VALUES (1, 'Понедельник', '2026-09-07', 0, 'Группа-1', 1)")
+    conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name, is_published) VALUES (2, 'Вторник', '2026-09-08', 1, 'Группа-1', 1)")
+    conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name, is_published) VALUES (3, 'Понедельник', '2026-09-14', 2, 'Группа-1', 1)")
     conn.commit()
     conn.close()
 

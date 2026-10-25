@@ -1,4 +1,4 @@
-
+﻿
 * {
     margin: 0;
     padding: 0;
@@ -6,17 +6,29 @@
 }
 
 :root {
-    --bg: #F7F8FA;
+    --bg: #F4F7F8;
+    --bg-main: #F4F7F8;
     --resize-dur: 300ms;
     --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-spring: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 
     --surface: #FFFFFF;
-    --surface-hover: #F0F0F5;
-    --text: #1D1D1F;
-    --text-secondary: #86868B;
-    --accent: #5B8C7A;
-    --accent-hover: #4A7A68;
-    --border: #E5E5EA;
+    --bg-card: #FFFFFF;
+    --surface-hover: #E8F0F2;
+    --bg-hover: #E8F0F2;
+    --text: #07191E;
+    --text-main: #07191E;
+    --text-secondary: #5A7078;
+    --text-muted: #5A7078;
+    --accent: #02F5A1;
+    --color-primary: #02F5A1;
+    --accent-hover: #00DB8F;
+    --color-primary-hover: #00DB8F;
+    --text-on-primary: #07191E;
+    --link-color: #00B876;
+    --border: #D3E0E3;
+    --border-color: #D3E0E3;
+    --card-shadow: 0 4px 12px rgba(7, 25, 30, 0.06);
     --danger: #ff453a;
     --danger-hover: #d63a31;
     --radius: 16px;
@@ -50,24 +62,44 @@
     --print-bg-light: #F4F6F5;
     --print-bg-cell: #F4F6F5;
     --print-text-dark: #1D2A24;
+
+    --color-success: #22c55e;
+    --color-success-glow: rgba(34, 197, 94, 0.25);
+    --color-warning: #f59e0b;
+    --color-warning-glow: rgba(245, 158, 11, 0.25);
+    --color-danger: #f43f5e;
+    --color-danger-glow: rgba(244, 63, 94, 0.25);
+    --color-accent: #6366f1;
+    --color-accent-glow: rgba(99, 102, 241, 0.25);
 }
 
 [data-theme="dark"] {
-    --bg: #0d0d0d;
-    --surface: #1a1a1a;
-    --surface-hover: #2a2a2a;
-    --text: #e0e0e0;
-    --text-secondary: #9e9e9e;
-    --accent: #6BAF8E;
-    --accent-hover: #5A9E7D;
-    --border: #333333;
+    --bg: #080c14;
+    --bg-main: #080c14;
+    --surface: #111827;
+    --bg-card: #111827;
+    --surface-hover: #1f2937;
+    --bg-hover: #1f2937;
+    --text: #FFFFFF;
+    --text-main: #FFFFFF;
+    --text-secondary: #9BB0B8;
+    --text-muted: #9BB0B8;
+    --accent: #02F5A1;
+    --color-primary: #02F5A1;
+    --accent-hover: #35F7B3;
+    --color-primary-hover: #35F7B3;
+    --text-on-primary: #07191E;
+    --link-color: #35F7B3;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
     --danger: #ff6b6b;
     --danger-hover: #e05555;
     --busy: rgba(255, 69, 58, 0.25);
     --busy-border: rgba(255, 69, 58, 0.45);
-    --header-bg: rgba(26, 26, 26, 0.88);
-    --input-bg: #2a2a2a;
-    --skeleton-bg: #2a2a2a;
+    --header-bg: rgba(17, 24, 39, 0.82);
+    --input-bg: #111827;
+    --skeleton-bg: #1f2937;
     --overlay-bg: rgba(0, 0, 0, 0.75);
     --busy-text: #ff6b6b;
     --busy-meta: #ff9999;
@@ -118,6 +150,135 @@
     --blur-large: 8px;
 }
 
+/* ==================== Дизайн-система (шаг 2) ====================
+   Новые токены добавлены РЯДОМ со старыми: исторические имена ниже связаны
+   с ними алиасами, поэтому остальные ~2700 строк CSS работают без правок.
+   Значения радиусов и теней подобраны так, чтобы этот шаг не двигал вёрстку. */
+:root {
+    /* Поверхности и текст */
+    --color-bg: #F7F8FA;
+    --color-surface: #FFFFFF;
+    --color-surface-2: #F2F4F7;
+    --color-surface-hover: #EEF1F5;
+    --color-border: #E4E7EC;
+    --color-border-strong: #D0D5DD;
+    --color-text: #101828;
+    --color-text-secondary: #667085;
+    --color-text-muted: #98A2B3;
+
+    /* Акцент: 500 — фон кнопки, 600 — hover, 700 — текст/ссылки (контраст ≥ 4.5:1) */
+    --accent-500: #00B87A;
+    --accent-600: #009E69;
+    --accent-700: #047857;
+    --accent-soft: rgba(0, 184, 122, 0.10);
+    --accent-on: #06231A;
+
+    /* Семантика */
+    --color-success: #12B76A;
+    --color-success-hover: #0E9F5B;
+    --color-warning: #F79009;
+    --color-warning-hover: #DC6803;
+    --color-danger: #F04438;
+    --color-info: #2E90FA;
+    --color-on-solid: #FFFFFF;
+
+    /* Типографика */
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --text-xs: 11px;
+    --text-sm: 13px;
+    --text-base: 14px;
+    --text-md: 16px;
+    --text-lg: 18px;
+    --text-xl: 22px;
+    --leading-tight: 1.25;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.6;
+
+    /* Отступы: шаг 4px */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+
+    /* Радиусы и тени */
+    --radius-xs: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 999px;
+    --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.06);
+    --shadow-sm: 0 4px 12px rgba(16, 24, 40, 0.08);
+    --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.12);
+    --shadow-lg: 0 20px 40px -12px rgba(16, 24, 40, 0.18);
+    --shadow-inset: inset 0 0 0 2px rgba(0, 0, 0, 0.15);
+
+    /* Контролы, фокус, движение */
+    --control-h-sm: 32px;
+    --control-h: 36px;
+    --control-h-lg: 40px;
+    --focus-ring: 0 0 0 3px rgba(0, 184, 122, 0.30);
+    --duration: 150ms;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-theme="dark"] {
+    --color-bg: #0B0F14;
+    --color-surface: #121821;
+    --color-surface-2: #1A2230;
+    --color-surface-hover: #1F2937;
+    --color-border: #253040;
+    --color-border-strong: #33415C;
+    --color-text: #E7ECF2;
+    --color-text-secondary: #9AA7B6;
+    --color-text-muted: #6B7A8C;
+    --accent-500: #2DD4A0;
+    --accent-600: #4CE0B3;
+    --accent-700: #3EE0AC;
+    --accent-soft: rgba(45, 212, 160, 0.14);
+    --accent-on: #08150F;
+    --color-success: #32D583;
+    --color-success-hover: #4ADE9B;
+    --color-warning: #FDB022;
+    --color-warning-hover: #FEC84B;
+    --color-danger: #F97066;
+    --color-info: #53B1FD;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.50);
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 24px 48px -16px rgba(0, 0, 0, 0.70);
+    --shadow-inset: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+    --focus-ring: 0 0 0 3px rgba(45, 212, 160, 0.35);
+}
+
+/* Алиасы: исторические имена → новые токены. Объявлены после обоих тем,
+   поэтому переключение темы продолжает работать через var()-резолвинг. */
+:root {
+    --bg: var(--color-bg);
+    --bg-main: var(--color-bg);
+    --surface: var(--color-surface);
+    --bg-card: var(--color-surface);
+    --surface-hover: var(--color-surface-hover);
+    --bg-hover: var(--color-surface-hover);
+    --text: var(--color-text);
+    --text-main: var(--color-text);
+    --text-secondary: var(--color-text-secondary);
+    --text-muted: var(--color-text-muted);
+    --accent: var(--accent-500);
+    --color-primary: var(--accent-500);
+    --accent-hover: var(--accent-600);
+    --color-primary-hover: var(--accent-600);
+    --text-on-primary: var(--accent-on);
+    --link-color: var(--accent-700);
+    --border: var(--color-border);
+    --border-color: var(--color-border);
+    --card-shadow: var(--shadow-sm);
+    --radius: var(--radius-lg);
+    --danger: var(--color-danger);
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background: var(--bg);
@@ -139,11 +300,11 @@ header {
 }
 
 header .btn-ghost {
-    color: var(--accent);
+    color: var(--link-color);
 }
 
 header .btn-ghost:hover {
-    color: var(--accent-hover);
+    color: var(--link-color);
     background: var(--surface-hover);
 }
 
@@ -164,7 +325,7 @@ header .btn-ghost:hover {
 }
 
 .header-content h1:hover {
-    color: var(--accent);
+    color: var(--link-color);
 }
 
 .header-actions {
@@ -195,7 +356,7 @@ main {
 
 .btn-primary {
     background: var(--accent);
-    color: white;
+    color: var(--text-on-primary);
     font-weight: 600;
 }
 
@@ -218,12 +379,60 @@ main {
 
 .btn-danger {
     background: var(--danger);
-    color: white;
+    color: var(--color-on-solid);
     font-weight: 600;
 }
 
 .btn-danger:hover {
     background: var(--danger-hover);
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.btn-outline:hover {
+    color: var(--text);
+    background: var(--surface-hover);
+    border-color: var(--accent);
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.btn-outline-secondary:hover {
+    color: var(--text);
+    background: var(--surface-hover);
+}
+
+.btn-success {
+    background: var(--color-success);
+    color: var(--color-on-solid);
+    font-weight: 600;
+}
+
+.btn-success:hover {
+    background: var(--color-success-hover);
+}
+
+.btn-warning {
+    background: var(--color-warning);
+    color: var(--color-on-solid);
+    font-weight: 600;
+}
+
+.btn-warning:hover {
+    background: var(--color-warning-hover);
+}
+
+.btn.active {
+    box-shadow: var(--shadow-inset);
+    transform: translateY(1px);
 }
 
 .btn-sm {
@@ -246,7 +455,7 @@ main {
 }
 
 .input:focus {
-    box-shadow: 0 0 0 2px var(--accent);
+    box-shadow: var(--focus-ring);
 }
 
 .input:disabled {
@@ -293,12 +502,12 @@ main {
     padding: 20px 24px;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-sm);
 }
 
 .select-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-md);
 }
 
 .select-card-title {
@@ -327,7 +536,7 @@ main {
 .course-subtitle {
     font-size: 16px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--link-color);
     margin-bottom: 16px;
     letter-spacing: -0.01em;
 }
@@ -343,43 +552,53 @@ main {
 .carousel-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .carousel-arrow {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    display: flex;
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 12px;
-    color: var(--text);
-    font-size: 18px;
+    color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(91, 140, 122, 0.04);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .carousel-arrow:hover {
     background: var(--surface-hover);
-    color: var(--accent);
-    box-shadow: 0 4px 16px rgba(91, 140, 122, 0.08);
+    border-color: var(--accent);
+    color: var(--link-color);
+    box-shadow: 0 4px 16px rgba(2, 245, 161, 0.12);
+    transform: translateY(-1px);
+}
+
+.carousel-arrow:active {
+    transform: translateY(0);
 }
 
 .carousel-arrow.disabled {
     opacity: 0.35;
     cursor: not-allowed;
     pointer-events: none;
+    box-shadow: none;
+    transform: none;
 }
 
 .carousel-strip {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
     display: flex;
     gap: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
     padding: 8px 4px;
+    scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
@@ -412,7 +631,57 @@ main {
 
 .carousel-chip.active .chip-week,
 .carousel-chip.active .chip-range {
-    color: white;
+    color: var(--text-on-primary);
+}
+
+.carousel-chip.current-week {
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.carousel-chip.current-week .chip-range::after {
+    content: ' • сейчас';
+    color: var(--link-color);
+    font-weight: 600;
+}
+
+.chip-indicator {
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.chip-indicator.filled {
+    color: var(--color-primary);
+}
+
+.carousel-chip.active .chip-indicator {
+    color: var(--text-on-primary);
+}
+
+.carousel-year,
+#carousel-year,
+#year-select {
+    flex: 0 0 82px;
+    width: 82px;
+    min-width: 82px;
+    max-width: 82px;
+    padding: 6px 22px 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-sizing: border-box;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.btn-today {
+    flex-shrink: 0;
+    padding: 6px 12px;
 }
 
 .chip-week {
@@ -430,6 +699,40 @@ main {
 }
 
 /* ---- Schedule Table ---- */
+
+.schedule-status-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 10px 0;
+}
+
+.schedule-status-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.publish-group {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.publish-group .btn {
+    border: none;
+    border-radius: 0;
+    min-height: 32px;
+    padding: 6px 14px;
+}
+
+.publish-group .btn.btn-outline-secondary {
+    border-left: 1px solid var(--border);
+}
+
+.publish-group .btn.active {
+    transform: none;
+}
 
 .schedule-table-wrap {
     overflow-x: auto;
@@ -483,13 +786,13 @@ main {
 }
 
 .schedule-table tbody tr.shift-row td {
-    background: rgba(91, 140, 122, 0.06);
+    background: rgba(2, 245, 161, 0.06);
     padding: 8px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--accent);
+    color: var(--link-color);
     border-bottom: 1px solid var(--border);
 }
 
@@ -529,7 +832,7 @@ main {
 }
 
 .schedule-table tbody td.day-cell.addable-cell:hover {
-    background: rgba(91, 140, 122, 0.08);
+    background: rgba(2, 245, 161, 0.08);
 }
 
 .schedule-table tbody td.day-cell.editable-cell {
@@ -580,6 +883,37 @@ main {
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* ---- Drag-and-Drop расписания (только для админа) ---- */
+
+.lesson-content[draggable="true"] {
+    cursor: grab;
+}
+
+.lesson-content[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.lesson-content.dragging {
+    opacity: 0.4;
+    transform: scale(0.96);
+    transition: all 0.15s ease;
+}
+
+td.day-cell.drag-hover {
+    background-color: rgba(34, 197, 94, 0.15) !important;
+    border: 2px dashed #22c55e !important;
+    border-radius: 8px;
+}
+
+@keyframes dnd-rollback-flash {
+    0% { background-color: rgba(239, 68, 68, 0.3); }
+    100% { background-color: transparent; }
+}
+
+td.day-cell.drop-error {
+    animation: dnd-rollback-flash 0.5s ease 2;
+}
+
 .no-schedule {
     text-align: center;
     padding: 80px 20px;
@@ -595,25 +929,71 @@ main {
 
 /* ---- Admin Panel ---- */
 
-.admin-panel {
-    position: fixed;
-    bottom: 32px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 50;
+.schedule-actions {
     display: flex;
-    gap: 12px;
     align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    margin: 12px 0 4px;
 }
 
-.print-panel {
-    position: fixed;
-    bottom: 32px;
-    right: 32px;
-    z-index: 50;
+.admin-panel {
     display: flex;
     gap: 8px;
     align-items: center;
+    justify-content: center;
+}
+
+.print-panel {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---- Dropdowns ---- */
+
+.dropdown {
+    position: relative;
+}
+
+.dropdown-toggle {
+    white-space: nowrap;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 260px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    padding: 6px;
+    display: none;
+    z-index: 100;
+}
+
+.dropdown.open .dropdown-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dropdown-menu .btn-block {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.dropdown-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 2px;
 }
 
 .btn-print {
@@ -635,6 +1015,7 @@ main {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 14px 16px;
+    box-shadow: var(--card-shadow);
 }
 .plan-progress-header h3 {
     margin: 0 0 4px;
@@ -704,7 +1085,7 @@ main {
     font-size: 11.5px;
     font-weight: 600;
 }
-.badge-success { background: #e8f5e9; color: #2e7d32; }
+.badge-success { background: var(--accent); color: var(--text-on-primary); }
 .badge-warning { background: #fff8e1; color: #f57f17; }
 .badge-danger  { background: #ffebee; color: #c62828; }
 .badge-info    { background: #e3f2fd; color: #1565c0; }
@@ -717,7 +1098,7 @@ main {
     padding: 14px 28px;
     font-size: 16px;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(91, 140, 122, 0.04);
+    box-shadow: 0 2px 8px rgba(2, 245, 161, 0.04);
 }
 
 .plus-icon {
@@ -765,6 +1146,86 @@ main {
     max-width: min(95vw, 1200px);
 }
 
+/* Импорт из Excel — полноэкранный оверлей (жёстко поверх любых контейнеров) */
+#import-modal.hidden,
+.import-modal-hidden {
+    display: none !important;
+}
+
+/* Оверлей поверх всего экрана и открытых админок */
+#import-modal:not(.hidden) {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.85) !important;
+    z-index: 9999999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 1 !important;            /* Сброс прозрачности */
+    visibility: visible !important;   /* Явная видимость */
+    pointer-events: auto !important;  /* Перехват кликов, пока открыт оверлей */
+    right: 0 !important;
+    bottom: 0 !important;
+    transform: none !important;
+    max-width: none !important;
+    border: none !important;
+    margin: 0 !important;
+}
+
+/* Сама всплывающая карточка с содержимым импорта */
+#import-modal .modal-content,
+#import-modal .modal-dialog,
+#import-modal > div:not(.hidden) {
+    background-color: #111827 !important; /* Тёмный непрозрачный фон карточки */
+    color: #f9fafb !important;
+    border: 1px solid #374151 !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    max-width: 550px !important;
+    width: 90% !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+    position: relative !important;
+    z-index: 10000000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    opacity: 1 !important;      /* Сброс прозрачности (.t-modal по умолчанию opacity:0) */
+    visibility: visible !important;
+    transform: none !important;
+    animation: none !important; /* Отключить modalIn-анимацию, стартующую с opacity:0 */
+}
+
+/* Внутренние элементы тёмной карточки импорта — читаемость текста */
+#import-modal .ref-header {
+    background: transparent !important;
+    padding: 0 0 12px 0;
+    border-bottom: 1px solid #374151;
+    border-radius: 0;
+    margin-bottom: 4px;
+}
+#import-modal .ref-header h2 {
+    color: #f9fafb !important;
+}
+#import-modal .ref-import-hint,
+#import-modal div[style*="13px"],
+#import-modal label {
+    color: #cbd5e1 !important;
+}
+#import-modal .input {
+    background-color: #1f2937 !important;
+    color: #f9fafb !important;
+    border-color: #374151 !important;
+}
+#import-modal select.input option {
+    background-color: #1f2937 !important;
+    color: #f9fafb !important;
+}
+#import-modal #import-result {
+    color: #f9fafb !important;
+}
+
 .modal-content {
     background: var(--surface);
     border-radius: var(--radius);
@@ -773,7 +1234,7 @@ main {
     flex-direction: column;
     gap: 16px;
     animation: modalIn 0.2s ease;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--card-shadow);
 }
 
 @keyframes modalIn {
@@ -877,8 +1338,8 @@ main {
     font-family: inherit;
     font-size: 14px;
     font-weight: 600;
-    color: var(--accent);
-    background: rgba(91, 140, 122, 0.1);
+    color: var(--link-color);
+    background: rgba(2, 245, 161, 0.12);
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease;
     white-space: nowrap;
@@ -886,7 +1347,7 @@ main {
 
 .btn-analytics:hover {
     background: var(--accent);
-    color: #fff;
+    color: var(--text-on-primary);
 }
 
 .ref-done {
@@ -900,7 +1361,7 @@ main {
     font-size: 14px;
     font-weight: 600;
     background: var(--accent);
-    color: #fff;
+    color: var(--text-on-primary);
     cursor: pointer;
     transition: background 0.2s ease;
 }
@@ -932,6 +1393,58 @@ main {
     font-weight: 600;
     margin-bottom: 16px;
     color: var(--text);
+}
+
+/* Заголовок секции с кнопкой действия справа (симметрия левой/правой колонок) */
+.ref-section-head {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px !important;
+}
+.ref-section-head .btn-xs {
+    padding: 3px 9px;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+/* Выпадающий список специальности в строке добавления группы */
+.ref-specialty-select {
+    min-width: 160px !important;
+    flex: 1 1 auto !important;
+    max-width: 200px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ref-specialty-select option {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+/* Единая симметрия строк добавления во всех блоках справочников */
+#references-modal .field-row {
+    gap: 8px;
+    margin-top: 12px;
+    align-items: center;
+}
+#references-modal .field-row .input,
+#references-modal .field-row select.input,
+#references-modal .field-row .btn-sm {
+    height: 38px;
+    box-sizing: border-box;
+}
+#references-modal .field-row .input {
+    align-items: center;
+}
+#references-modal .field-row .checkbox-label {
+    height: 38px;
+    display: flex;
+    align-items: center;
 }
 
 .ref-list {
@@ -1000,6 +1513,150 @@ main {
 .ref-item:hover .ref-item-actions,
 .ref-item:focus-within .ref-item-actions {
     opacity: 1;
+}
+
+.ref-item-tag.tag-code {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.ref-item-tag.tag-specialty {
+    background: rgba(168, 85, 247, 0.15);
+    color: #a855f7;
+}
+
+.ref-import-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ref-import-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* ---- Нижняя строка Справочников: убрать бирюзовый акцентный фон ----
+   (футер/блоки добавления внизу #references-view). Тёмный фон карточки,
+   аккуратная верхняя рамка-разделитель и скругление нижних углов.
+   Применяется в тёмной теме — там, где фон панели уже тёмный. */
+[data-theme="dark"] #references-modal .ref-add-row,
+[data-theme="dark"] #references-modal .ref-footer,
+[data-theme="dark"] #references-modal .ref-section .field-row:last-child {
+    background-color: #111827 !important;
+    background: transparent !important;
+    border-top: 1px solid #374151 !important;
+    border-bottom-left-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+}
+
+[data-theme="dark"] #references-modal #admin-tab-refs .ref-section > .field-row {
+    background-color: #111827 !important;
+    background-image: none !important;
+    background-clip: padding-box !important;
+}
+
+[data-theme="dark"] #references-modal .ref-list::-webkit-scrollbar-track {
+    background: #0b1220 !important;
+}
+[data-theme="dark"] #references-modal .ref-list::-webkit-scrollbar-thumb {
+    background: #374151 !important;
+    border-radius: 8px !important;
+}
+[data-theme="dark"] #references-modal .ref-list {
+    background: transparent !important;
+}
+
+/* ---- Специальности (таблица) ---- */
+
+.ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.ref-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.ref-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.ref-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.ref-table-code {
+    font-weight: 600;
+    color: var(--accent, #3b82f6);
+    white-space: nowrap;
+}
+
+.ref-table-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.ref-table-actions .btn {
+    margin-left: 4px;
+}
+
+/* ---- Учебные планы: циклы и формы контроля ---- */
+
+.cur-cycle-block {
+    margin-bottom: 6px;
+}
+
+.cur-cycle-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--accent, #3b82f6);
+    padding: 8px 4px 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+}
+
+.cur-control-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 5px;
+    line-height: 1.4;
+}
+
+.cur-control-badge.badge-exam {
+    background: rgba(239, 68, 68, 0.16);
+    color: #ef4444;
+}
+
+.cur-control-badge.badge-zach {
+    background: rgba(34, 197, 94, 0.16);
+    color: #22c55e;
+}
+
+.cur-control-badge.badge-diff {
+    background: rgba(245, 158, 11, 0.16);
+    color: #f59e0b;
 }
 
 /* ---- Week Preview ---- */
@@ -1227,7 +1884,7 @@ main {
     }
 
     .schedule-table tbody tr.shift-row td {
-        background: rgba(91, 140, 122, 0.06) !important;
+        background: rgba(2, 245, 161, 0.06) !important;
         color: #5B8C7A;
         font-size: 11px;
         padding: 4px 8px !important;
@@ -1289,6 +1946,47 @@ main {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
     margin-bottom: 12px;
     flex-wrap: wrap;
+}
+
+.avail-empty {
+    padding: 24px 20px;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.ui-watchdog-fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.ui-watchdog-title {
+    font-weight: 600;
+    color: var(--danger, #c62828);
+}
+
+.busy-sub-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: #FF9800;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.avail-cell-busy.day-overload,
+.avail-cell-free.day-overload {
+    outline: 2px solid #e53935;
+    outline-offset: -2px;
 }
 
 .avail-filters {
@@ -1360,12 +2058,12 @@ main {
 
 .avail-day-tab:hover {
     color: var(--text);
-    box-shadow: 0 4px 16px rgba(91, 140, 122, 0.08);
+    box-shadow: 0 4px 16px rgba(2, 245, 161, 0.08);
 }
 
 .avail-day-tab.active {
     background: var(--accent);
-    color: #fff;
+    color: var(--text-on-primary);
 }
 
 .avail-mode-toggle {
@@ -1375,7 +2073,7 @@ main {
 
 .avail-mode-toggle .btn.active {
     background: var(--accent);
-    color: #fff;
+    color: var(--text-on-primary);
 }
 
 .avail-table {
@@ -1464,7 +2162,7 @@ main {
 }
 
 .avail-table td.avail-cell-free {
-    background: rgba(91, 140, 122, 0.08);
+    background: rgba(2, 245, 161, 0.08);
     color: var(--free-cell-color);
     font-weight: 600;
     font-size: 13px;
@@ -1526,17 +2224,17 @@ main {
     vertical-align: middle;
 }
 
-.lesson-type-ПО {
+.lesson-type-РџРћ {
     background: var(--badge-lecture-bg);
     color: var(--badge-lecture-text);
 }
 
-.lesson-type-ВТ {
+.lesson-type-Р’Рў {
     background: var(--badge-seminar-bg);
     color: var(--badge-seminar-text);
 }
 
-.lesson-type-ЛР {
+.lesson-type-Р›Р  {
     background: var(--badge-lab-bg);
     color: var(--badge-lab-text);
 }
@@ -1544,7 +2242,7 @@ main {
 .avail-summary {
     font-weight: 600;
     font-size: 12px;
-    color: var(--accent);
+    color: var(--link-color);
 }
 
 #avail-table-container {
@@ -1595,6 +2293,7 @@ main {
 
 @media (prefers-reduced-motion: reduce) {
     .t-skeleton { animation: none !important; }
+    .skeleton { animation: none !important; }
 }
 
 /* ---- Tab Content Animation ---- */
@@ -1660,7 +2359,7 @@ main {
     box-shadow: inset 0 2px 0 var(--accent);
 }
 .admin-tab.active {
-    color: var(--accent);
+    color: var(--link-color);
     border-bottom-color: var(--accent);
     font-weight: 600;
 }
@@ -1710,7 +2409,7 @@ main {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: .5px;
-    color: var(--accent);
+    color: var(--link-color);
     font-weight: 600;
 }
 .trash-card-name {
@@ -1729,7 +2428,7 @@ main {
 .trash-card-actions {
     margin-top: 4px;
 }
-#toast-container{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}.toast{pointer-events:auto;padding:12px 16px;border-radius:var(--radius-sm);font-size:14px;line-height:1.4;color:#fff;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:toastIn .3s ease;cursor:pointer;max-width:360px}.toast-success{background:#2e7d32}.toast-error{background:var(--danger)}.toast-warning{background:#f57f17;color:#333}.toast-info{background:var(--accent)}@keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+#toast-container{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}.toast{pointer-events:auto;padding:12px 16px;border-radius:var(--radius-sm);font-size:14px;line-height:1.4;color:#fff;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:toastIn .3s ease;cursor:pointer;max-width:360px}.toast-success{background:#2e7d32}.toast-error{background:var(--danger)}.toast-warning{background:#f57f17;color:#333}.toast-info{background:var(--accent);color:var(--text-on-primary)}@keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
 
 /* ---- Analytics ---- */
 .analytics-section {
@@ -1762,6 +2461,39 @@ main {
 }
 .analytics-card-body {
     padding: 12px 20px 16px;
+}
+
+/* ==== Графики аналитики (Chart.js) ==== */
+
+.avail-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.chart-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+.chart-card-header {
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.chart-card-body {
+    position: relative;
+    height: 280px;
+    padding: 12px;
 }
 .analytics-table {
     width: 100%;
@@ -2001,7 +2733,7 @@ main {
     padding: 32px 40px;
     background: var(--surface);
     border-radius: var(--radius);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--card-shadow);
 }
 .app-loader-dots {
     display: flex;
@@ -2024,4 +2756,350 @@ main {
 @keyframes loaderDot {
     0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
     40% { transform: scale(1); opacity: 1; }
+}
+
+/* ---- Brand theme: links & smooth theme transition ---- */
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+body,
+header,
+main,
+.schedule-table,
+.schedule-table th,
+.schedule-table td,
+.avail-table th,
+.avail-table td,
+.plan-progress-box,
+.plan-card,
+.modal-overlay,
+.modal-content,
+.avail-day-tab,
+.badge,
+.input,
+.load-bar-fill,
+.app-loader {
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease;
+}
+
+/* ======================== Печать «Свободных окон» (PDF) ======================== */
+
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 1cm;
+    }
+
+    header, nav, #avail-group-filter, .btn, .avail-toolbar, #avail-analytics {
+        display: none !important;
+    }
+
+    .avail-head, .avail-day-tabs, .avail-controls {
+        display: none !important;
+    }
+
+    #app, #availability-view, #avail-table-container {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .avail-table,
+    table {
+        page-break-inside: auto;
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 9px;
+    }
+
+    .avail-table tr,
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    .avail-cell-busy.day-overload,
+    .avail-cell-free.day-overload {
+        outline: none;
+    }
+
+    .busy-sub-badge {
+        display: none;
+    }
+}
+
+/* ==== Шаг 1 Глобального UI-Апгрейда: микро-физика кликов (Linear) + моноширинные цифры ==== */
+
+/* 1. Пружинная физика переходов */
+.btn,
+.carousel-btn,
+.carousel-arrow,
+.nav-btn,
+.admin-tab,
+.avail-day-tab,
+.select-card,
+.checkbox-label,
+.trash-card,
+.lesson-content[draggable="true"] {
+    transition: var(--transition-spring);
+}
+
+/* 2. Тактильный отклик при клике: «прожатие» */
+.btn:not(:disabled):active,
+.carousel-btn:not(:disabled):active,
+.carousel-arrow:not(.disabled):active,
+.nav-btn:not(:disabled):active,
+.admin-tab:active,
+.avail-day-tab:active,
+.select-card:active,
+.checkbox-label:active,
+.lesson-content[draggable="true"]:not(.dragging):active {
+    transform: scale(0.97) !important;
+}
+
+/* 3. Лёгкий микро-подъём при наведении */
+.btn:hover,
+.carousel-btn:hover,
+.carousel-arrow:hover,
+.nav-btn:hover,
+.admin-tab:hover,
+.avail-day-tab:hover,
+.select-card:hover,
+.checkbox-label:hover,
+.lesson-content[draggable="true"]:not(.dragging):hover {
+    transform: translateY(-1px);
+}
+
+/* Drag-and-drop не должен «прожиматься» во время перетаскивания */
+.lesson-content.dragging {
+    transition: all 0.15s ease;
+}
+
+/* 4. Моноширинные цифры (Swiss-watch tabular nums) */
+.schedule-table tbody td.time-cell,
+.schedule-table tbody td.time-cell .period-num,
+.schedule-table thead th .day-date,
+.avail-period-label,
+.busy-time,
+.chip-week,
+.chip-range,
+.plan-stat-value,
+.analytics-table th,
+.analytics-table td,
+.avail-summary,
+.trash-card-date {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+/* ==== Шаг 2 Глобального UI-Апгрейда: слои глубины, парящие панели, матовое стекло ==== */
+
+/* 1. Многоуровневая система глубины (Apple/Linear) — тёмная тема */
+[data-theme="dark"] body {
+    background: #080c14;
+}
+
+/* Блоки-«карточки»: слой #111827, микро-рамка, радиус 14px */
+[data-theme="dark"] .schedule-table-wrap,
+[data-theme="dark"] .select-card,
+[data-theme="dark"] .analytics-card,
+[data-theme="dark"] .chart-card,
+[data-theme="dark"] .trash-card,
+[data-theme="dark"] .ref-section {
+    background: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+}
+
+[data-theme="dark"] .ref-section {
+    padding: 14px;
+}
+
+/* Модальные окна: слой выше (#1f2937) + объёмная глубокая тень */
+[data-theme="dark"] .modal-content {
+    background: #1f2937;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+}
+
+/* 2. Матовое стекло для парящих панелей: шапка, карусель недель, статус-бар */
+[data-theme="dark"] header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(17, 24, 39, 0.82) !important;
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .week-carousel,
+[data-theme="dark"] .schedule-status-bar {
+    background: rgba(17, 24, 39, 0.82);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .schedule-status-bar {
+    border-radius: 12px;
+    border-bottom: none;
+    padding: 8px 12px;
+}
+
+/* Светлая тема: матовое стекло шапки и карусели недель */
+[data-theme="light"] header,
+[data-theme="light"] .week-carousel {
+    background: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 3. Утончённые микро-рамки элементов управления */
+[data-theme="dark"] .btn {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .btn:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .btn:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+}
+
+[data-theme="dark"] .input:hover,
+[data-theme="dark"] select.input:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .input:focus,
+[data-theme="dark"] select.input:focus {
+    border-color: var(--accent);
+}
+
+/* Сегмент-контрол публикации недели остаётся монолитным (без рамок между кнопками) */
+[data-theme="dark"] .publish-group .btn {
+    border: none;
+}
+
+[data-theme="dark"] .publish-group .btn.btn-outline-secondary {
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ==== Шаг 3 Глобального UI-Апгрейда: скелетон-загрузчики (Shimmer) ==== */
+
+.skeleton {
+    border-radius: 8px !important;
+    pointer-events: none !important;
+}
+
+/* Тёмная тема */
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #111827 25%, #1f2937 50%, #111827 75%) !important;
+    background-size: 200% 100% !important;
+    animation: skeletonShimmer 1.4s infinite ease-in-out !important;
+}
+
+/* Светлая тема */
+[data-theme="light"] .skeleton,
+body:not([data-theme="dark"]) .skeleton {
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%) !important;
+    background-size: 200% 100% !important;
+    animation: skeletonShimmer 1.4s infinite ease-in-out !important;
+}
+
+@keyframes skeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+    display: block;
+    height: 16px;
+    margin-bottom: 6px;
+    width: 80%;
+}
+
+.skeleton-card {
+    display: block;
+    height: 60px;
+    width: 100%;
+}
+
+.avail-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+}
+
+.skeleton-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+/* ==== Шаг 4 Глобального UI-Апгрейда: семантика цвета и неоновое свечение (Ambient Glows) ==== */
+
+/* 1. Активные кнопки статуса публикации недели */
+.btn-success.active,
+.publish-group .btn-success.active {
+    box-shadow: 0 0 15px var(--color-success-glow), 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-warning.active,
+.publish-group .btn-warning.active {
+    box-shadow: 0 0 15px var(--color-warning-glow), 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 2. Выбранная карточка недели в карусели — мягкая световая аура */
+.carousel-chip.active,
+.chip-week.active,
+.chip.active {
+    box-shadow: 0 0 12px var(--color-success-glow);
+}
+
+/* 3. Подсвечиваемые ячейки окон (свободные пары) — предупредительное внутреннее свечение */
+.gap-period,
+.avail-cell-free {
+    box-shadow: inset 0 0 10px var(--color-warning-glow);
+}
+
+/* 4. Фокус и наведение: мягкий подсвеченный контур */
+.input:focus,
+select.input:focus,
+[data-theme="dark"] .input:focus,
+[data-theme="dark"] select.input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.btn:focus-visible,
+[data-theme="dark"] .btn:focus-visible {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.btn:hover,
+[data-theme="dark"] .btn:hover {
+    border-color: var(--color-accent);
+}
+
+.input:hover,
+select.input:hover {
+    border-color: var(--color-accent);
 }

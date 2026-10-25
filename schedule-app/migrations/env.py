@@ -21,6 +21,7 @@ schedule_days = Table(
     Column('group_name', String, server_default=''),
     Column('created_at', TIMESTAMP, server_default='CURRENT_TIMESTAMP'),
     Column('deleted_at', TIMESTAMP, nullable=True),
+    Column('is_published', Integer, server_default='0', nullable=False),
 )
 
 lessons = Table(
@@ -59,6 +60,17 @@ groups_list = Table(
     Column('name', String, nullable=False),
     Column('course', Integer, server_default='1'),
     Column('is_distance', Integer, server_default='0'),
+    Column('specialty_id', Integer, ForeignKey('specialties.id'), nullable=True),
+)
+
+specialties = Table(
+    'specialties', meta,
+    Column('id', Integer, primary_key=True),
+    Column('code', String, nullable=False),
+    Column('name', String, nullable=False),
+    Column('qualification', String, nullable=True),
+    Column('created_at', TIMESTAMP, server_default='CURRENT_TIMESTAMP'),
+    Column('deleted_at', TIMESTAMP, nullable=True),
 )
 
 classrooms_list = Table(

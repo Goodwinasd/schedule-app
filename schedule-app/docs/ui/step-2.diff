@@ -1,0 +1,206 @@
+--- a/schedule-app/static/css/style.css
++++ b/schedule-app/static/css/style.css
+@@ -150,6 +150,135 @@
+     --blur-large: 8px;
+ }
+ 
++/* ==================== Дизайн-система (шаг 2) ====================
++   Новые токены добавлены РЯДОМ со старыми: исторические имена ниже связаны
++   с ними алиасами, поэтому остальные ~2700 строк CSS работают без правок.
++   Значения радиусов и теней подобраны так, чтобы этот шаг не двигал вёрстку. */
++:root {
++    /* Поверхности и текст */
++    --color-bg: #F7F8FA;
++    --color-surface: #FFFFFF;
++    --color-surface-2: #F2F4F7;
++    --color-surface-hover: #EEF1F5;
++    --color-border: #E4E7EC;
++    --color-border-strong: #D0D5DD;
++    --color-text: #101828;
++    --color-text-secondary: #667085;
++    --color-text-muted: #98A2B3;
++
++    /* Акцент: 500 — фон кнопки, 600 — hover, 700 — текст/ссылки (контраст ≥ 4.5:1) */
++    --accent-500: #00B87A;
++    --accent-600: #009E69;
++    --accent-700: #047857;
++    --accent-soft: rgba(0, 184, 122, 0.10);
++    --accent-on: #06231A;
++
++    /* Семантика */
++    --color-success: #12B76A;
++    --color-success-hover: #0E9F5B;
++    --color-warning: #F79009;
++    --color-warning-hover: #DC6803;
++    --color-danger: #F04438;
++    --color-info: #2E90FA;
++    --color-on-solid: #FFFFFF;
++
++    /* Типографика */
++    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
++    --text-xs: 11px;
++    --text-sm: 13px;
++    --text-base: 14px;
++    --text-md: 16px;
++    --text-lg: 18px;
++    --text-xl: 22px;
++    --leading-tight: 1.25;
++    --leading-normal: 1.5;
++    --leading-relaxed: 1.6;
++
++    /* Отступы: шаг 4px */
++    --space-1: 4px;
++    --space-2: 8px;
++    --space-3: 12px;
++    --space-4: 16px;
++    --space-6: 24px;
++    --space-8: 32px;
++    --space-12: 48px;
++
++    /* Радиусы и тени */
++    --radius-xs: 6px;
++    --radius-md: 12px;
++    --radius-lg: 16px;
++    --radius-xl: 20px;
++    --radius-full: 999px;
++    --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.06);
++    --shadow-sm: 0 4px 12px rgba(16, 24, 40, 0.08);
++    --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.12);
++    --shadow-lg: 0 20px 40px -12px rgba(16, 24, 40, 0.18);
++    --shadow-inset: inset 0 0 0 2px rgba(0, 0, 0, 0.15);
++
++    /* Контролы, фокус, движение */
++    --control-h-sm: 32px;
++    --control-h: 36px;
++    --control-h-lg: 40px;
++    --focus-ring: 0 0 0 3px rgba(0, 184, 122, 0.30);
++    --duration: 150ms;
++    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
++}
++
++[data-theme="dark"] {
++    --color-bg: #0B0F14;
++    --color-surface: #121821;
++    --color-surface-2: #1A2230;
++    --color-surface-hover: #1F2937;
++    --color-border: #253040;
++    --color-border-strong: #33415C;
++    --color-text: #E7ECF2;
++    --color-text-secondary: #9AA7B6;
++    --color-text-muted: #6B7A8C;
++    --accent-500: #2DD4A0;
++    --accent-600: #4CE0B3;
++    --accent-700: #3EE0AC;
++    --accent-soft: rgba(45, 212, 160, 0.14);
++    --accent-on: #08150F;
++    --color-success: #32D583;
++    --color-success-hover: #4ADE9B;
++    --color-warning: #FDB022;
++    --color-warning-hover: #FEC84B;
++    --color-danger: #F97066;
++    --color-info: #53B1FD;
++    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.50);
++    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.45);
++    --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.55);
++    --shadow-lg: 0 24px 48px -16px rgba(0, 0, 0, 0.70);
++    --shadow-inset: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
++    --focus-ring: 0 0 0 3px rgba(45, 212, 160, 0.35);
++}
++
++/* Алиасы: исторические имена → новые токены. Объявлены после обоих тем,
++   поэтому переключение темы продолжает работать через var()-резолвинг. */
++:root {
++    --bg: var(--color-bg);
++    --bg-main: var(--color-bg);
++    --surface: var(--color-surface);
++    --bg-card: var(--color-surface);
++    --surface-hover: var(--color-surface-hover);
++    --bg-hover: var(--color-surface-hover);
++    --text: var(--color-text);
++    --text-main: var(--color-text);
++    --text-secondary: var(--color-text-secondary);
++    --text-muted: var(--color-text-muted);
++    --accent: var(--accent-500);
++    --color-primary: var(--accent-500);
++    --accent-hover: var(--accent-600);
++    --color-primary-hover: var(--accent-600);
++    --text-on-primary: var(--accent-on);
++    --link-color: var(--accent-700);
++    --border: var(--color-border);
++    --border-color: var(--color-border);
++    --card-shadow: var(--shadow-sm);
++    --radius: var(--radius-lg);
++    --danger: var(--color-danger);
++}
++
+ body {
+     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+     background: var(--bg);
+@@ -250,7 +379,7 @@
+ 
+ .btn-danger {
+     background: var(--danger);
+-    color: white;
++    color: var(--color-on-solid);
+     font-weight: 600;
+ }
+ 
+@@ -282,27 +411,27 @@
+ }
+ 
+ .btn-success {
+-    background: #43a047;
+-    color: #fff;
++    background: var(--color-success);
++    color: var(--color-on-solid);
+     font-weight: 600;
+ }
+ 
+ .btn-success:hover {
+-    background: #2e7d32;
++    background: var(--color-success-hover);
+ }
+ 
+ .btn-warning {
+-    background: #f9a825;
+-    color: #fff;
++    background: var(--color-warning);
++    color: var(--color-on-solid);
+     font-weight: 600;
+ }
+ 
+ .btn-warning:hover {
+-    background: #f57f17;
++    background: var(--color-warning-hover);
+ }
+ 
+ .btn.active {
+-    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.15);
++    box-shadow: var(--shadow-inset);
+     transform: translateY(1px);
+ }
+ 
+@@ -326,7 +455,7 @@
+ }
+ 
+ .input:focus {
+-    box-shadow: 0 0 0 2px var(--accent);
++    box-shadow: var(--focus-ring);
+ }
+ 
+ .input:disabled {
+@@ -373,12 +502,12 @@
+     padding: 20px 24px;
+     cursor: pointer;
+     transition: all 0.2s ease;
+-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
++    box-shadow: var(--shadow-sm);
+ }
+ 
+ .select-card:hover {
+     transform: translateY(-2px);
+-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
++    box-shadow: var(--shadow-md);
+ }
+ 
+ .select-card-title {

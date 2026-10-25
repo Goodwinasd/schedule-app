@@ -1,15 +1,15 @@
 import state from './state.js';
 import { api } from './api.js';
 import { escapeHtml, populateSelect, populateSelectByName } from './utils.js';
-import { confirmModal, showKimiAlert, showKimiPrompt, triggerErrorShake } from './modal.js';
+import { confirmModal, showKimiAlert, showKimiPrompt, showKimiSelect, triggerErrorShake, openModal } from './modal.js';
 import { showToast } from './toast.js';
 import { dispatchEvent, onEvent, REFERENCES_UPDATED, DATA_MUTATED } from './events.js';
 
 export async function loadReferences() {
     const refs = await Promise.all([
-        api('/api/subjects'), api('/api/teachers'), api('/api/groups'), api('/api/classrooms'),
+        api('/api/subjects'), api('/api/teachers'), api('/api/groups'), api('/api/classrooms'), api('/api/specialties'),
     ]);
-    const labels = ['subjects', 'teachers', 'groups', 'classrooms'];
+    const labels = ['subjects', 'teachers', 'groups', 'classrooms', 'specialties'];
     for (let i = 0; i < refs.length; i++) {
         if (refs[i].error) { console.error('loadReferences failed:', labels[i], refs[i].error); return; }
     }
@@ -17,12 +17,22 @@ export async function loadReferences() {
     state.teachersList = refs[1];
     state.groupsList = refs[2];
     state.classroomsList = refs[3];
+    state.specialtiesList = refs[4];
+    populateGroupSpecialtySelect();
     const tws = await api('/api/teachers');
     if (tws.error) { console.error('loadReferences teachers:', tws.error); }
     else { state.teachersWithSchedule = tws; }
     const cws = await api('/api/classrooms');
     if (cws.error) { console.error('loadReferences classrooms:', cws.error); }
     else { state.classroomsWithSchedule = cws; }
+}
+
+export function populateGroupSpecialtySelect() {
+    const sel = document.getElementById('ref-groups-specialty');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Без специальности</option>' + (state.specialtiesList || []).map(s => `<option value="${s.id}">${escapeHtml(s.code + ' — ' + s.name)}</option>`).join('');
+    sel.value = cur;
 }
 
 export function populateSubjectTeacherSelect() {
@@ -34,30 +44,93 @@ export function populateSubjectTeacherSelect() {
 export async function renderRefList(endpoint, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    container.innerHTML = '<div class="t-skeleton t-skeleton-block"></div><div class="t-skeleton t-skeleton-block" style="width:80%"></div><div class="t-skeleton t-skeleton-block" style="width:60%"></div>';
+    container.innerHTML = '<div class="skeleton skeleton-text"></div><div class="skeleton skeleton-card" style="height:34px"></div><div class="skeleton skeleton-card" style="height:34px;width:90%"></div>';
     const items = await api(`/api/${endpoint}`);
     if (items.error) { container.innerHTML = '<div style="font-size:13px;color:var(--danger)">Ошибка загрузки</div>'; return; }
     if (endpoint === 'subjects') state.subjectsList = items;
     else if (endpoint === 'teachers') state.teachersList = items;
     else if (endpoint === 'groups') state.groupsList = items;
     else if (endpoint === 'classrooms') state.classroomsList = items;
+    else if (endpoint === 'specialties') { state.specialtiesList = items; populateGroupSpecialtySelect(); renderSpecialtiesTable(container, items); return; }
     container.innerHTML = items.length ? items.map(i => {
         let extra = '';
-        if (endpoint === 'groups') extra = ` <span class="ref-item-tag">${i.course}к.</span>${i.is_distance ? ' <span class="ref-item-tag tag-distance">Заочн.</span>' : ''}`;
+        if (endpoint === 'groups') extra = ` <span class="ref-item-tag">${i.course}к.</span>${i.is_distance ? ' <span class="ref-item-tag tag-distance">Заочн.</span>' : ''}${i.specialty_code ? ` <span class="ref-item-tag tag-specialty">${escapeHtml(i.specialty_code)} · ${escapeHtml(i.specialty_name)}</span>` : ''}`;
         if (endpoint === 'subjects' && i.default_teacher_id) { const t = state.teachersList.find(t => t.id === i.default_teacher_id); if (t) extra += ` <span class="ref-item-tag">${escapeHtml(t.name)}</span>`; }
         if (endpoint === 'teachers' && i.phone) extra += ` <span class="ref-item-tag tag-phone">${escapeHtml(i.phone)}</span>`;
-        const editFn = endpoint === 'subjects' ? `editSubject(${i.id})` : endpoint === 'teachers' ? `editTeacher(${i.id})` : endpoint === 'classrooms' ? `editClassroom(${i.id})` : `editGroup(${i.id})`;
+        if (endpoint === 'specialties') {
+            extra += ` <span class="ref-item-tag tag-code">${escapeHtml(i.code)}</span>`;
+            if (i.qualification) extra += ` <span class="ref-item-tag tag-phone">${escapeHtml(i.qualification)}</span>`;
+        }
+        const editFn = endpoint === 'subjects' ? `editSubject(${i.id})` : endpoint === 'teachers' ? `editTeacher(${i.id})` : endpoint === 'classrooms' ? `editClassroom(${i.id})` : endpoint === 'specialties' ? `editSpecialty(${i.id})` : `editGroup(${i.id})`;
         return `<div class="ref-item"><span class="ref-item-name">${escapeHtml(i.name)}${extra}</span><div class="ref-item-actions"><button class="btn btn-ghost btn-sm" onclick="${editFn}">Изм</button><button type="button" class="btn btn-danger btn-sm delete-btn" data-endpoint="${endpoint}" data-id="${i.id}" data-container="${containerId}">×</button></div></div>`;
     }).join('') : '<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">Пусто</div>';
+}
+
+export async function addSpecialty() {
+    const code = document.getElementById('ref-specialties-code').value.trim();
+    const name = document.getElementById('ref-specialties-name').value.trim();
+    if (!name) { triggerErrorShake(document.getElementById('ref-specialties-name')); return; }
+    if (!code) { triggerErrorShake(document.getElementById('ref-specialties-code')); return; }
+    const qualification = document.getElementById('ref-specialties-qualification').value.trim();
+    const res = await api('/api/specialties', { method: 'POST', body: JSON.stringify({ code, name, qualification }) });
+    if (res.error) { await showKimiAlert(res.error); return; }
+    document.getElementById('ref-specialties-code').value = '';
+    document.getElementById('ref-specialties-name').value = '';
+    document.getElementById('ref-specialties-qualification').value = '';
+    showToast('Специальность добавлена', 'success');
+    dispatchEvent(REFERENCES_UPDATED);
+    await loadSpecialties();
+}
+
+export async function editSpecialty(id) {
+    const s = state.specialtiesList.find(x => x.id === id);
+    if (!s) return;
+    const nn = await showKimiPrompt('Название специальности:', s.name);
+    if (nn === null || !nn.trim()) return;
+    const cc = await showKimiPrompt('Код специальности:', s.code);
+    if (cc === null) return;
+    const qq = await showKimiPrompt('Направленность / квалификация:', s.qualification || '');
+    if (qq === null) return;
+    const res = await api(`/api/specialties/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), code: cc.trim(), qualification: (qq || '').trim() }) });
+    if (res.error) { await showKimiAlert(res.error); return; }
+    showToast('Специальность обновлена', 'success');
+    dispatchEvent(REFERENCES_UPDATED);
+    await loadSpecialties();
+}
+
+/** Отрисовка списка специальностей как таблицы (Код | Название | Квалификация).
+ *  Вызывается при переключении на вкладку «Специальности». */
+export async function loadSpecialties() {
+    await renderRefList('specialties', 'ref-specialties');
+}
+
+function renderSpecialtiesTable(container, items) {
+    if (!items.length) {
+        container.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">Специальности не загружены. Нажмите «Добавить» для создания первой записи.</div>';
+        return;
+    }
+    const rows = items.map(i => `
+        <tr>
+            <td class="ref-table-code">${escapeHtml(i.code)}</td>
+            <td>${escapeHtml(i.name)}</td>
+            <td>${escapeHtml(i.qualification || '')}</td>
+            <td class="ref-table-actions">
+                <button class="btn btn-ghost btn-sm" onclick="editSpecialty(${i.id})">Редактировать</button>
+                <button type="button" class="btn btn-danger btn-sm delete-btn" data-endpoint="specialties" data-id="${i.id}" data-container="ref-specialties">Удалить</button>
+            </td>
+        </tr>`).join('');
+    container.innerHTML = `<table class="ref-table"><thead><tr><th>Код</th><th>Название</th><th>Квалификация / Направленность</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 export async function addGroup() {
     const inp = document.getElementById('ref-groups-input');
     const name = inp.value.trim();
     if (!name) { triggerErrorShake(inp); return; }
-    const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked }) });
+    const specialtySel = document.getElementById('ref-groups-specialty');
+    const specialty_id = specialtySel && specialtySel.value ? parseInt(specialtySel.value) : null;
+    const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked, specialty_id }) });
     if (res.error) { await showKimiAlert(res.error); return; }
-    inp.value = ''; document.getElementById('ref-groups-distance').checked = false;
+    inp.value = ''; document.getElementById('ref-groups-distance').checked = false; if (specialtySel) specialtySel.value = '';
     dispatchEvent(REFERENCES_UPDATED);
     renderRefList('groups', 'ref-groups');
 }
@@ -69,8 +142,19 @@ export async function editGroup(id) {
     if (nn === null || !nn.trim()) return;
     const nc = await showKimiPrompt('Курс (1-4):', String(g.course));
     if (nc === null) return;
-    const dist = await confirmModal('Заочное отделение?');
-    const res = await api(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), course: parseInt(nc) || g.course, is_distance: dist }) });
+    // confirmModal отдаёт только true/false, поэтому отмену было не отличить от «Очно»,
+    // и отмена записывала is_distance: false. Спрашиваем выбором: «Очно» → false, «Заочно» → true,
+    // отмена (null) → выходим, ничего не меняя.
+    const distOpt = await showKimiSelect('Заочное отделение?', [
+        { value: '0', label: 'Очно' },
+        { value: '1', label: 'Заочно' },
+    ], g.is_distance ? '1' : '0');
+    if (distOpt === null) return;
+    const dist = distOpt === '1';
+    const spOpts = [{ value: '', label: 'Без специальности' }, ...(state.specialtiesList || []).map(s => ({ value: String(s.id), label: `${s.code} — ${s.name}` }))];
+    const sp = await showKimiSelect('Специальность:', spOpts, g.specialty_id ? String(g.specialty_id) : '');
+    if (sp === null) return;
+    const res = await api(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), course: parseInt(nc) || g.course, is_distance: dist, specialty_id: sp ? parseInt(sp) : null }) });
     if (res.error) { await showKimiAlert(res.error); return; }
     dispatchEvent(REFERENCES_UPDATED);
     renderRefList('groups', 'ref-groups');
@@ -135,6 +219,109 @@ export async function advanceCourses() {
     if (!await confirmModal('Перевести все курсы на +1?\nГруппы 4-го курса будут Удалены.')) return;
     const res = await api('/api/groups/advance-courses', { method: 'POST' });
     if (res.success) { await showKimiAlert(`Готово! Удалено групп: ${res.deleted}`); dispatchEvent(REFERENCES_UPDATED); renderRefList('groups', 'ref-groups'); }
+}
+
+export function openImportModal(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    const sel = document.getElementById('import-entity-type');
+    if (sel) sel.value = 'teachers';
+    const file = document.getElementById('import-file');
+    if (file) file.value = '';
+    const res = document.getElementById('import-result');
+    if (res) res.innerHTML = '';
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.setProperty('display', 'flex', 'important');
+        modal.style.setProperty('z-index', '99999', 'important');
+    }
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) overlay.classList.add('active');
+}
+
+export function closeImportModal(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.setProperty('display', 'none', 'important');
+    }
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
+export async function downloadImportTemplate() {
+    const sel = document.getElementById('import-entity-type');
+    const entity = sel ? sel.value : 'teachers';
+    try {
+        const resp = await fetch(`/api/admin/import/template/${entity}`, {
+            headers: state.csrfToken ? { 'X-CSRF-Token': state.csrfToken } : {},
+        });
+        if (!resp.ok) { const d = await resp.json(); await showKimiAlert(d.error || 'Ошибка скачивания шаблона'); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `template_${entity}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+        showToast('Шаблон скачан', 'success');
+    } catch (e) {
+        await showKimiAlert('Не удалось скачать шаблон');
+    }
+}
+
+export async function uploadImportExcel() {
+    const sel = document.getElementById('import-entity-type');
+    const entity = sel ? sel.value : 'teachers';
+    const fileInput = document.getElementById('import-file');
+    const result = document.getElementById('import-result');
+    if (!fileInput.files || !fileInput.files.length) {
+        await showKimiAlert('Выберите файл .xlsx');
+        return;
+    }
+    const file = fileInput.files[0];
+    if (!/\.xlsx$/i.test(file.name)) {
+        await showKimiAlert('Только файлы .xlsx');
+        return;
+    }
+    if (result) result.innerHTML = '<div class="loading">Загрузка...</div>';
+    const fd = new FormData();
+    fd.append('entity_type', entity);
+    fd.append('file', file);
+    try {
+        const resp = await fetch('/api/admin/import/excel', {
+            method: 'POST',
+            headers: state.csrfToken ? { 'X-CSRF-Token': state.csrfToken } : {},
+            body: fd,
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            if (result) result.innerHTML = `<div style="color:var(--danger)">${escapeHtml(data.error || 'Ошибка импорта')}</div>`;
+            return;
+        }
+        if (result) {
+            let html = `<div style="color:var(--accent);font-weight:600">✅ Импортировано записей: ${data.created}, пропущено: ${data.skipped}</div>`;
+            if (data.errors && data.errors.length) {
+                html += `<div style="margin-top:6px;color:var(--warning-text,#e6a700)">Предупреждения (${data.errors.length}):<ul style="margin:4px 0 0 16px;font-size:12px">`;
+                html += data.errors.slice(0, 10).map(e => `<li>${escapeHtml(e)}</li>`).join('');
+                html += '</ul></div>';
+            }
+            result.innerHTML = html;
+        }
+        showToast(`Импортировано: ${data.created}, пропущено: ${data.skipped}`, data.created ? 'success' : 'info');
+        dispatchEvent(REFERENCES_UPDATED);
+        const containerId = { teachers: 'ref-teachers', classrooms: 'ref-classrooms', groups: 'ref-groups', subjects: 'ref-subjects' }[entity];
+        if (containerId) {
+            await loadReferences();
+            renderRefList(entity, containerId);
+        }
+    } catch (e) {
+        if (result) result.innerHTML = '<div style="color:var(--danger)">Ошибка сети при импорте</div>';
+    }
 }
 
 export async function addRefItem(endpoint, inputId, containerId) {
@@ -227,6 +414,9 @@ async function refetchEntity(entity) {
         state.classroomsList = data;
         const cws = await api('/api/classrooms', { silent: true });
         if (!cws.error) state.classroomsWithSchedule = cws;
+    } else if (entity === 'specialties') {
+        state.specialtiesList = data;
+        populateGroupSpecialtySelect();
     }
 }
 
@@ -258,7 +448,7 @@ function refreshSelects(entity) {
 
 onEvent(DATA_MUTATED, (e) => {
     const { entity } = e.detail;
-    if (['teachers', 'subjects', 'groups', 'classrooms'].includes(entity)) {
+    if (['teachers', 'subjects', 'groups', 'classrooms', 'specialties'].includes(entity)) {
         refetchEntity(entity).then(() => refreshSelects(entity));
     }
 });

@@ -195,6 +195,164 @@ class TestValidateWeeklyLoad:
             assert l['is_substitution'] == 1, f"Lesson {l['id']} not flagged as substitution"
             assert l['original_teacher_id'] == 1, f"Lesson {l['id']} missing original_teacher"
 
+    def test_generator_no_substitute_reports_error(self, client, seed_refs, admin_csrf):
+        """If no qualified replacement exists for a sick teacher, an understandable error is reported."""
+        import db as db_module
+        conn = db_module.get_db()
+        # Teacher 1 (Иванов) on sick leave whole week, NO substitute qualified for subject 1
+        conn.execute("INSERT INTO teacher_absences (teacher_id, start_date, end_date, reason) VALUES (1, '2026-09-07', '2026-09-12', 'illness')")
+        conn.commit()
+        conn.close()
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.post('/api/curriculum', json={
+            'group_id': 1, 'subject_id': 1, 'teacher_id': 1,
+            'semester': 1, 'total_hours': 72,
+        }, headers=h)
+        assert resp.status_code == 201
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': 1, 'semester': 1, 'monday': '2026-09-07', 'week_count': 1,
+        }, headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        # No lessons can be placed (sick + no substitute)
+        assert data['created'] == 0
+        assert data['errors'], "Expected a human-readable error about the missing substitute"
+        joined = ' '.join(data['errors'])
+        assert 'замена' in joined.lower() or 'пропущена' in joined.lower() or 'не найдена' in joined
+
+    def test_restore_week_scopes_strictly_to_group_and_dates(self, client, seed_refs, admin_csrf):
+        """Restore must revive ONLY the target group's pairs on the target week."""
+        h = {'X-CSRF-Token': admin_csrf}
+        # Create 2nd group
+        resp = client.post('/api/groups', json={'name': 'Группа-2', 'course': 2}, headers=h)
+        assert resp.status_code in (200, 201)
+        g2 = resp.get_json()['id']
+        # Curriculum: group1 math/teacher1, group2 physics/teacher2 (distinct, avoid collisions)
+        resp = client.post('/api/curriculum', json={
+            'group_id': 1, 'subject_id': 1, 'teacher_id': 1,
+            'semester': 1, 'total_hours': 144,
+        }, headers=h)
+        assert resp.status_code == 201
+        resp = client.post('/api/curriculum', json={
+            'group_id': g2, 'subject_id': 2, 'teacher_id': 2,
+            'semester': 1, 'total_hours': 144,
+        }, headers=h)
+        assert resp.status_code == 201
+        for gid in (1, g2):
+            resp = client.post('/api/schedule/generate', json={
+                'group_id': gid, 'semester': 1, 'monday': '2026-09-07', 'weeks_count': 1,
+            }, headers=h)
+            assert resp.status_code == 200
+        # Group 1 also has Week B (2026-09-14) generated
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': 1, 'semester': 1, 'monday': '2026-09-14', 'weeks_count': 1,
+        }, headers=h)
+        assert resp.status_code == 200
+        # Soft-delete Week A for group 1 only and Week A for group 2, plus week B for group 1
+        for gid, start in [(1, '2026-09-07'), (g2, '2026-09-07'), (1, '2026-09-14')]:
+            resp = client.delete(f'/api/schedule/clear-week?start_date={start}&group_id={gid}', headers=h)
+            assert resp.status_code == 200
+        # Now restore ONLY group 1 on Week A
+        resp = client.post('/api/schedule/restore-week?start_date=2026-09-07&group_id=1', headers=h)
+        assert resp.status_code == 200
+        restored = resp.get_json()['restored_count']
+        assert restored > 0 and restored <= 24, f"restored={restored} out of range"
+        # Week A group 1 pairs revived (active)
+        import db as db_module
+        conn = db_module.get_db()
+        g1a = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = 1 AND sd.date BETWEEN '2026-09-07' AND '2026-09-12' AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''').fetchone()[0]
+        # Week B group 1 still deleted
+        g1b_deleted = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = 1 AND sd.date BETWEEN '2026-09-14' AND '2026-09-19' AND l.deleted_at IS NOT NULL AND sd.deleted_at IS NOT NULL
+        ''').fetchone()[0]
+        # Week A group 2 still deleted
+        g2a_deleted = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = ? AND sd.date BETWEEN '2026-09-07' AND '2026-09-12' AND l.deleted_at IS NOT NULL AND sd.deleted_at IS NOT NULL
+        ''', (g2,)).fetchone()[0]
+        conn.close()
+        assert g1a == restored, f"expected {restored} restored for grp1 wkA, got {g1a}"
+        assert g1b_deleted >= 1, "Week B of group 1 must remain deleted"
+        assert g2a_deleted >= 1, "Week A of group 2 must remain deleted"
+
+    def test_delete_week_scopes_strictly_to_group_and_dates(self, client, seed_refs, admin_csrf):
+        """Deleting one group's week must not touch other groups or adjacent weeks."""
+        h = {'X-CSRF-Token': admin_csrf}
+        import db as db_module
+        # Two groups, generate Week A for both, Week B for group 1
+        resp = client.post('/api/groups', json={'name': 'Группа-2', 'course': 2}, headers=h)
+        assert resp.status_code in (200, 201)
+        g2 = resp.get_json()['id']
+        resp = client.post('/api/curriculum', json={
+            'group_id': 1, 'subject_id': 1, 'teacher_id': 1,
+            'semester': 1, 'total_hours': 144,
+        }, headers=h)
+        assert resp.status_code == 201
+        resp = client.post('/api/curriculum', json={
+            'group_id': g2, 'subject_id': 2, 'teacher_id': 2,
+            'semester': 1, 'total_hours': 144,
+        }, headers=h)
+        assert resp.status_code == 201
+        for gid in (1, g2):
+            resp = client.post('/api/schedule/generate', json={
+                'group_id': gid, 'semester': 1, 'monday': '2026-09-07', 'weeks_count': 1,
+            }, headers=h)
+            assert resp.status_code == 200
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': 1, 'semester': 1, 'monday': '2026-09-14', 'weeks_count': 1,
+        }, headers=h)
+        assert resp.status_code == 200
+        # Delete only group 1 Week A
+        resp = client.delete('/api/schedule/clear-week?start_date=2026-09-07&group_id=1', headers=h)
+        assert resp.status_code == 200
+        assert resp.get_json()['deleted_count'] <= 24
+        # Verify: group 1 Week A deleted, group 1 Week B intact, group 2 Week A intact
+        conn = db_module.get_db()
+        g1a_active = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = 1 AND sd.date BETWEEN '2026-09-07' AND '2026-09-12' AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''').fetchone()[0]
+        g1b_active = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = 1 AND sd.date BETWEEN '2026-09-14' AND '2026-09-19' AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''').fetchone()[0]
+        g2a_active = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = ? AND sd.date BETWEEN '2026-09-07' AND '2026-09-12' AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''', (g2,)).fetchone()[0]
+        conn.close()
+        assert g1a_active == 0, f"Group1 WeekA should be empty, got {g1a_active}"
+        assert g1b_active >= 1, f"Group1 WeekB must be intact, got {g1b_active}"
+        assert g2a_active >= 1, f"Group2 WeekA must be intact, got {g2a_active}"
+
+    def test_clear_week_isolates_even_with_many_pairs(self, client, seed_refs, admin_csrf):
+        """Clearing a week must isolate to the target group even if it holds many pairs."""
+        import db as db_module
+        h = {'X-CSRF-Token': admin_csrf}
+        conn = db_module.get_db()
+        # Ensure the day exists, then add 40 pairs for group 1 on the week
+        day = conn.execute("SELECT id FROM schedule_days WHERE group_name='Группа-1' AND date='2026-09-07'").fetchone()
+        if not day:
+            cur = conn.execute("INSERT INTO schedule_days (day_name, date, group_name) VALUES ('Понедельник','2026-09-07','Группа-1')")
+            day_id = cur.lastrowid
+        else:
+            day_id = day['id']
+        for i in range(40):
+            conn.execute(
+                "INSERT INTO lessons (day_id, period, subject_id, teacher_id, group_id) VALUES (?, ?, 1, 1, 1)",
+                (day_id, (i % 8) + 1)
+            )
+        conn.commit()
+        conn.close()
+        # Clear must succeed (200) and delete exactly those 40 pairs of group 1 only
+        resp = client.delete('/api/schedule/clear-week?start_date=2026-09-07&group_id=1', headers=h)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.get_json()}"
+        assert resp.get_json()['deleted_count'] == 40
+
     def test_generate_schedule_monthly_batch(self, client, seed_refs, admin_csrf):
         """Batch generation (weeks_count=4) must produce schedule on 4 distinct weeks without collisions."""
         h = {'X-CSRF-Token': admin_csrf}
@@ -505,3 +663,44 @@ class TestValidateWeeklyLoad:
                     if l['classroom_id'] and (d['date'], p['period'], l['classroom_id']) in slots_g1:
                         collisions += 1
         assert collisions == 0, f"Found {collisions} classroom double-booking(s) between groups"
+
+    def test_generator_september_first_only_first_course(self, client, seed_refs, admin_csrf):
+        """Sept 1 (линейка) skips pairs ONLY for first-course groups; seniors study normally."""
+        h = {'X-CSRF-Token': admin_csrf}
+        # Senior group (course=2), 5 pairs/week so a pair lands on 2026-09-01 (Tue, even week)
+        resp = client.post('/api/groups', json={'name': '02-Тест', 'course': 2}, headers=h)
+        assert resp.status_code in (200, 201)
+        senior_id = resp.get_json()['id']
+        for gid in (1, senior_id):
+            resp = client.post('/api/curriculum', json={
+                'group_id': gid, 'subject_id': 1, 'teacher_id': 1,
+                'semester': 1, 'total_hours': 180,
+            }, headers=h)
+            assert resp.status_code == 201
+        # Week 2026-08-31 (ISO week 36, even) → day_order reversed [5,4,3,2,1,0];
+        # 5 pairs → Sat,Fri,Thu,Wed,Tue, so Tuesday 2026-09-01 gets the 5th pair
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': 1, 'semester': 1, 'monday': '2026-08-31', 'week_count': 1,
+        }, headers=h)
+        assert resp.status_code == 200
+        assert resp.get_json()['created'] == 4, "first course must skip Sept 1 (5 pairs - 1)"
+        resp = client.post('/api/schedule/generate', json={
+            'group_id': senior_id, 'semester': 1, 'monday': '2026-08-31', 'week_count': 1,
+        }, headers=h)
+        assert resp.status_code == 200
+        assert resp.get_json()['created'] == 5, "senior course must study on Sept 1 (all 5 pairs)"
+        import db as db_module
+        conn = db_module.get_db()
+        first_course_sept1 = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = 1 AND sd.date = '2026-09-01'
+              AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''').fetchone()[0]
+        senior_sept1 = conn.execute('''
+            SELECT COUNT(*) FROM lessons l JOIN schedule_days sd ON l.day_id = sd.id
+            WHERE l.group_id = ? AND sd.date = '2026-09-01'
+              AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
+        ''', (senior_id,)).fetchone()[0]
+        conn.close()
+        assert first_course_sept1 == 0, "first-course group must have no pairs on Sept 1"
+        assert senior_sept1 == 1, "senior group must have its pair on Sept 1"

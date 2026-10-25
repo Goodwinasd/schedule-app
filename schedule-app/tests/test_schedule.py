@@ -154,6 +154,207 @@ class TestAvailability:
         classroom_ids = [c['id'] for c in data['classrooms']]
         assert 1 not in classroom_ids, 'Classroom 1 should be excluded after deletion'
 
+    @staticmethod
+    def _insert_lesson(db, lid, day_id, period, teacher_id=1, classroom_id=1, group_id=1, subject_id=1):
+        conn = db.get_db()
+        conn.execute(
+            'INSERT INTO lessons (id, day_id, period, subject_id, teacher_id, classroom_id, group_id) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (lid, day_id, period, subject_id, teacher_id, classroom_id, group_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def test_availability_math_accuracy(self, client, db, seed_days, admin_csrf):
+        """Математическая точность: total/free/load_pct/busy-ключи при известном сиде
+        и отсутствие двойного учёта при дубле урока в один и тот же слот."""
+        h = {'X-CSRF-Token': admin_csrf}
+        # Teacher 1: Пн 1-я пара (day 1 = 2026-09-07) и Вт 2-я пара (day 2 = 2026-09-08)
+        self._insert_lesson(db, 10, 1, 1)
+        self._insert_lesson(db, 11, 2, 2, classroom_id=2)
+
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+
+        st = data['teacher_stats']['1']
+        assert st['total'] == 2, f'Ожидалось 2 занятых слота, получено {st["total"]}'
+        assert st['free'] == 46, f'Ожидалось 46 свободных слотов (48-2), получено {st["free"]}'
+        assert st['load_pct'] == round(2 / 48 * 100, 1), \
+            f'load_pct не соответствует round(2/48*100, 1): {st["load_pct"]}'
+
+        assert set(data['teacher_busy']['1'].keys()) == {'2026-09-07_1', '2026-09-08_2'}
+        assert data['group_lesson_count']['1']['lessons'] == 2
+        assert data['all_courses'] == [1]
+
+        # Дубликат урока в тот же слот (Вт 2-я пара) не должен удваивать занятость преподавателя
+        self._insert_lesson(db, 12, 2, 2, classroom_id=2)
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+
+        st = data['teacher_stats']['1']
+        assert st['total'] == 2, f'Дубль слота не должен удваивать total: {st["total"]}'
+        assert st['free'] == 46
+        assert set(data['teacher_busy']['1'].keys()) == {'2026-09-07_1', '2026-09-08_2'}
+
+    def test_availability_course_null_does_not_crash(self, client, db, seed_days, admin_csrf):
+        """Группа с course IS NULL не должна ронять sorted() (баг #1 аудита)."""
+        h = {'X-CSRF-Token': admin_csrf}
+        conn = db.get_db()
+        conn.execute('INSERT INTO groups_list (id, name, course, is_distance) VALUES (99, \'Группа-NULL\', NULL, 0)')
+        conn.execute(
+            'INSERT INTO lessons (id, day_id, period, subject_id, teacher_id, classroom_id, group_id) '
+            'VALUES (20, 1, 3, 1, 2, 2, 99)',
+        )
+        conn.commit()
+        conn.close()
+
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['all_courses'] == []
+        assert 'courses' not in data['teachers'][1]  # у Петрова только курс None — ключ не добавляется
+
+    def test_availability_substitutions_payload(self, client, db, seed_days, admin_csrf):
+        """Замена (is_substitution) должна попадать в слот занятости с именем исходного преподавателя."""
+        h = {'X-CSRF-Token': admin_csrf}
+        # Петров (2) заменяет Иванова (1) на Пн 1-я пара (2026-09-07)
+        conn = db.get_db()
+        conn.execute(
+            'INSERT INTO lessons (id, day_id, period, subject_id, teacher_id, classroom_id, group_id, '
+            'is_substitution, original_teacher_id) '
+            'VALUES (30, 1, 1, 1, 2, 1, 1, 1, 1)',
+        )
+        conn.commit()
+        conn.close()
+
+        resp = client.get('/api/availability?monday=2026-09-07', headers=h)
+        assert resp.status_code == 200
+        data = resp.get_json()
+
+        slot = data['teacher_busy']['2']['2026-09-07_1']
+        assert slot['is_sub'] is True, 'Слот замены должен содержать is_sub=True'
+        assert slot['original_teacher'] == 'Иванов И.И.', \
+            f'original_teacher не совпадает: {slot.get("original_teacher")}'
+
+        # Исходный преподаватель свободен в этом слоте (его урок вёл заместитель)
+        assert '2026-09-07_1' not in data['teacher_busy'].get('1', {})
+
+        # Урок группы учтён в статистике
+        assert data['group_lesson_count']['1']['lessons'] == 1
+
+
+class TestSubstitutionsSuggest:
+    def test_suggest_returns_available(self, client, seed_lessons, admin_csrf):
+        """Петров (2) свободен на Пн 1-я пара, Иванов (1) занят (lesson 1)."""
+        resp = client.get('/api/schedule/substitutions-suggest?date=2026-09-07&period=1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        ids = [t['id'] for t in data['available']]
+        assert 2 in ids, 'Петров должен быть свободен'
+        assert 1 not in ids, 'Иванов занят на Пн 1-я пара'
+
+    def test_suggest_via_day_id(self, client, seed_lessons, admin_csrf):
+        resp = client.get('/api/schedule/substitutions-suggest?day_id=1&period=1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        ids = [t['id'] for t in resp.get_json()['available']]
+        assert 2 in ids and 1 not in ids
+
+    def test_suggest_requires_params(self, client, admin_csrf):
+        resp = client.get('/api/schedule/substitutions-suggest?period=1', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 400
+        resp = client.get('/api/schedule/substitutions-suggest?date=2026-09-07', headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 400
+
+    def test_suggest_excludes_busy_and_deleted(self, client, db, seed_lessons, admin_csrf):
+        h = {'X-CSRF-Token': admin_csrf}
+        conn = db.get_db()
+        conn.execute('INSERT INTO lessons (id, day_id, period, subject_id, teacher_id, classroom_id, group_id) VALUES (40, 1, 3, 1, 2, 2, 1)')
+        conn.commit()
+        conn.close()
+
+        resp = client.get('/api/schedule/substitutions-suggest?date=2026-09-07&period=3', headers=h)
+        assert resp.status_code == 200
+        ids = [t['id'] for t in resp.get_json()['available']]
+        assert 2 not in ids, 'Петров занят на Пн 3-я пара (lesson 40)'
+        assert 1 in ids
+
+        conn = db.get_db()
+        conn.execute('INSERT INTO teachers (id, name, deleted_at) VALUES (99, \'Удалён\', \'2026-09-01\')')
+        conn.commit()
+        conn.close()
+        resp = client.get('/api/schedule/substitutions-suggest?date=2026-09-07&period=1', headers=h)
+        assert resp.status_code == 200
+        ids = [t['id'] for t in resp.get_json()['available']]
+        assert 99 not in ids, 'Удалённые преподаватели не предлагаются'
+
+    def test_suggest_excludes_already_substituting(self, client, db, seed_days, admin_csrf):
+        """Преподаватель, уже стоящий заменяющим в другом уроке на эту пару, не предлагается —
+        даже если exclude_teacher_id совпадает с ним (нельзя снять его с замены)."""
+        h = {'X-CSRF-Token': admin_csrf}
+        conn = db.get_db()
+        # Иванов (1) на period=4 уже указан как заменяющий в другом уроке
+        conn.execute('''INSERT INTO lessons
+                        (id, day_id, period, subject_id, teacher_id, classroom_id, group_id, is_substitution)
+                        VALUES (50, 1, 4, 1, 1, 1, 1, 1)''')
+        conn.commit()
+        conn.close()
+
+        resp = client.get('/api/schedule/substitutions-suggest?date=2026-09-07&period=4&exclude_teacher_id=1', headers=h)
+        assert resp.status_code == 200
+        ids = [t['id'] for t in resp.get_json()['available']]
+        assert 1 not in ids, 'Преподаватель уже стоит заменяющим на эту пару — не должен предлагаться'
+        assert 2 in ids, 'Петров свободен и должен предлагаться'
+
+    def test_suggest_exclude_teacher_works_for_non_substitute(self, client, db, seed_lessons, admin_csrf):
+        """exclude_teacher_id снимает занятость/исключение только обычного преподавателя,
+        а не того, кто уже стоит как заменяющий."""
+        h = {'X-CSRF-Token': admin_csrf}
+        conn = db.get_db()
+        # Петров (2) занят на Пн 2-я пара собственным уроком (lesson 2), НЕ как заменяющий
+        resp = client.get('/api/schedule/substitutions-suggest?date=2026-09-07&period=2&exclude_teacher_id=2', headers=h)
+        assert resp.status_code == 200
+        ids = [t['id'] for t in resp.get_json()['available']]
+        assert 2 in ids, 'Исключаемый преподаватель снимается из busy при exclude_teacher_id'
+        conn.close()
+
+    def test_create_lesson_persists_substitution_fields(self, client, db, seed_days, admin_csrf):
+        """POST /api/days/1/lessons должен сохранить флаг замены и исходного преподавателя."""
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.post('/api/days/1/lessons', json={
+            'period': 4, 'subject_id': 1, 'teacher_id': 2, 'classroom_id': 1,
+            'group_id': 1, 'is_substitution': True, 'original_teacher_id': 1,
+            'substitution_reason': 'больничный',
+        }, headers=h)
+        assert resp.status_code == 201
+
+        resp = client.get('/api/days?group=%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0-1')
+        assert resp.status_code == 200
+        lessons = resp.get_json()[0]['lessons']
+        lesson = next(l for l in lessons if l['period'] == 4)
+        assert lesson['is_substitution'] == 1
+        assert lesson['original_teacher_id'] == 1
+        assert lesson['substitution_reason'] == 'больничный'
+
+    def test_update_lesson_persists_substitution_fields(self, client, db, seed_lessons, admin_csrf):
+        """PUT /api/lessons/1 должен обновлять поля замены."""
+        h = {'X-CSRF-Token': admin_csrf}
+        resp = client.put('/api/lessons/1', json={
+            'period': 1, 'subject_id': 1, 'teacher_id': 2, 'classroom_id': 1,
+            'group_id': 1, 'is_substitution': True, 'original_teacher_id': 1,
+            'substitution_reason': 'отпуск',
+        }, headers=h)
+        assert resp.status_code == 200, resp.get_json()
+
+        resp = client.get('/api/days?group=%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0-1')
+        assert resp.status_code == 200
+        lessons = resp.get_json()[0]['lessons']
+        lesson = next(l for l in lessons if l['id'] == 1)
+        assert lesson['is_substitution'] == 1
+        assert lesson['original_teacher_id'] == 1
+        assert lesson['substitution_reason'] == 'отпуск'
+
 
 class TestExport:
     def test_export_xlsx(self, client, seed_lessons):
@@ -296,3 +497,41 @@ class TestValidate:
         }, headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         assert resp.get_json()['ok'] is True
+
+
+class TestWeeksSummary:
+    def test_weeks_summary_empty_year(self, client, seed_refs):
+        resp = client.get('/api/weeks-summary?year=2030')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['year'] == 2030
+        assert data['active_mondays'] == []
+
+    def test_weeks_summary_year_with_lessons(self, client, seed_lessons):
+        resp = client.get('/api/weeks-summary?year=2026')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['year'] == 2026
+        assert data['active_mondays'] == ['2026-09-07']
+
+    def test_weeks_summary_group_filter(self, client, seed_lessons):
+        resp = client.get('/api/weeks-summary?year=2026&group=Группа-1')
+        assert resp.status_code == 200
+        assert resp.get_json()['active_mondays'] == ['2026-09-07']
+
+        resp = client.get('/api/weeks-summary?year=2026&group=Неизвестная')
+        assert resp.status_code == 200
+        assert resp.get_json()['active_mondays'] == []
+
+    def test_weeks_summary_teacher_filter(self, client, seed_lessons):
+        resp = client.get('/api/weeks-summary?year=2026&teacher_id=2')
+        assert resp.status_code == 200
+        assert resp.get_json()['active_mondays'] == ['2026-09-07']
+
+        resp = client.get('/api/weeks-summary?year=2026&teacher_id=999')
+        assert resp.status_code == 200
+        assert resp.get_json()['active_mondays'] == []
+
+    def test_weeks_summary_invalid_year(self, client):
+        resp = client.get('/api/weeks-summary?year=999')
+        assert resp.status_code == 400

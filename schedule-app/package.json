@@ -1,0 +1,10 @@
+{
+  "name": "schedule-app",
+  "private": true,
+  "description": "Расписание колледжа — Flask + SQLite + Vanilla JS SPA",
+  "scripts": {
+    "test": "pytest tests/ -q",
+    "test:e2e": "pytest tests/e2e -v",
+    "test:e2e:install": "python -m playwright install chromium"
+  }
+}

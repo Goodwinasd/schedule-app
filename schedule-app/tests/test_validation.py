@@ -1,6 +1,6 @@
 import pytest
 
-from utils import _validate_lesson_data, _safe_filename, LESSON_SELECT, LESSON_SELECT_WITH_DAY
+from utils import _validate_lesson_data, _validate_lesson_slot, _safe_filename, LESSON_SELECT, LESSON_SELECT_WITH_DAY
 
 
 class TestSafeFilename:
@@ -120,3 +120,66 @@ class TestValidateLessonData:
         )
         assert blocking is False
         assert warnings == []
+
+
+class TestValidateLessonSlot:
+    def _seed(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conn.execute("INSERT INTO teachers (id, name) VALUES (1, 'T1')")
+        conn.execute("INSERT INTO subjects (id, name) VALUES (1, 'S1')")
+        conn.execute("INSERT INTO classrooms_list (id, name) VALUES (1, 'C1')")
+        conn.execute("INSERT INTO groups_list (id, name) VALUES (1, 'G1')")
+        conn.execute("INSERT INTO schedule_days (id, day_name, date, sort_order, group_name) VALUES (1, 'Пн', '2026-09-07', 0, 'G1')")
+        conn.execute("INSERT INTO lessons (id, day_id, period, subject_id, teacher_id, classroom_id, group_id) VALUES (1, 1, 1, 1, 1, 1, 1)")
+        conn.commit()
+        conn.close()
+
+    @pytest.fixture(autouse=True)
+    def setup(self, request, db):
+        self._seed()
+
+    def _day_row(self, conn):
+        return conn.execute('SELECT * FROM schedule_days WHERE id = 1').fetchone()
+
+    def test_teacher_conflict_detected(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conflicts = _validate_lesson_slot(conn, self._day_row(conn), 1, subject_id=1, teacher_id=1, classroom_id=1, group_id=1)
+        assert len(conflicts['teacher']) == 1
+        assert conflicts['teacher'][0]['id'] == 1
+
+    def test_classroom_conflict_detected(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conflicts = _validate_lesson_slot(conn, self._day_row(conn), 1, subject_id=1, teacher_id=1, classroom_id=1, group_id=1)
+        assert len(conflicts['classroom']) == 1
+
+    def test_duplicate_detected(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conflicts = _validate_lesson_slot(conn, self._day_row(conn), 1, subject_id=1, teacher_id=1, classroom_id=1, group_id=1)
+        assert len(conflicts['duplicate']) == 1
+
+    def test_empty_slot_no_conflicts(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conflicts = _validate_lesson_slot(conn, self._day_row(conn), 2, subject_id=1, teacher_id=1, classroom_id=1, group_id=1)
+        assert conflicts['teacher'] == []
+        assert conflicts['classroom'] == []
+        assert conflicts['duplicate'] == []
+
+    def test_exclude_id_removes_conflicts(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conflicts = _validate_lesson_slot(conn, self._day_row(conn), 1, subject_id=1, teacher_id=1, classroom_id=1, group_id=1, exclude_id=1)
+        assert conflicts['teacher'] == []
+        assert conflicts['classroom'] == []
+        assert conflicts['duplicate'] == []
+
+    def test_returns_rich_row_columns(self):
+        import db as db_module
+        conn = db_module.get_db()
+        conflicts = _validate_lesson_slot(conn, self._day_row(conn), 1, subject_id=1, teacher_id=1, classroom_id=1, group_id=1)
+        assert 'day_name' in conflicts['teacher'][0].keys()
+        assert 'groups' in conflicts['teacher'][0].keys()

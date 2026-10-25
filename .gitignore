@@ -1,0 +1,27 @@
+# --- Артефакты инструментов ---
+node_modules/
+graphify-out/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.log
+.coverage
+*,cover
+
+# --- Секреты и боевые данные (дублирует schedule-app/.gitignore) ---
+.env
+.env.*
+!.env.example
+data/
+backups/
+*.db
+*.db-shm
+*.db-wal
+*.db.bak_*
+
+# --- Артефакты текущей рабочей сессии (не часть проекта) ---
+chat-context-handoff.md
+
+# --- ОС ---
+.DS_Store
+Thumbs.db
