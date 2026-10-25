@@ -1,4 +1,4 @@
-
+﻿
 * {
     margin: 0;
     padding: 0;
@@ -184,6 +184,7 @@
 
     /* Типографика */
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --text-2xs: 12px;
     --text-xs: 11px;
     --text-sm: 13px;
     --text-base: 14px;
@@ -1380,7 +1381,7 @@ td.day-cell.drop-error {
     width: 100%;
 }
 
-@media (max-width: 640px) {
+@media screen and (max-width: 640px) {
     #references-modal .ref-grid {
         grid-template-columns: 1fr;
     }
@@ -1722,7 +1723,7 @@ td.day-cell.drop-error {
 
 /* ---- Responsive ---- */
 
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
     .select-grid {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
@@ -1752,20 +1753,8 @@ td.day-cell.drop-error {
         font-size: 10px;
     }
 
-    .schedule-table {
-        font-size: 11px;
-    }
-
     .schedule-table thead th.col-day {
-        min-width: 100px;
-    }
-
-    .lesson-content .lesson-subject {
-        font-size: 11px;
-    }
-
-    .lesson-content .lesson-meta {
-        font-size: 10px;
+        min-width: 120px;
     }
 
     .avail-table td {
@@ -3058,3 +3047,72 @@ select.input:focus {
 }
 .panel-pad { padding: var(--space-4) var(--space-5); }
 .text-sm { font-size: var(--text-sm); }
+
+/* ---- Планшеты и телефоны: плотность, липкая колонка времени, скролл ---- */
+@media screen and (max-width: 1024px) {
+    main {
+        padding: var(--space-4) var(--space-4) 80px;
+    }
+
+    /* Плотность: уменьшаем отступы, но не размер текста (не мельче 12px) */
+    .schedule-table {
+        font-size: var(--text-sm);
+        min-width: 720px; /* не сжимаем колонки — вместо этого горизонтальный скролл */
+    }
+
+    .schedule-table th,
+    .schedule-table td {
+        padding: var(--space-2);
+    }
+
+    .schedule-table thead th {
+        padding: var(--space-2) var(--space-1);
+    }
+
+    .schedule-table tbody td.day-cell {
+        padding: var(--space-1) var(--space-2);
+    }
+
+    .schedule-table tbody td.time-cell {
+        padding: var(--space-2) var(--space-1);
+        font-size: var(--text-2xs);
+    }
+
+    .lesson-content .lesson-subject {
+        font-size: var(--text-sm);
+    }
+
+    .lesson-content .lesson-meta {
+        font-size: var(--text-2xs);
+    }
+
+    /* Ось скролла: горизонтальный свайп остаётся внутри таблицы и не «уезжает»
+       в карусель недель. pan-x pan-y (а не только pan-x), иначе вертикальная
+       прокрутка страницы блокируется, если палец начал движение по таблице. */
+    .schedule-table-wrap {
+        touch-action: pan-x pan-y;
+        overscroll-behavior-x: contain;
+        /* Индикатор прокрутки вправо: мягкая внутренняя тень у правого края */
+        box-shadow:
+            var(--shadow-sm),
+            inset -14px 0 14px -14px rgba(16, 24, 40, 0.28);
+    }
+
+    /* Липкая колонка времени. В border-collapse: collapse border у sticky-ячейки
+       «съезжает», поэтому границы рисуем box-shadow — они не пропадают при скролле. */
+    .schedule-table thead th.col-time,
+    .schedule-table tbody td.time-cell {
+        position: sticky;
+        left: 0;
+        background: var(--color-surface-2);
+        box-shadow: inset -1px 0 0 var(--color-border), inset 0 -1px 0 var(--color-border);
+    }
+
+    .schedule-table thead th.col-time {
+        z-index: 4; /* выше обычных th (z-index: 2) */
+    }
+
+    .schedule-table tbody td.time-cell {
+        z-index: 3;
+    }
+}
