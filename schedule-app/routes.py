@@ -15,7 +15,7 @@ from flask import Blueprint, jsonify, request, session, send_file, render_templa
 from werkzeug.security import check_password_hash
 
 from config import (
-    BELL_SCHEDULE, SHIFT_LABELS, ADMIN_PASSWORD_HASH, DB_PATH,
+    SHIFT_LABELS, ADMIN_PASSWORD_HASH, DB_PATH,
     SETTINGS, apply_setting,
     BELL_SCHEDULE_PRESETS, get_bell_schedule, save_bell_schedule,
     TRASH_RETENTION_DAYS,
@@ -28,6 +28,11 @@ from cache import refs_cache
 from schedule_balancer import weekly_pairs, validate_weekly_load
 
 bp = Blueprint('main', __name__)
+
+# Пределы объёма генерации за один запрос: генерация выполняется в одной транзакции
+# и блокирует записи остальных пользователей.
+MAX_GENERATE_WEEKS = 12          # week_count (произвольный диапазон недель)
+MAX_GENERATE_WEEKS_ALIAS = 4     # weeks_count (алиас «на месяц» из UI)
 
 
 @bp.after_request
@@ -3101,7 +3106,7 @@ def availability():
             if c_id and l['classroom_name']:
                 classroom_busy.setdefault(c_id, {})[key] = info
 
-        periods = [{'period': b['period'], 'start': b['start'], 'end': b['end']} for b in BELL_SCHEDULE]
+        periods = [{'period': b['period'], 'start': b['start'], 'end': b['end']} for b in get_bell_schedule()]
 
         teachers_out = []
         for t in all_teachers:
@@ -3499,9 +3504,23 @@ def schedule_generate():
     # weeks_count = alias for batch/monthly generation (max 4)
     weeks_count = body.get('weeks_count')
     if weeks_count:
-        week_count = min(max(int(weeks_count), 1), 4)
+        try:
+            week_count = min(max(int(weeks_count), 1), MAX_GENERATE_WEEKS_ALIAS)
+        except (TypeError, ValueError):
+            return jsonify({"error": "weeks_count должен быть целым числом"}), 400
     else:
-        week_count = max(int(week_count or 1), 1)
+        try:
+            week_count = int(week_count or 1)
+        except (TypeError, ValueError):
+            return jsonify({"error": "week_count должен быть целым числом"}), 400
+        if week_count < 1:
+            week_count = 1
+        elif week_count > MAX_GENERATE_WEEKS:
+            # Генерация идёт в одной транзакции и блокирует записи: ограничиваем объём.
+            return jsonify({
+                "error": f"Слишком много недель за один запрос: {week_count} > {MAX_GENERATE_WEEKS}. "
+                         f"Генерируйте порциями по {MAX_GENERATE_WEEKS} недель."
+            }), 400
     if not group_id or not monday:
         return jsonify({"error": "group_id and monday required"}), 400
     conn = get_db()

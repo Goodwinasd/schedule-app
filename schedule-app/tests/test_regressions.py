@@ -223,3 +223,45 @@ class TestConfigValidation:
     def test_config_error_is_runtime_error(self):
         import config
         assert issubclass(config.ConfigError, RuntimeError)
+
+
+class TestAvailabilityUsesCustomBellSchedule:
+    """availability должна брать схему звонков из настроек, а не хардкод BELL_SCHEDULE."""
+
+    def test_custom_bell_schedule_visible_in_availability(self, client, seed_refs, admin_csrf):
+        original = client.get('/api/bell-schedule').get_json()
+        custom = [{'period': 1, 'start': '09:15', 'end': '10:30', 'shift': 1}]
+        try:
+            resp = client.put('/api/admin/bell-schedule', json={'schedule': custom},
+                              headers={'X-CSRF-Token': admin_csrf})
+            assert resp.status_code == 200, resp.get_json()
+
+            data = client.get('/api/availability?monday=2026-09-07').get_json()
+            assert data['periods'] == [{'period': 1, 'start': '09:15', 'end': '10:30'}], data['periods']
+        finally:
+            client.put('/api/admin/bell-schedule', json={'schedule': original},
+                       headers={'X-CSRF-Token': admin_csrf})
+
+
+class TestGenerateWeekCountLimit:
+    """Нельзя генерировать произвольно много недель одним запросом."""
+
+    def test_too_many_weeks_rejected(self, client, seed_refs, admin_csrf):
+        resp = client.post('/api/schedule/generate',
+                           json={'group_id': 1, 'semester': 1, 'monday': '2026-09-07', 'week_count': 13},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 400, resp.get_json()
+        assert 'недел' in resp.get_json()['error'].lower()
+
+    def test_non_integer_week_count_rejected(self, client, seed_refs, admin_csrf):
+        resp = client.post('/api/schedule/generate',
+                           json={'group_id': 1, 'semester': 1, 'monday': '2026-09-07', 'week_count': 'много'},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 400
+
+    def test_alias_weeks_count_still_clamped_to_four(self, client, seed_refs, admin_csrf):
+        resp = client.post('/api/schedule/generate',
+                           json={'group_id': 1, 'semester': 1, 'monday': '2026-09-07', 'weeks_count': 99},
+                           headers={'X-CSRF-Token': admin_csrf})
+        assert resp.status_code == 200
+        assert resp.get_json()['weeks_processed'] <= 4
