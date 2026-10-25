@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -91,7 +91,7 @@
                         <button class="btn btn-ghost btn-sm active" id="avail-mode-teacher" data-action="setAvailMode" data-params='["teacher"]'>Преподаватели</button>
                         <button class="btn btn-ghost btn-sm" id="avail-mode-classroom" data-action="setAvailMode" data-params='["classroom"]'>Аудитории</button>
                     </div>
-                    <select id="avail-group-filter" class="input" style="max-width:160px" onchange="loadAvailability()"><option value="">Все группы</option></select>
+                    <select id="avail-group-filter" class="input mw-160" onchange="loadAvailability()"><option value="">Все группы</option></select>
                 </div>
                 <div id="avail-carousel" class="week-carousel"></div>
                 <div class="avail-day-tabs" id="avail-day-tabs"></div>
@@ -197,19 +197,19 @@
                 <option value="1">Подгруппа 1</option>
                 <option value="2">Подгруппа 2</option>
             </select>
-            <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <hr class="divider">
+            <label class="checkbox-row">
                 <input type="checkbox" id="lesson-is-substitution" onchange="document.getElementById('substitution-fields').style.display=this.checked?'':'none'; if(this.checked) refreshSubstitutionSuggest()">
                 Назначить замену
             </label>
             <div id="substitution-fields" style="display:none;margin-top:8px">
                 <label class="field-label">Причина замены</label>
-                <input type="text" id="lesson-substitution-reason" class="input" placeholder="Например: больничный, отпуск" style="max-width:300px">
+                <input type="text" id="lesson-substitution-reason" class="input mw-300" placeholder="Например: больничный, отпуск">
                 <label class="field-label">Основной преподаватель (болеет)</label>
-                <select id="lesson-original-teacher" class="input" style="max-width:250px"><option value="">— не указан —</option></select>
-                <div id="substitution-suggest-block" style="margin-top:10px">
+                <select id="lesson-original-teacher" class="input mw-250"><option value="">— не указан —</option></select>
+                <div class="spacer-top-2" id="substitution-suggest-block">
                     <label class="field-label" for="lesson-substitution-select">Свободные преподаватели на эту пару</label>
-                    <div class="field-row" style="margin-bottom:4px">
+                    <div class="field-row spacer-bottom-1">
                         <select id="lesson-substitution-select" class="input" onchange="pickSubstituteTeacher(this.value)">
                             <option value="">— выберите заменяющего —</option>
                         </select>
@@ -221,7 +221,7 @@
             <div class="modal-actions">
                 <button class="btn btn-danger" id="btn-delete-lesson" style="display:none" data-action="deleteCurrentLesson">Удалить</button>
                 <button class="btn btn-ghost" id="btn-add-subgroup" style="display:none" data-action="addSubgroupLesson">+ Подгруппа</button>
-                <div style="flex:1"></div>
+                <div class="flex-1"></div>
                 <button class="btn btn-ghost" data-action="closeModals">❌ Отмена</button>
                 <button class="btn btn-primary" id="btn-save-lesson" data-action="addLesson">Добавить</button>
             </div>
@@ -254,7 +254,7 @@
                     <div class="ref-list" id="ref-subjects"></div>
                     <div class="field-row">
                         <input type="text" id="ref-subjects-input" placeholder="Новый предмет" class="input">
-                        <select id="ref-subjects-teacher" class="input" style="max-width:160px"><option value="">Преподаватель</option></select>
+                        <select id="ref-subjects-teacher" class="input mw-160"><option value="">Преподаватель</option></select>
                         <button class="btn btn-primary btn-sm" data-action="addSubject">Добавить</button>
                     </div>
                 </div>
@@ -263,7 +263,7 @@
                     <div class="ref-list" id="ref-teachers"></div>
                     <div class="field-row">
                         <input type="text" id="ref-teachers-input" placeholder="ФИО преподавателя" class="input">
-                        <input type="text" id="ref-teachers-phone" placeholder="Телефон" class="input" style="max-width:140px">
+                        <input type="text" id="ref-teachers-phone" placeholder="Телефон" class="input mw-140">
                         <button class="btn btn-primary btn-sm" data-action="addRefItem" data-params='["teachers", "ref-teachers-input", "ref-teachers"]'>Добавить</button>
                     </div>
                 </div>
@@ -274,8 +274,8 @@
                     </h3>
                     <div class="ref-list" id="ref-groups"></div>
                     <div class="field-row">
-                        <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input" style="max-width:140px">
-                        <select id="ref-groups-course" class="input" style="max-width:90px">
+                        <input type="text" id="ref-groups-input" placeholder="Номер группы" class="input mw-140">
+                        <select id="ref-groups-course" class="input mw-90">
                             <option value="1">1 курс</option>
                             <option value="2">2 курс</option>
                             <option value="3">3 курс</option>
@@ -301,9 +301,9 @@
                     <h3>Специальности</h3>
                     <div class="ref-list" id="ref-specialties"></div>
                     <div class="field-row">
-                        <input type="text" id="ref-specialties-code" placeholder="Код (напр. 40.02.04)" class="input" style="max-width:130px">
+                        <input type="text" id="ref-specialties-code" placeholder="Код (напр. 40.02.04)" class="input mw-130">
                         <input type="text" id="ref-specialties-name" placeholder="Название специальности" class="input">
-                        <input type="text" id="ref-specialties-qualification" placeholder="Направленность / квалификация" class="input" style="max-width:230px">
+                        <input type="text" id="ref-specialties-qualification" placeholder="Направленность / квалификация" class="input mw-230">
                         <button class="btn btn-primary btn-sm" data-action="addSpecialty">Добавить</button>
                     </div>
                 </div>
@@ -311,19 +311,19 @@
             <div id="admin-tab-trash" class="admin-tab-content tab-content">
                 <h3>Корзина</h3>
                 <div id="trash-content"></div>
-                <div style="margin-top:12px">
+                <div class="spacer-top-3">
                     <button class="btn btn-danger" data-action="purgeTrash" data-params="[]">Очистить корзину (старше 30 дней)</button>
                 </div>
             </div>
             <div id="admin-tab-system" class="admin-tab-content tab-content">
                 <h3>Диагностика БД</h3>
                 <div id="db-health-content"></div>
-                <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+                <hr class="divider-lg">
                 <h3>Настройки</h3>
                 <div id="settings-content"></div>
-                <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+                <hr class="divider-lg">
                 <div id="bell-schedule-content"></div>
-                <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+                <hr class="divider-lg">
                 <div id="excluded-dates-content"></div>
             </div>
             <div id="admin-tab-curriculum" class="admin-tab-content tab-content">
@@ -338,10 +338,10 @@
                 <h2>📥 Импорт из Excel</h2>
                 <button type="button" class="ref-done" data-action="closeImportModal">Закрыть</button>
             </div>
-            <div style="padding:16px 20px">
-                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Выберите тип данных, скачайте шаблон, заполните его и загрузите файл (.xlsx). Пустые строки и дубликаты будут пропущены.</div>
-                <div class="field-row" style="margin-bottom:12px">
-                    <select id="import-entity-type" class="input" style="max-width:200px">
+            <div class="panel-pad">
+                <div class="hint-text">Выберите тип данных, скачайте шаблон, заполните его и загрузите файл (.xlsx). Пустые строки и дубликаты будут пропущены.</div>
+                <div class="field-row spacer-bottom-3">
+                    <select id="import-entity-type" class="input mw-200">
                         <option value="teachers">Преподаватели</option>
                         <option value="classrooms">Кабинеты</option>
                         <option value="groups">Группы</option>
@@ -350,11 +350,11 @@
                     <button type="button" class="btn btn-ghost btn-sm" data-action="downloadImportTemplate">📥 Скачать шаблон Excel</button>
                 </div>
                 <div class="field-row">
-                    <input type="file" id="import-file" accept=".xlsx" class="input" style="max-width:320px">
+                    <input type="file" id="import-file" accept=".xlsx" class="input mw-320">
                     <button type="button" class="btn btn-primary btn-sm" data-action="uploadImportExcel">Загрузить</button>
                 </div>
-                <div id="import-result" style="margin-top:12px;font-size:13px"></div>
-                <div class="modal-actions" style="justify-content:flex-end;margin-top:4px">
+                <div class="spacer-top-3 text-sm" id="import-result"></div>
+                <div class="modal-actions modal-actions-end">
                     <button type="button" class="btn btn-ghost btn-sm" data-action="closeImportModal">Отмена</button>
                 </div>
             </div>

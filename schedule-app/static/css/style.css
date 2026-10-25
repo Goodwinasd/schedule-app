@@ -38,7 +38,7 @@
     --header-bg: rgba(255, 255, 255, 0.85);
     --input-bg: #ffffff;
     --skeleton-bg: #e2e8f0;
-    --overlay-bg: rgba(0, 0, 0, 0.6);
+    --overlay-bg: rgba(16, 24, 40, 0.55);
     --busy-text: #ff6b6b;
     --busy-meta: #ff9999;
     --conflict-error-bg: #fce4e4;
@@ -100,7 +100,7 @@
     --header-bg: rgba(17, 24, 39, 0.82);
     --input-bg: #111827;
     --skeleton-bg: #1f2937;
-    --overlay-bg: rgba(0, 0, 0, 0.75);
+    --overlay-bg: rgba(0, 0, 0, 0.72);
     --busy-text: #ff6b6b;
     --busy-meta: #ff9999;
     --conflict-error-bg: rgba(255, 69, 58, 0.2);
@@ -199,6 +199,7 @@
     --space-2: 8px;
     --space-3: 12px;
     --space-4: 16px;
+    --space-5: 20px;
     --space-6: 24px;
     --space-8: 32px;
     --space-12: 48px;
@@ -760,34 +761,36 @@ main {
     overflow-x: auto;
     border-radius: var(--radius);
     background: var(--surface);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    padding: 24px 24px;
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-4);
 }
 
 .schedule-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-sm);
     table-layout: fixed;
 }
 
 .schedule-table th,
 .schedule-table td {
-    padding: 14px 16px;
+    padding: var(--space-3);
     border: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--color-border);
     vertical-align: top;
 }
 
 .schedule-table thead th {
-    background: var(--bg);
-    padding: 12px 8px;
+    background: var(--color-surface-2);
+    padding: var(--space-2);
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
     text-align: center;
     position: sticky;
     top: 0;
     z-index: 2;
+    border-bottom: 1px solid var(--color-border-strong);
 }
 
 .schedule-table thead th.col-time {
@@ -802,43 +805,43 @@ main {
 .schedule-table thead th .day-date {
     display: block;
     font-weight: 400;
-    font-size: 11px;
-    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
     margin-top: 2px;
 }
 
 .schedule-table tbody tr.shift-row td {
-    background: rgba(2, 245, 161, 0.06);
-    padding: 8px;
-    font-size: 11px;
+    background: var(--accent-soft);
+    padding: var(--space-2);
+    font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--link-color);
-    border-bottom: 1px solid var(--border);
+    color: var(--accent-700);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .schedule-table tbody td.time-cell {
-    background: var(--bg);
-    padding: 10px 8px;
+    background: var(--color-surface-2);
+    padding: var(--space-2);
     text-align: center;
     font-variant-numeric: tabular-nums;
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
     font-weight: 500;
 }
 
 .schedule-table tbody td.time-cell .period-num {
-    font-size: 14px;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text);
     display: block;
 }
 
 .schedule-table tbody td.day-cell {
-    padding: 8px;
+    padding: var(--space-2) var(--space-3);
     min-height: 60px;
-    transition: background 0.15s;
+    transition: background var(--duration) var(--ease);
 }
 
 .schedule-table tbody td.day-cell:hover {
@@ -846,7 +849,7 @@ main {
 }
 
 .schedule-table tbody td.day-cell.empty-cell {
-    background: rgba(255, 255, 255, 0.02);
+    background: transparent;
 }
 
 .schedule-table tbody td.day-cell.addable-cell {
@@ -854,7 +857,7 @@ main {
 }
 
 .schedule-table tbody td.day-cell.addable-cell:hover {
-    background: rgba(2, 245, 161, 0.08);
+    background: var(--accent-soft);
 }
 
 .schedule-table tbody td.day-cell.editable-cell {
@@ -866,27 +869,29 @@ main {
 }
 
 .lesson-content {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .lesson-content .lesson-subject {
     font-weight: 600;
-    font-size: 13px;
-    margin-bottom: 2px;
+    font-size: var(--text-base);
+    line-height: var(--leading-tight);
+    color: var(--color-text);
+    margin-bottom: var(--space-1);
 }
 
 .lesson-content .lesson-meta {
-    font-size: 11px;
-    color: var(--text-secondary);
-    line-height: 1.4;
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    line-height: var(--leading-normal);
 }
 
 .busy-cell .lesson-content .lesson-subject {
-    color: var(--busy-text);
+    color: var(--color-text);
 }
 
 .busy-cell .lesson-content .lesson-meta {
-    color: var(--busy-meta);
+    color: var(--color-text-secondary);
 }
 
 .busy-cell .lesson-content + .lesson-content {
@@ -902,7 +907,7 @@ main {
 }
 
 .busy-cell .lesson-content:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--color-surface-hover);
 }
 
 /* ---- Drag-and-Drop расписания (только для админа) ---- */
@@ -921,10 +926,12 @@ main {
     transition: all 0.15s ease;
 }
 
-td.day-cell.drag-hover {
-    background-color: rgba(34, 197, 94, 0.15) !important;
-    border: 2px dashed #22c55e !important;
-    border-radius: 8px;
+/* Специфичность (0,3,2) равна правилу :hover выше, поэтому побеждает по порядку —
+   без !important. */
+.schedule-table tbody td.day-cell.drag-hover {
+    background-color: var(--accent-soft);
+    border: 2px dashed var(--accent-500);
+    border-radius: var(--radius-xs);
 }
 
 @keyframes dnd-rollback-flash {
@@ -1139,12 +1146,10 @@ td.day-cell.drop-error {
 .modal-overlay {
     display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: var(--overlay-bg);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 200;
 }
 
@@ -1168,95 +1173,59 @@ td.day-cell.drop-error {
     max-width: min(95vw, 1200px);
 }
 
-/* Импорт из Excel — полноэкранный оверлей (жёстко поверх любых контейнеров) */
-#import-modal.hidden,
-.import-modal-hidden {
-    display: none !important;
+/* Импорт из Excel: полноэкранный оверлей.
+   Видимостью управляет JS (references.js ставит inline display), поэтому
+   display-правила и !important здесь не нужны — только раскладка и облик. */
+#import-modal {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border: none;
+    transform: none;
+    z-index: 300;
+    background: var(--overlay-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
 }
 
-/* Оверлей поверх всего экрана и открытых админок */
-#import-modal:not(.hidden) {
-    display: flex !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background-color: rgba(0, 0, 0, 0.85) !important;
-    z-index: 9999999 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    opacity: 1 !important;            /* Сброс прозрачности */
-    visibility: visible !important;   /* Явная видимость */
-    pointer-events: auto !important;  /* Перехват кликов, пока открыт оверлей */
-    right: 0 !important;
-    bottom: 0 !important;
-    transform: none !important;
-    max-width: none !important;
-    border: none !important;
-    margin: 0 !important;
+#import-modal .modal-content {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    max-width: 560px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
 }
 
-/* Сама всплывающая карточка с содержимым импорта */
-#import-modal .modal-content,
-#import-modal .modal-dialog,
-#import-modal > div:not(.hidden) {
-    background-color: #111827 !important; /* Тёмный непрозрачный фон карточки */
-    color: #f9fafb !important;
-    border: 1px solid #374151 !important;
-    border-radius: 16px !important;
-    padding: 24px !important;
-    max-width: 550px !important;
-    width: 90% !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
-    position: relative !important;
-    z-index: 10000000 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    opacity: 1 !important;      /* Сброс прозрачности (.t-modal по умолчанию opacity:0) */
-    visibility: visible !important;
-    transform: none !important;
-    animation: none !important; /* Отключить modalIn-анимацию, стартующую с opacity:0 */
-}
-
-/* Внутренние элементы тёмной карточки импорта — читаемость текста */
 #import-modal .ref-header {
-    background: transparent !important;
-    padding: 0 0 12px 0;
-    border-bottom: 1px solid #374151;
+    background: transparent;
+    padding: 0 0 var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
     border-radius: 0;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
 }
-#import-modal .ref-header h2 {
-    color: #f9fafb !important;
-}
+
 #import-modal .ref-import-hint,
-#import-modal div[style*="13px"],
 #import-modal label {
-    color: #cbd5e1 !important;
-}
-#import-modal .input {
-    background-color: #1f2937 !important;
-    color: #f9fafb !important;
-    border-color: #374151 !important;
-}
-#import-modal select.input option {
-    background-color: #1f2937 !important;
-    color: #f9fafb !important;
-}
-#import-modal #import-result {
-    color: #f9fafb !important;
+    color: var(--color-text-secondary);
 }
 
 .modal-content {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 24px 28px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-4);
     animation: modalIn 0.2s ease;
-    box-shadow: var(--card-shadow);
+    box-shadow: var(--shadow-lg);
 }
 
 @keyframes modalIn {
@@ -1419,11 +1388,11 @@ td.day-cell.drop-error {
 
 /* Заголовок секции с кнопкой действия справа (симметрия левой/правой колонок) */
 .ref-section-head {
-    display: flex !important;
+    display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 10px !important;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
 }
 .ref-section-head .btn-xs {
     padding: 3px 9px;
@@ -1435,9 +1404,9 @@ td.day-cell.drop-error {
 
 /* Выпадающий список специальности в строке добавления группы */
 .ref-specialty-select {
-    min-width: 160px !important;
-    flex: 1 1 auto !important;
-    max-width: 200px !important;
+    min-width: 160px;
+    flex: 1 1 auto;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1569,28 +1538,27 @@ td.day-cell.drop-error {
 [data-theme="dark"] #references-modal .ref-add-row,
 [data-theme="dark"] #references-modal .ref-footer,
 [data-theme="dark"] #references-modal .ref-section .field-row:last-child {
-    background-color: #111827 !important;
-    background: transparent !important;
-    border-top: 1px solid #374151 !important;
-    border-bottom-left-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
+    background: transparent;
+    border-top: 1px solid var(--color-border);
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
 }
 
 [data-theme="dark"] #references-modal #admin-tab-refs .ref-section > .field-row {
-    background-color: #111827 !important;
-    background-image: none !important;
-    background-clip: padding-box !important;
+    background: transparent;
+    background-image: none;
+    background-clip: padding-box;
 }
 
 [data-theme="dark"] #references-modal .ref-list::-webkit-scrollbar-track {
-    background: #0b1220 !important;
+    background: var(--color-surface-2);
 }
 [data-theme="dark"] #references-modal .ref-list::-webkit-scrollbar-thumb {
-    background: #374151 !important;
-    border-radius: 8px !important;
+    background: var(--color-border-strong);
+    border-radius: var(--radius-xs);
 }
 [data-theme="dark"] #references-modal .ref-list {
-    background: transparent !important;
+    background: transparent;
 }
 
 /* ---- Специальности (таблица) ---- */
@@ -3033,3 +3001,48 @@ select.input:focus {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* ---- Утилиты раскладки: заменили инлайн-стили в index.html ---- */
+.mw-90 { max-width: 90px; }
+.mw-130 { max-width: 130px; }
+.mw-140 { max-width: 140px; }
+.mw-160 { max-width: 160px; }
+.mw-200 { max-width: 200px; }
+.mw-230 { max-width: 230px; }
+.mw-250 { max-width: 250px; }
+.mw-300 { max-width: 300px; }
+.mw-320 { max-width: 320px; }
+.flex-1 { flex: 1; }
+.spacer-top-1 { margin-top: var(--space-1); }
+.spacer-top-2 { margin-top: var(--space-2); }
+.spacer-top-3 { margin-top: var(--space-3); }
+.spacer-bottom-1 { margin-bottom: var(--space-1); }
+.spacer-bottom-3 { margin-bottom: var(--space-3); }
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.hint-text {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-3);
+}
+.modal-actions-end {
+    justify-content: flex-end;
+    margin-top: var(--space-1);
+}
+.divider {
+    margin: var(--space-3) 0;
+    border: none;
+    border-top: 1px solid var(--color-border);
+}
+.divider-lg {
+    margin: var(--space-6) 0;
+    border: none;
+    border-top: 1px solid var(--color-border);
+}
+.panel-pad { padding: var(--space-4) var(--space-5); }
+.text-sm { font-size: var(--text-sm); }
