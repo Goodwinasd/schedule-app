@@ -265,3 +265,40 @@ class TestGenerateWeekCountLimit:
                            headers={'X-CSRF-Token': admin_csrf})
         assert resp.status_code == 200
         assert resp.get_json()['weeks_processed'] <= 4
+
+
+class TestPdfExportEscaping:
+    """Символы &, <, > из БД не должны ломать XML-парсер reportlab."""
+
+    def test_pdf_export_with_special_chars_in_data(self, client, seed_lessons, db):
+        conn = db.get_db()
+        conn.execute("UPDATE subjects SET name = ? WHERE id = 1", ('Математика & <Тригонометрия>',))
+        conn.execute("UPDATE teachers SET name = ? WHERE id = 1", ('Иванов & <И.И.>',))
+        conn.commit()
+        conn.close()
+
+        resp = client.get('/api/export', query_string={
+            'type': 'group', 'name': 'Группа-1', 'monday': '2026-09-07', 'format': 'pdf',
+        })
+        assert resp.status_code == 200, resp.data[:300]
+        assert resp.mimetype == 'application/pdf'
+        assert resp.data.startswith(b'%PDF')
+
+    def test_pdf_font_fallback_warns(self, monkeypatch, caplog):
+        import logging
+
+        import routes
+        monkeypatch.delenv('PDF_FONT_PATH', raising=False)
+        monkeypatch.setattr(routes.os.path, 'exists', lambda p: False)
+        with caplog.at_level(logging.WARNING):
+            path, bold = routes._resolve_pdf_font()
+        assert path is None and bold is None
+        assert any('кириллиц' in r.getMessage().lower() or 'шрифт' in r.getMessage().lower()
+                   for r in caplog.records), [r.getMessage() for r in caplog.records]
+
+    def test_pdf_safe_escapes_reportlab_markup(self):
+        import routes
+        assert routes._pdf_safe('Математика & <Тригонометрия>') == \
+            'Математика &amp; &lt;Тригонометрия&gt;'
+        assert routes._pdf_safe('без спецсимволов') == 'без спецсимволов'
+        assert routes._pdf_safe(None) == ''

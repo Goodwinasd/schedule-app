@@ -9,6 +9,7 @@ import logging
 import threading
 from datetime import datetime, timedelta
 from functools import wraps
+from xml.sax.saxutils import escape as _xml_escape
 
 logger = logging.getLogger(__name__)
 from flask import Blueprint, jsonify, request, session, send_file, render_template
@@ -448,6 +449,55 @@ def _export_word(week_dates, periods, title):
     return buf
 
 
+def _pdf_safe(value):
+    """Экранировать текст для reportlab Paragraph: его содержимое парсится как XML,
+    поэтому `&`, `<`, `>` из названий предметов/групп ломают разметку
+    (а `<текст>` молча проглатывается как неизвестный тег)."""
+    return _xml_escape('' if value is None else str(value))
+
+
+def _resolve_pdf_font():
+    """Найти TTF с поддержкой кириллицы.
+
+    Порядок: PDF_FONT_PATH из окружения → Windows-шрифты → Linux (DejaVu/Liberation/Noto).
+    Если ничего не найдено — (None, None) и WARNING: Helvetica кириллицу не покажет.
+    """
+    font_path = (os.environ.get('PDF_FONT_PATH') or '').strip()
+    if not font_path:
+        candidates = [
+            r'C:\Windows\Fonts\arial.ttf',
+            r'C:\Windows\Fonts\segoeui.ttf',
+            r'C:\Windows\Fonts\tahoma.ttf',
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/TTF/DejaVuSans.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+            '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+        ]
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                font_path = candidate
+                break
+
+    if not font_path or not os.path.exists(font_path):
+        logger.warning(
+            "PDF: не найден шрифт с поддержкой кириллицы — используется Helvetica, "
+            "русский текст в PDF может отобразиться некорректно. Задайте PDF_FONT_PATH."
+        )
+        return None, None
+
+    bold_path = (os.environ.get('PDF_FONT_BOLD_PATH') or '').strip()
+    if not bold_path:
+        for suffix in ('bd.ttf', '-Bold.ttf', 'Bold.ttf'):
+            candidate = font_path[:-4] + suffix
+            if os.path.exists(candidate):
+                bold_path = candidate
+                break
+    if not bold_path or not os.path.exists(bold_path):
+        bold_path = font_path
+    return font_path, bold_path
+
+
 def _export_pdf(week_dates, periods, title):
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
@@ -457,28 +507,7 @@ def _export_pdf(week_dates, periods, title):
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    font_path = os.environ.get('PDF_FONT_PATH', '')
-    if not font_path:
-        candidates = [
-            r'C:\Windows\Fonts\tahoma.ttf',
-            r'C:\Windows\Fonts\arial.ttf',
-            r'C:\Windows\Fonts\segoeui.ttf',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            '/usr/share/fonts/TTF/DejaVuSans.ttf',
-        ]
-        for cp in candidates:
-            if os.path.exists(cp):
-                font_path = cp
-                break
-    if not font_path or not os.path.exists(font_path):
-        font_path = None
-
-    font_bold_path = os.environ.get('PDF_FONT_BOLD_PATH', '')
-    if not font_bold_path and font_path:
-        bname = font_path.replace('.ttf', 'bd.ttf')
-        if os.path.exists(bname):
-            font_bold_path = bname
-
+    font_path, font_bold_path = _resolve_pdf_font()
     if font_path:
         pdfmetrics.registerFont(TTFont('Tahoma', font_path))
         pdfmetrics.registerFont(TTFont('Tahoma-Bold', font_bold_path or font_path))
@@ -494,23 +523,26 @@ def _export_pdf(week_dates, periods, title):
     style_header = ParagraphStyle('Header', fontName=font_bold_name, fontSize=9, leading=11, alignment=1)
 
     elements = []
-    elements.append(Paragraph(title, style_title))
+    elements.append(Paragraph(_pdf_safe(title), style_title))
     elements.append(Spacer(1, 0.3*cm))
 
     header_dates = [(wd['day_name'], datetime.strptime(wd['date'], '%Y-%m-%d')) for wd in week_dates]
-    data = [['Пара'] + [f"{name}\n{d.day}.{d.month}" for name, d in header_dates]]
+    data = [['Пара'] + [f"{_pdf_safe(name)}\n{d.day}.{d.month}" for name, d in header_dates]]
 
     last_shift = 0
     for p in periods:
         if p['shift'] != last_shift:
             last_shift = p['shift']
-            shift_row_data = [Paragraph(f"<b>{SHIFT_LABELS[p['shift']]}</b>", style_header)]
+            shift_row_data = [Paragraph(f"<b>{_pdf_safe(SHIFT_LABELS[p['shift']])}</b>", style_header)]
             shift_row_data += [''] * len(week_dates)
             data.append(shift_row_data)
-        row = [Paragraph(f"<b>{p['period']} пара</b><br/>{p['start']}–{p['end']}", style_cell)]
+        row = [Paragraph(
+            f"<b>{p['period']} пара</b><br/>{_pdf_safe(p['start'])}–{_pdf_safe(p['end'])}",
+            style_cell,
+        )]
         for wd in week_dates:
             text = p['lessons'].get(wd['date'], '')
-            row.append(Paragraph(text.replace('\n', '<br/>'), style_cell) if text else '')
+            row.append(Paragraph(_pdf_safe(text).replace('\n', '<br/>'), style_cell) if text else '')
         data.append(row)
 
     col_widths = [2.5*cm] + [max(2.2*cm, (landscape(A4)[0] - 4*cm - 2.5*cm) / len(week_dates))] * len(week_dates)
