@@ -128,3 +128,43 @@ def test_composite_stream_skipped_and_logged(app, db):
     assert moved == 0
     messages = [r.getMessage() for r in records]
     assert any('составной поток' in m and '02-0923' in m for m in messages), messages
+
+
+def _plan_with_gaps():
+    """Рваные дни: Пн 1-2-4 (окно), Вт 2-3 (поздний старт). Оптимум — 1-2-3 и 1-2."""
+    lessons = []
+    for period in (1, 2, 4):
+        lessons.append({'date': '2026-09-07', 'period': period, 'teacher_id': period,
+                        'classroom_id': period, 'group_id': 1, 'subject_id': period})
+    for period in (2, 3):
+        lessons.append({'date': '2026-09-08', 'period': period, 'teacher_id': 10 + period,
+                        'classroom_id': 10 + period, 'group_id': 1, 'subject_id': 10 + period})
+    return lessons
+
+
+def test_cost_spec_examples(app):
+    """Штрафы ровно как в ТЗ: окно дороже 4-й пары в разы."""
+    def cost(*periods, date='2026-09-07'):
+        return generator._calculate_cost([
+            {'date': date, 'period': p, 'group_id': 1, 'teacher_id': p} for p in periods])
+
+    assert cost(1, 2, 3, 4) == 0                 # идеальный день: 4 пары подряд
+    assert cost(1, 2, 4) == 100 + 100 * 1        # окно на 3-й паре
+    assert cost(1, 4) == 100 + 100 * 2           # два окна
+    assert cost(2, 3) == 100                     # день начался со 2-й пары
+    assert cost(1, 2, 4) > cost(1, 2, 3, 4) * 10
+
+
+def test_no_group_gaps_in_optimized_schedule(app):
+    """После отжига в днях нет окон, и день начинается с 1-й пары."""
+    plan = _plan_with_gaps()
+    optimized = generator._optimize_schedule(plan, seed=42, iterations=800, time_budget=2.0)
+    assert generator._calculate_cost(optimized) == 0, optimized
+
+    by_date = {}
+    for item in optimized:
+        by_date.setdefault(item['date'], []).append(item['period'])
+    for date, periods in by_date.items():
+        periods = sorted(periods)
+        assert periods[0] == 1, f'{date}: день начинается не с 1-й пары: {periods}'
+        assert periods == list(range(1, len(periods) + 1)), f'{date}: окно в дне: {periods}'

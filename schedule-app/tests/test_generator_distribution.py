@@ -99,3 +99,25 @@ def test_topup_moves_pairs_instead_of_dropping(app, db):
     # понедельник занят чужими парами, остальные дни добрали нагрузку
     assert counts[0] == 4, counts
     assert sum(counts[1:]) == 18, counts
+
+
+def test_optimized_generation_has_no_duplicate_periods(app, db):
+    """Отжиг меняет только период внутри дня и не создаёт дублей (date, period)."""
+    conn = db.get_db()
+    gid = _setup_group(conn)
+    monday = _monday()
+    res = generator.generate_schedule(conn, gid, 'Тест-группа', 1, monday, 2, optimize=True)
+    conn.commit()
+
+    assert res['created'] > 0, res
+    duplicates = conn.execute(
+        "SELECT sd.date, l.period, COUNT(*) c FROM lessons l "
+        "JOIN schedule_days sd ON l.day_id = sd.id "
+        "WHERE l.group_id = ? AND l.deleted_at IS NULL AND sd.deleted_at IS NULL "
+        "GROUP BY sd.date, l.period HAVING c > 1", (gid,)).fetchall()
+    assert not duplicates, [dict(r) for r in duplicates]
+
+    for periods in _periods_by_day(conn, gid, monday):
+        if periods:
+            assert periods[0] == 1, f'день не с 1-й пары: {periods}'
+            assert periods == list(range(1, len(periods) + 1)), f'окно в дне: {periods}'

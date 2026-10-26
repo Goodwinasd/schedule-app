@@ -171,9 +171,10 @@ def _mirror_week_lessons(conn, group_name, placed):
 
 W_TEACHER_GAP_BASE = 10   # окно преподавателя: базовый штраф за разрыв
 W_TEACHER_GAP_STEP = 6    # + за каждую «пустую» пару в разрыве
-W_GROUP_GAP_BASE = 4      # окно группы: средний штраф
-W_GROUP_GAP_STEP = 2
-W_OVERLOAD = 5            # каждая пара сверх дневного лимита
+W_GROUP_GAP_BASE = 100    # окно группы: «рваный» день недопустим — штраф выше любого другого
+W_GROUP_GAP_STEP = 100    # +100 за каждую пропущенную пару в разрыве
+W_GROUP_START = 100       # каждая пустая пара в начале дня (день должен начинаться с 1-й)
+W_OVERLOAD = 5            # каждая пара сверх дневного лимита (4 пары подряд — норма)
 OPTIMIZE_ITERATIONS = 1000
 OPTIMIZE_TIME_BUDGET = 2.5
 ANNEAL_T_START = 8.0
@@ -221,6 +222,10 @@ def _calculate_cost(plan, fixed=None):
         cost += _gap_cost(periods, W_TEACHER_GAP_BASE, W_TEACHER_GAP_STEP)
     for (gid, date), periods in group_days.items():
         cost += _gap_cost(periods, W_GROUP_GAP_BASE, W_GROUP_GAP_STEP)
+        first_period = min(periods)
+        if first_period > 1:
+            # День должен начинаться с 1-й пары: каждая пустая пара в начале — штраф.
+            cost += W_GROUP_START * (first_period - 1)
         limit = MAX_PAIRS_SATURDAY if _is_saturday(date) else MAX_PAIRS_WEEKDAY
         if len(periods) > limit:
             cost += W_OVERLOAD * (len(periods) - limit)
@@ -254,12 +259,16 @@ def _slot_taken(occupancy, date, period, item):
 
 
 def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
-                       time_budget=OPTIMIZE_TIME_BUDGET, fixed=None, allowed_periods=None):
+                       time_budget=OPTIMIZE_TIME_BUDGET, fixed=None, allowed_periods=None,
+                       same_date_only=False):
     """Имитация отжига: двигаем пары по периодам в рамках тех же дней.
 
     Жёсткие ограничения (преподаватель/аудитория/группа) проверяются по
     in-memory индексам занятости: конфликтный ход просто не применяется.
     Детерминированность — за счёт `random.Random(seed)`.
+    `same_date_only=True` — свап только между парами одной даты: режим для записи
+    в БД, где мы обновляем только `period` и не переносим пары на другие дни.
+
     Возвращает лучший найденный план (не хуже исходного).
     """
     if not plan:
@@ -293,6 +302,8 @@ def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
             if b['period'] not in allowed or a['period'] not in allowed:
                 continue
             if (a['date'], a['period'], a.get('group_id')) == (b['date'], b['period'], b.get('group_id')):
+                continue
+            if same_date_only and a['date'] != b['date']:
                 continue
             rest = [item for k, item in enumerate(current) if k not in (i, j)]
             occupancy = _occupancy(rest + fixed)
@@ -371,7 +382,8 @@ def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed
     plan = [dict(row) for row in rows]
     fixed = [dict(row) for row in fixed_rows]
     before = _calculate_cost(plan, fixed)
-    optimized = _optimize_schedule(plan, seed=seed, fixed=fixed, allowed_periods=allowed_periods)
+    optimized = _optimize_schedule(plan, seed=seed, fixed=fixed, allowed_periods=allowed_periods,
+                                   same_date_only=True)
     after = _calculate_cost(optimized, fixed)
 
     original_period = {item['id']: item['period'] for item in plan}
