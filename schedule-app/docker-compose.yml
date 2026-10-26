@@ -1,15 +1,41 @@
-version: "3.9"
-
 services:
-  app:
+  web:
     build: .
+    image: schedule-app:latest
+    container_name: schedule-app
+    restart: unless-stopped
     ports:
       - "5000:5000"
-    volumes:
-      - ./data:/app/data
-      - ./backups:/app/backups
     env_file:
       - .env
     environment:
-      - FLASK_HOST=0.0.0.0
+      SCHEDULE_DATA_DIR: /app/data
+      SCHEDULE_BACKUPS_DIR: /app/backups
+      PDF_FONT_PATH: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Бэкапы вне веб-процесса: под WSGI/несколькими воркерами apscheduler ненадёжен.
+  backup:
+    image: schedule-app:latest
     restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SCHEDULE_DATA_DIR: /app/data
+      SCHEDULE_BACKUPS_DIR: /app/backups
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "while true; do python -c 'import db; db.create_backup()' || true; sleep 21600; done"
+    depends_on:
+      - web

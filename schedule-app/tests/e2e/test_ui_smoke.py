@@ -22,6 +22,10 @@ def test_availability_smoke(page, e2e_server):
     page.on('console', lambda m: console_msgs.append((m.type, m.text)))
     page.on('pageerror', lambda err: console_msgs.append(('pageerror', str(err))))
 
+    health = page.request.get(f'{e2e_server}/api/health')
+    assert health.status == 200, health.text()
+    assert health.json() == {'status': 'ok', 'db': 'ok'}
+
     page.goto(f'{e2e_server}/', wait_until='domcontentloaded')
 
     # 1. #app не пуст — нет «белого экрана»

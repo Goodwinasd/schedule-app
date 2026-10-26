@@ -8,3 +8,4 @@ reportlab>=4.0
 flasgger>=0.9.7
 alembic>=1.18
 apscheduler>=3.10
+waitress>=3.0

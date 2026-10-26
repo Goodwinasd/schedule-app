@@ -1,12 +1,30 @@
-__pycache__
-*.pyc
+# секреты и данные
 .env
-.git
-.gitignore
-.gitattributes
-.pytest_cache
+.env.*
+data/
+backups/
+run/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# dev/док/тесты не нужны в образе
 tests/
-README.md
-DOCKER.md
-docker-compose.yml
-.DS_Store
+docs/
+.git/
+.gitignore
+*.log
+*.png
+*.md
+.opencode/
+node_modules/
+chat-context-handoff.md

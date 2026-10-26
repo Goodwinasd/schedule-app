@@ -64,6 +64,25 @@ python -m flask --app app run --port 5000
 Вспомогательные скрипты: `run.bat` (запуск), `start.bat`, `restart.bat`.
 **`restart.bat` убивает все процессы `python.exe` на машине** — не использовать без необходимости.
 
+## Docker (production)
+
+```bash
+cp .env.example .env            # заполнить SCHEDULE_PASSWORD и SCHEDULE_SECRET_KEY
+docker compose up -d --build    # web + backup
+docker compose ps               # статус, healthcheck
+docker compose logs -f web
+docker compose down
+```
+
+- образ `python:3.13-slim`, пользователь `appuser` (non-root), WSGI — `waitress` (один процесс:
+  кэш справочников и планировщик не конфликтуют);
+- `fonts-dejavu-core` в образе — кириллица в PDF;
+- `./data` и `./backups` — volumes, переживают пересоздание контейнера;
+- миграции и seed выполняются при старте (`docker/entrypoint.sh`);
+- бэкапы — отдельный сервис `backup` (вне веб-процесса), каждые 6 часов;
+- healthcheck: `GET /api/health` → `{"status":"ok","db":"ok"}`;
+- наружу порт 5000; в проде — за reverse-proxy (nginx/Caddy) с HTTPS.
+
 ## Тесты
 
 ```bat

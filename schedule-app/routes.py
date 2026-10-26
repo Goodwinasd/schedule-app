@@ -83,6 +83,19 @@ def csrf_check():
                 return jsonify({"error": "CSRF token missing or invalid"}), 403
 
 
+@bp.route('/api/health')
+def health():
+    """Живость приложения и БД — для Docker HEALTHCHECK / мониторинга."""
+    try:
+        conn = get_db()
+        conn.execute('SELECT 1').fetchone()
+        conn.close()
+    except Exception:
+        logger.exception("Health check failed")
+        return jsonify({"status": "degraded", "db": "error"}), 503
+    return jsonify({"status": "ok", "db": "ok"})
+
+
 @bp.errorhandler(ValueError)
 def _handle_bad_value(exc):
     """Некорректный параметр запроса (дата, число) — 400 вместо 500 с трассировкой.
