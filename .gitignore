@@ -25,3 +25,6 @@ chat-context-handoff.md
 # --- РћРЎ ---
 .DS_Store
 Thumbs.db
+
+# PID-файлы локального запуска (scripts/start-site.bat)
+run/
