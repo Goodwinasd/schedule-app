@@ -66,6 +66,8 @@ python -m flask --app app run --port 5000
 
 ## Docker (production)
 
+> ⚠️ **Перед запуском в production обязательно смените `SCHEDULE_PASSWORD` и `SCHEDULE_SECRET_KEY` в `.env`.** Дефолтные/засвеченные значения недопустимы: ключ подписи сессий позволяет подделать вход администратора.
+
 ```bash
 cp .env.example .env            # заполнить SCHEDULE_PASSWORD и SCHEDULE_SECRET_KEY
 docker compose up -d --build    # web + backup
