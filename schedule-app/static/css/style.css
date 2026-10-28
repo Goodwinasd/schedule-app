@@ -4960,6 +4960,16 @@ select.input:focus {
         box-shadow: var(--shadow-lg);
     }
 
+    #references-modal .ref-header,
+    #references-modal .admin-tabs {
+        flex: 0 0 auto;
+    }
+
+    #references-modal .admin-tab-content {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
     .ref-header {
         display: flex;
         align-items: center;
