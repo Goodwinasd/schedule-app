@@ -95,21 +95,18 @@ Danger / Icon. Все размеры, цвета и радиусы — из то
 
 ## Проверка
 
+- `pytest tests/ -q --ignore=tests/e2e` — **356 passed**.
+- `pytest tests/e2e -q` — **7 passed**.
+- `node --check` по всем затронутым JS-модулям — без ошибок.
+- Скриншоты: `docs/ui/buttons/01-home-desktop.png` … `10-add-lesson-mobile.png`
+  (включая вход, добавление пары, настройки, корзину, публикацию, мобильный вид).
+- Отдельно исправлено схлопывание вкладок админки в flex-колонке модалки:
+  `.ref-header` и `.admin-tabs` получили `flex: 0 0 auto`.
+
 Статический preview: [`buttons-preview.html`](buttons-preview.html) — открыть
 в браузере, он подключает реальный `../../static/css/style.css`.
 
-Автоматические проверки и скриншоты в этой сессии недоступны: PowerShell
-падает до запуска команд с кодом `3221225794`; `git` в воркспейсе не
-обнаружен (`.git` отсутствует). После восстановления окружения нужно
-прогнать:
+Ветка: `feat/ui-buttons-audit`; коммиты:
+`10164ff` (аудит и preview), `efb5edc` (финальная полировка кнопок и вкладок).
+Редизайн — `39e2c4a` в ветке `feat/ui-redesign`.
 
-```bat
-python -m pytest tests/ -q --ignore=tests/e2e --tb=short
-node --check static/js/modules/ui.js
-node --check static/js/modules/schedule.js
-node --check static/js/modules/modal.js
-node --check static/js/modules/utils.js
-```
-
-и снять скриншоты: главная, модалка входа, добавление пары, настройки,
-корзина, публикация недели.

@@ -65,17 +65,14 @@
 
 ## Проверка
 
-Слой собран статически. Автоматические проверки (`pytest`, `node --check`,
-скриншоты Playwright) в этой сессии не запускались: PowerShell в окружении
-падает до выполнения команд с кодом `3221225794`. Перед коммитом нужно
-прогнать:
+Проверено на рабочем окружении:
 
 ```bat
-python -m pytest tests/ -q --ignore=tests/e2e --tb=short
-python -m pytest tests/e2e -q
-node --check static/js/modules/ui.js
-node --check static/js/modules/schedule.js
-node --check static/js/modules/main.js
+python -m pytest tests/ -q --ignore=tests/e2e --tb=short   :: 356 passed
+python -m pytest tests/e2e -q                              :: 7 passed
+node --check static/js/modules/*.js                         :: без ошибок
 ```
 
-и снять скриншоты главной, таблицы, админки и мобильной версии.
+Скриншоты: `docs/ui/buttons/01-home-desktop.png` … `10-add-lesson-mobile.png`.
+Кнопочная система и финальная полировка зафиксированы в ветке
+`feat/ui-buttons-audit`; подробности — `docs/ui/buttons-audit.md`.
