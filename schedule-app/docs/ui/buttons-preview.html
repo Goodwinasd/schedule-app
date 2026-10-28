@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кнопочная система · preview</title>
+    <link rel="stylesheet" href="../../static/css/style.css">
+    <style>
+        .preview-main {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 32px 24px 80px;
+        }
+        .preview-heading {
+            margin: 0 0 6px;
+            font-family: var(--font-display);
+            font-size: 38px;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            color: var(--color-text);
+        }
+        .preview-lead {
+            margin: 0 0 34px;
+            max-width: 72ch;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--color-text-secondary);
+        }
+        .preview-section {
+            margin-bottom: 34px;
+        }
+        .preview-section > h2 {
+            margin: 0 0 12px;
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            color: var(--color-text);
+        }
+        .preview-box {
+            padding: 22px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+        }
+        .preview-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        .preview-row + .preview-row {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--color-border);
+        }
+        .preview-label {
+            display: block;
+            min-width: 150px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.13em;
+            text-transform: uppercase;
+            color: var(--color-text-muted);
+        }
+        .preview-mods {
+            display: grid;
+            grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+        .preview-frame {
+            padding: 18px;
+            background: var(--color-surface-2);
+            border: 1px dashed var(--color-border-strong);
+            border-radius: var(--radius-lg);
+        }
+        .preview-frame .modal-content {
+            width: 100%;
+            max-width: 100%;
+            box-shadow: var(--shadow-sm);
+        }
+        .preview-caption {
+            margin: 8px 0 0;
+            font-size: 11px;
+            color: var(--color-text-muted);
+        }
+        .preview-publish {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .preview-form-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 520px;
+        }
+        .preview-form-row .input {
+            max-width: 140px;
+        }
+        .preview-trash {
+            max-width: 340px;
+        }
+        @media (max-width: 900px) {
+            .preview-mods { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 600px) {
+            .preview-main { padding: 22px 14px 64px; }
+            .preview-heading { font-size: 30px; }
+            .preview-label { min-width: 100%; }
+            .preview-row { align-items: stretch; }
+            .preview-row .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<main class="preview-main">
+    <p class="home-eyebrow" style="margin-bottom:8px">Дизайн-система</p>
+    <h1 class="preview-heading">Кнопки: роли и размеры</h1>
+    <p class="preview-lead">Статический preview для визуальной проверки. Подключает реальный
+        <code>static/css/style.css</code>: размеры, токены и адаптивные правила совпадают с приложением.</p>
+
+    <section class="preview-section">
+        <h2>Четыре роли</h2>
+        <div class="preview-box">
+            <div class="preview-row">
+                <span class="preview-label">Primary 44</span>
+                <button class="btn btn-primary">Войти</button>
+                <button class="btn btn-primary">Сохранить</button>
+                <button class="btn btn-primary">Сгенерировать</button>
+            </div>
+            <div class="preview-row">
+                <span class="preview-label">Secondary 40</span>
+                <button class="btn btn-ghost">Отмена</button>
+                <button class="btn btn-ghost">Закрыть</button>
+                <button class="btn btn-ghost">Управление неделей</button>
+            </div>
+            <div class="preview-row">
+                <span class="preview-label">Danger 40</span>
+                <button class="btn btn-danger">Удалить</button>
+                <button class="btn btn-danger">Очистить корзину</button>
+            </div>
+            <div class="preview-row">
+                <span class="preview-label">Compact / Icon</span>
+                <button class="btn btn-primary btn-sm">Добавить</button>
+                <button class="btn btn-ghost btn-sm">Изменить</button>
+                <button class="btn btn-danger btn-icon btn-sm" aria-label="Удалить">×</button>
+                <button class="btn btn-ghost btn-icon" aria-label="Добавить">+</button>
+                <button class="btn btn-ghost btn-icon" aria-label="Тема">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="preview-section">
+        <h2>Панель расписания</h2>
+        <div class="preview-box">
+            <div class="schedule-actions" style="border-bottom:none;padding-bottom:0;margin:0">
+                <div class="admin-panel">
+                    <button class="btn btn-primary btn-add-day">Добавить неделю</button>
+                    <button class="btn btn-ghost dropdown-toggle">Управление неделей ▾</button>
+                </div>
+                <div class="print-panel">
+                    <button class="btn btn-ghost dropdown-toggle">Экспорт ▾</button>
+                </div>
+            </div>
+            <div class="preview-publish" style="margin-top:18px">
+                <span class="preview-label">Публикация</span>
+                <div class="publish-group" role="group" aria-label="Статус публикации">
+                    <button class="btn btn-sm publish-btn publish-published is-active">Опубликовано</button>
+                    <button class="btn btn-sm publish-btn publish-draft">В черновик</button>
+                </div>
+                <div class="publish-group" role="group" aria-label="Черновик">
+                    <button class="btn btn-sm publish-btn publish-published">Опубликовать</button>
+                    <button class="btn btn-sm publish-btn publish-draft is-active">Черновик</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="preview-section">
+        <h2>Модалки: узкая и широкая</h2>
+        <div class="preview-mods">
+            <div class="preview-frame">
+                <div class="modal-content modal-narrow">
+                    <h2>Вход</h2>
+                    <label class="field-label" for="preview-password">Пароль администратора</label>
+                    <input id="preview-password" class="input" type="password" placeholder="Пароль">
+                    <div class="modal-actions">
+                        <button class="btn btn-ghost">Отмена</button>
+                        <button class="btn btn-primary">Войти</button>
+                    </div>
+                </div>
+                <p class="preview-caption">Узкая: primary на всю ширину, secondary под ним.</p>
+            </div>
+            <div class="preview-frame">
+                <div class="modal-content">
+                    <h2>Новая пара</h2>
+                    <div class="field-row">
+                        <select class="input"><option>Предмет</option></select>
+                        <button class="btn btn-ghost btn-icon" aria-label="Добавить предмет">+</button>
+                    </div>
+                    <div class="field-row">
+                        <select class="input"><option>Преподаватель</option></select>
+                        <button class="btn btn-ghost btn-icon" aria-label="Добавить преподавателя">+</button>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-danger">Удалить</button>
+                        <button class="btn btn-ghost">Переместить</button>
+                        <button class="btn btn-ghost">Отмена</button>
+                        <button class="btn btn-primary">Сохранить</button>
+                    </div>
+                </div>
+                <p class="preview-caption">Широкая: secondary слева, primary справа, danger отдельно.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="preview-section">
+        <h2>Формы и строки</h2>
+        <div class="preview-box">
+            <div class="preview-form-row">
+                <input class="input" value="3600" aria-label="Время сессии">
+                <button class="btn btn-primary btn-sm" style="margin-left:auto">Сохранить</button>
+            </div>
+            <div class="ref-item" style="margin-top:14px;max-width:520px">
+                <span class="ref-item-name">Иванов И. И. <span class="ref-item-tag">Преподаватель</span></span>
+                <div class="ref-item-actions">
+                    <button class="btn btn-ghost btn-xs">Изменить</button>
+                    <button class="btn btn-danger btn-icon btn-sm" aria-label="Удалить">×</button>
+                </div>
+            </div>
+            <div class="trash-card preview-trash" style="margin-top:14px">
+                <div class="trash-card-type">Группа</div>
+                <div class="trash-card-name">09-01/24</div>
+                <div class="trash-card-meta">Удалена 26.10.2026</div>
+                <div class="trash-card-actions">
+                    <button class="btn btn-outline-accent btn-sm">Восстановить</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="preview-section">
+        <h2>Мобильное поведение</h2>
+        <div class="preview-box">
+            <p class="preview-lead" style="margin-bottom:12px">Сузьте окно до 768 px: header-кнопки
+                становятся 36×36, а действия модалок — колонкой: primary сверху на всю ширину,
+                secondary ниже.</p>
+            <div class="modal-actions" style="max-width:420px">
+                <button class="btn btn-ghost">Отмена</button>
+                <button class="btn btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>
