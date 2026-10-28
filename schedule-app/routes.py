@@ -1,4 +1,4 @@
-﻿# Изменение №4 (бэкенд-рефакторинг): выделены маршруты в routes.py
+# Изменение №4 (бэкенд-рефакторинг): выделены маршруты в routes.py
 
 import sqlite3
 import os
@@ -197,6 +197,8 @@ def _fetch_entity_raw(entity_table, entity_id, entity_col, monday):
             'id': r['id'], 'subject': r['subject_name'], 'teacher': r['teacher_name'],
             'classroom': r['classroom_name'],
             'groups': r['group_name'] or r['groups'],
+            'additional_teachers': r['additional_teachers'],
+            'custom_room_name': r['custom_room_name'],
             'day_id': r['day_id'],
             'group_id': r['group_id'], 'subgroup': r['subgroup']
         }
@@ -217,6 +219,8 @@ def _build_schedule_periods(week_dates, lessons_by_date_period):
                 lessons[d] = [{
                     'id': lesson['id'], 'subject': lesson['subject'], 'teacher': lesson['teacher'],
                     'classroom': lesson['classroom'], 'groups': lesson['groups'],
+                    'additional_teachers': lesson.get('additional_teachers'),
+                    'custom_room_name': lesson.get('custom_room_name'),
                     'day_id': lesson['day_id'],
                     'group_id': lesson.get('group_id'), 'subgroup': lesson.get('subgroup')
                 }]
@@ -224,6 +228,18 @@ def _build_schedule_periods(week_dates, lessons_by_date_period):
                 lessons[d] = []
         periods.append({**b, 'lessons': lessons})
     return periods
+
+
+def _export_lesson_text(l):
+    """Текст пары для экспорта: время вне сетки, предмет, преподаватели, место/аудитория."""
+    time_prefix = f"{l['custom_start_time']}–{l['custom_end_time']}\n" if l['custom_start_time'] else ''
+    teacher = l['teacher_name'] or ''
+    if l['additional_teachers']:
+        teacher = (teacher + ', ' if teacher else '') + l['additional_teachers']
+    room = l['custom_room_name'] or l['classroom_name'] or ''
+    if l['classroom_2_name']:
+        room = (room + ' / ' if room else '') + l['classroom_2_name']
+    return f"{time_prefix}{l['subject_name'] or ''}\n{teacher}\n{room}"
 
 
 def _get_export_data(schedule_type, name, monday, entity_id=None):
@@ -237,11 +253,7 @@ def _get_export_data(schedule_type, name, monday, entity_id=None):
                 d = wd['date']
                 if d in lessons_by_date and p in lessons_by_date[d]:
                     raw_list = lessons_by_date[d][p]
-                    lessons[d] = '\n---\n'.join(
-                        (f"{l['custom_start_time']}–{l['custom_end_time']}\n" if l['custom_start_time'] else '')
-                        + f"{l['subject_name'] or ''}\n{l['teacher_name'] or ''}\n{(l['classroom_name'] or '') + (' / ' + l['classroom_2_name'] if l['classroom_2_name'] else '')}"
-                        for l in raw_list
-                    )
+                    lessons[d] = '\n---\n'.join(_export_lesson_text(l) for l in raw_list)
                 else:
                     lessons[d] = ''
             periods.append({**b, 'lessons': lessons})
@@ -1978,22 +1990,30 @@ def create_lesson(day_id):
         custom_start_time = (data.get('custom_start_time') or None)
         custom_end_time = (data.get('custom_end_time') or None)
         event_type = (data.get('event_type') or None)
+        additional_teachers = (data.get('additional_teachers') or None)
+        custom_room_name = (data.get('custom_room_name') or None)
         is_special_event = _auto_special_event(conn, subject_id, data.get('is_special_event'))
         if custom_start_time:
+            is_special_event = 1
+        # Консультация и курсовая — разовые события: генератор и очистка недели
+        # их не трогают, даже если чекбокс «Разовое» не пришёл с фронта.
+        if event_type in ('consultation', 'coursework'):
             is_special_event = 1
 
         warnings, blocking = _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id, group_id=group_id, subgroup=subgroup)
         if blocking:
             conn.rollback()
             return jsonify({"error": "Conflict detected", "warnings": warnings}), 409
+        if event_type == 'coursework' and not additional_teachers:
+            warnings.append('Курсовая без дополнительных преподавателей: добавьте ФИО через запятую')
 
         cursor = conn.execute(
-            'INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, is_substitution, original_teacher_id, substitution_reason, is_special_event, custom_start_time, custom_end_time, event_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, int(is_substitution), original_teacher_id, substitution_reason, is_special_event, custom_start_time, custom_end_time, event_type)
+            'INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, is_substitution, original_teacher_id, substitution_reason, is_special_event, custom_start_time, custom_end_time, event_type, additional_teachers, custom_room_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, int(is_substitution), original_teacher_id, substitution_reason, is_special_event, custom_start_time, custom_end_time, event_type, additional_teachers, custom_room_name)
         )
         lesson_id = cursor.lastrowid
         conn.commit()
-        return jsonify({"id": lesson_id}), 201
+        return jsonify({"id": lesson_id, "warnings": warnings}), 201
     finally:
         conn.close()
 
@@ -2066,8 +2086,12 @@ def update_lesson(lesson_id):
         custom_start_time = _field('custom_start_time')
         custom_end_time = _field('custom_end_time')
         event_type = _field('event_type')
+        additional_teachers = _field('additional_teachers') or None
+        custom_room_name = _field('custom_room_name') or None
         is_special_event = _auto_special_event(conn, subject_id, _field('is_special_event'))
         if custom_start_time and not is_special_event:
+            is_special_event = 1
+        if event_type in ('consultation', 'coursework'):
             is_special_event = 1
 
         if not day_id or not period or period not in range(1, 9):
@@ -2085,6 +2109,8 @@ def update_lesson(lesson_id):
         if blocking:
             conn.rollback()
             return jsonify({"error": "Conflict detected", "warnings": warnings}), 409
+        if event_type == 'coursework' and not additional_teachers:
+            warnings.append('Курсовая без дополнительных преподавателей: добавьте ФИО через запятую')
 
         conn.execute(
             'INSERT INTO lesson_history (lesson_id, old_subject_id, old_teacher_id, old_classroom_id, old_group_id, old_subgroup) VALUES (?, ?, ?, ?, ?, ?)',
@@ -2092,7 +2118,7 @@ def update_lesson(lesson_id):
         )
 
         conn.execute(
-            'UPDATE lessons SET day_id = ?, period = ?, subject_id = ?, teacher_id = ?, classroom_id = ?, classroom_id_2 = ?, group_id = ?, subgroup = ?, is_substitution = ?, original_teacher_id = ?, substitution_reason = ?, is_special_event = ?, custom_start_time = ?, custom_end_time = ?, event_type = ? WHERE id = ?',
+            'UPDATE lessons SET day_id = ?, period = ?, subject_id = ?, teacher_id = ?, classroom_id = ?, classroom_id_2 = ?, group_id = ?, subgroup = ?, is_substitution = ?, original_teacher_id = ?, substitution_reason = ?, is_special_event = ?, custom_start_time = ?, custom_end_time = ?, event_type = ?, additional_teachers = ?, custom_room_name = ? WHERE id = ?',
             (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup,
              int(is_substitution),
              original_teacher_id,
@@ -2101,10 +2127,12 @@ def update_lesson(lesson_id):
              custom_start_time,
              custom_end_time,
              event_type,
+             additional_teachers,
+             custom_room_name,
              lesson_id)
         )
         conn.commit()
-        return jsonify({"success": True})
+        return jsonify({"success": True, "warnings": warnings})
     finally:
         conn.close()
 
@@ -2315,6 +2343,7 @@ def schedule_table():
                     'is_special_event': bool(l['is_special_event']), 'groups': l['groups'],
                     'custom_start_time': l['custom_start_time'], 'custom_end_time': l['custom_end_time'],
                     'event_type': l['event_type'],
+                    'additional_teachers': l['additional_teachers'], 'custom_room_name': l['custom_room_name'],
                     'day_id': l['day_id'],
                     'subject_id': l['subject_id'], 'teacher_id': l['teacher_id'],
                     'classroom_id': l['classroom_id'],

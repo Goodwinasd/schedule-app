@@ -285,13 +285,20 @@
             </label>
             <div id="special-event-fields" style="display:none;margin-top:8px">
                 <label class="field-label">Тип события</label>
-                <select id="lesson-event-type" class="input mw-250">
+                <select id="lesson-event-type" class="input mw-250"
+                        onchange="document.getElementById('coursework-fields').style.display=this.value==='coursework'?'':'none'">
                     <option value="">— не указан —</option>
                     <option value="exam">Экзамен</option>
                     <option value="test">Зачёт</option>
                     <option value="coursework">Курсовая</option>
+                    <option value="consultation">Консультация</option>
                     <option value="event">Мероприятие</option>
                 </select>
+                <div id="coursework-fields" style="display:none;margin-top:8px">
+                    <label class="field-label">Дополнительные преподаватели</label>
+                    <input type="text" id="lesson-additional-teachers" class="input mw-300"
+                           placeholder="Иванов И.И., Петров П.П. (через запятую)">
+                </div>
                 <label class="field-label">Вторая аудитория (экзамен: 501 левая / 501 правая)</label>
                 <select id="lesson-classroom-2" class="input mw-250"><option value="">— не нужна —</option></select>
                 <label class="checkbox-row">
@@ -304,6 +311,9 @@
                         <input type="time" id="lesson-custom-start" class="input mw-140" aria-label="Начало">
                         <input type="time" id="lesson-custom-end" class="input mw-140" aria-label="Конец">
                     </div>
+                    <label class="field-label">Место</label>
+                    <input type="text" id="lesson-custom-room-name" class="input mw-300"
+                           placeholder="Музей МВД, актовый зал">
                 </div>
             </div>
             <hr class="divider" id="move-lesson-divider" style="display:none">

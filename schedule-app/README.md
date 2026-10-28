@@ -1,4 +1,4 @@
-﻿# schedule-app
+# schedule-app
 
 Расписание занятий колледжа/техникума: Flask + SQLite, SPA на ванильном JS (без сборщика),
 экспорт в XLSX/DOCX/PDF. Однопользовательское приложение: один администратор входит по паролю.
@@ -68,8 +68,8 @@ python -m flask --app app run --port 5000
 ## Тесты
 
 ```bat
-python -m pytest tests/ -q --ignore=tests/e2e     :: 364 теста
-python -m pytest tests/e2e -q                     :: 5 e2e (Playwright)
+python -m pytest tests/ -q --ignore=tests/e2e     :: 367 тестов
+python -m pytest tests/e2e -q                     :: 7 e2e (Playwright)
 
 :: подготовка e2e (один раз)
 python -m pip install pytest-playwright
@@ -115,7 +115,7 @@ migrations/       Alembic
 static/js/modules 16 ES-модулей SPA
 static/css/style.css  стили на CSS-токенах (дизайн-система)
 templates/index.html  разметка SPA
-tests/            364 теста + 7 e2e
+tests/            367 тестов + 7 e2e
 docs/             аудит, план нагрузки, диффы и скриншоты UI
 ```
 

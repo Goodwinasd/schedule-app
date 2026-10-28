@@ -1,4 +1,4 @@
-﻿import state from './state.js';
+import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getWeekNumber, getMonday, addDays, formatDateRange, formatChipRange, shiftLabel, populateSelect } from './utils.js';
 import { api } from './api.js';
@@ -96,8 +96,10 @@ function renderScheduleTable(data) {
                         const isSub = l.is_substitution ? true : false;
                         const subCls = isSub ? ' is-substitution' : '';
                         const customTime = l.custom_start_time ? ` · ${l.custom_start_time}–${l.custom_end_time || ''}` : '';
-                        const roomText = (l.classroom || '') + (l.classroom_2 ? ' / ' + l.classroom_2 : '');
-                        let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${roomText ? ' · ауд. ' + escapeHtml(roomText) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${roomText ? ' · ауд. ' + escapeHtml(roomText) : ''}`;
+                        const roomText = (l.custom_room_name || l.classroom || '') + (l.classroom_2 ? ' / ' + l.classroom_2 : '');
+                        const roomPrefix = l.custom_room_name ? ' · место: ' : ' · ауд. ';
+                        let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${roomText ? roomPrefix + escapeHtml(roomText) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${roomText ? roomPrefix + escapeHtml(roomText) : ''}`;
+                        if (l.additional_teachers) meta += ' · доп.: ' + escapeHtml(l.additional_teachers);
                         if (customTime) meta = `${escapeHtml(customTime.slice(3))} · ` + meta;
                         if (l.is_special_event) meta += ' · 📌 мероприятие';
                         if (isSub) meta += ' · замена';
@@ -492,6 +494,12 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     if (room2) room2.value = '';
     const evt = document.getElementById('lesson-event-type');
     if (evt) evt.value = '';
+    const addTeachers = document.getElementById('lesson-additional-teachers');
+    if (addTeachers) addTeachers.value = '';
+    const courseworkFields = document.getElementById('coursework-fields');
+    if (courseworkFields) courseworkFields.style.display = 'none';
+    const customRoom = document.getElementById('lesson-custom-room-name');
+    if (customRoom) customRoom.value = '';
     const custom = document.getElementById('lesson-custom-time');
     if (custom) custom.checked = false;
     const customFields = document.getElementById('custom-time-fields');
@@ -540,6 +548,8 @@ async function collectLessonData() {
         custom_end_time: document.getElementById('lesson-custom-time')?.checked
             ? (document.getElementById('lesson-custom-end')?.value || null) : null,
         event_type: document.getElementById('lesson-event-type')?.value || null,
+        additional_teachers: document.getElementById('lesson-additional-teachers')?.value.trim() || null,
+        custom_room_name: document.getElementById('lesson-custom-room-name')?.value.trim() || null,
     };
 }
 
@@ -598,6 +608,12 @@ export function editLesson(lesson) {
     if (specialFieldsEl) specialFieldsEl.style.display = isSpecial ? '' : 'none';
     const evtEl = document.getElementById('lesson-event-type');
     if (evtEl) evtEl.value = lesson.event_type || '';
+    const addTeachersEl = document.getElementById('lesson-additional-teachers');
+    if (addTeachersEl) addTeachersEl.value = lesson.additional_teachers || '';
+    const courseworkFieldsEl = document.getElementById('coursework-fields');
+    if (courseworkFieldsEl) courseworkFieldsEl.style.display = lesson.event_type === 'coursework' ? '' : 'none';
+    const customRoomEl = document.getElementById('lesson-custom-room-name');
+    if (customRoomEl) customRoomEl.value = lesson.custom_room_name || '';
     const customEl = document.getElementById('lesson-custom-time');
     const hasCustom = !!(lesson.custom_start_time || lesson.custom_end_time);
     if (customEl) customEl.checked = hasCustom;
