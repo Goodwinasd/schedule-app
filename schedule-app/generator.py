@@ -13,6 +13,11 @@ BELL_SCHEDULE = list(range(1, 9))
 MAX_PAIRS_WEEKDAY = 4
 MAX_PAIRS_SATURDAY = 3
 
+# Реальные расписания: последняя пара — 7-я (18:25–19:50); 8-ю не ставим.
+GENERATOR_MAX_PERIOD = 7
+SHIFT2_PERIODS = [3, 4, 5, 6, 7]   # 2-я смена начинается с 13:30
+SHIFT2_EXPECTED_START = 4          # ожидаемый старт 2-й смены
+
 
 def _max_pairs_per_day(day_idx):
     """Дневной лимит нагрузки группы: будни — до 4 пар, суббота — облегчённый режим до 3 пар."""
@@ -59,12 +64,43 @@ def _is_classroom_free(conn, classroom_id, date_str, period):
     return row is None
 
 
-def _pick_classroom(conn, subject_id, teacher_id, date_str, period, last_classroom_id):
-    """Cascade classroom selection: subject default -> same as last (min hopping) -> first free general."""
-    # Preference 1: keep the same room as previous lesson in same day (room hopping minimisation)
-    if last_classroom_id is not None:
-        if _is_classroom_free(conn, last_classroom_id, date_str, period):
-            return last_classroom_id
+def _subject_required_room_type(conn, subject_id):
+    """Тип аудитории, требуемый предметом (NULL — обычная аудитория)."""
+    row = conn.execute(
+        "SELECT required_room_type FROM subjects WHERE id = ? AND deleted_at IS NULL",
+        (subject_id,)
+    ).fetchone()
+    value = row["required_room_type"] if row else None
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _room_type_matches(room_type, required_room_type):
+    """NULL/'normal' — обычная аудитория; спец. предметы ходят только в свой тип."""
+    current = (room_type or "").strip()
+    if required_room_type:
+        return current == required_room_type
+    return current in ("", "normal")
+
+
+def _pick_classroom(conn, subject_id, teacher_id, date_str, period, last_classroom_id,
+                    required_room_type=None):
+    """Cascade classroom selection с учётом типа аудитории.
+
+    Спец. предметы (физкультура → gym, информатика → computer) ставятся только
+    в аудиторию требуемого типа; остальные — в свободную обычную.
+    """
+    rows = conn.execute(
+        "SELECT id, room_type FROM classrooms_list WHERE deleted_at IS NULL "
+        "ORDER BY CAST(name AS INTEGER), name"
+    ).fetchall()
+    candidates = [r["id"] for r in rows if _room_type_matches(r["room_type"], required_room_type)]
+
+    def free(room_id):
+        return room_id in candidates and _is_classroom_free(conn, room_id, date_str, period)
+
+    # Preference 1: keep the same room as previous lesson in same day
+    if last_classroom_id is not None and free(last_classroom_id):
+        return last_classroom_id
     # Preference 2: subject-level default teacher's classroom
     row = conn.execute(
         'SELECT default_teacher_id FROM subjects WHERE id = ? AND deleted_at IS NULL',
@@ -75,24 +111,19 @@ def _pick_classroom(conn, subject_id, teacher_id, date_str, period, last_classro
             "SELECT default_classroom_id FROM teachers WHERE id = ? AND deleted_at IS NULL",
             (row['default_teacher_id'],)
         ).fetchone()
-        if t_row and t_row['default_classroom_id']:
-            if _is_classroom_free(conn, t_row['default_classroom_id'], date_str, period):
-                return t_row['default_classroom_id']
+        if t_row and t_row['default_classroom_id'] and free(t_row['default_classroom_id']):
+            return t_row['default_classroom_id']
     # Preference 3: teacher's own default classroom
     t_row = conn.execute(
         "SELECT default_classroom_id FROM teachers WHERE id = ? AND deleted_at IS NULL",
         (teacher_id,)
     ).fetchone()
-    if t_row and t_row['default_classroom_id']:
-        if _is_classroom_free(conn, t_row['default_classroom_id'], date_str, period):
-            return t_row['default_classroom_id']
-    # Fallback: first free classroom
-    classrooms = conn.execute(
-        "SELECT id FROM classrooms_list WHERE deleted_at IS NULL ORDER BY CAST(name AS INTEGER), name"
-    ).fetchall()
-    for c in classrooms:
-        if _is_classroom_free(conn, c['id'], date_str, period):
-            return c['id']
+    if t_row and t_row['default_classroom_id'] and free(t_row['default_classroom_id']):
+        return t_row['default_classroom_id']
+    # Fallback: first free room of the allowed type
+    for room_id in candidates:
+        if _is_classroom_free(conn, room_id, date_str, period):
+            return room_id
     return None
 
 
@@ -199,12 +230,13 @@ def _gap_cost(periods, base, step):
     return total
 
 
-def _calculate_cost(plan, fixed=None):
+def _calculate_cost(plan, fixed=None, expected_start=1):
     """Стоимость плана: чем меньше — тем лучше.
 
     Штрафы: окна преподавателей (сильные), окна групп (средние),
     перегруз дня у группы (слабый). `fixed` — чужие занятия (из БД),
     чтобы окна преподавателя считались по всей его дневной нагрузке.
+    `expected_start` — ожидаемый первый период дня (1-я смена — 1, 2-я — 4).
     """
     teacher_days, group_days = {}, {}
     for item in list(plan) + list(fixed or []):
@@ -223,9 +255,9 @@ def _calculate_cost(plan, fixed=None):
     for (gid, date), periods in group_days.items():
         cost += _gap_cost(periods, W_GROUP_GAP_BASE, W_GROUP_GAP_STEP)
         first_period = min(periods)
-        if first_period > 1:
-            # День должен начинаться с 1-й пары: каждая пустая пара в начале — штраф.
-            cost += W_GROUP_START * (first_period - 1)
+        if first_period != expected_start:
+            # День должен начинаться с ожидаемой пары (1-я смена — 1, 2-я — 4).
+            cost += W_GROUP_START * abs(first_period - expected_start)
         limit = MAX_PAIRS_SATURDAY if _is_saturday(date) else MAX_PAIRS_WEEKDAY
         if len(periods) > limit:
             cost += W_OVERLOAD * (len(periods) - limit)
@@ -260,7 +292,7 @@ def _slot_taken(occupancy, date, period, item):
 
 def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
                        time_budget=OPTIMIZE_TIME_BUDGET, fixed=None, allowed_periods=None,
-                       same_date_only=False):
+                       same_date_only=False, expected_start=1):
     """Имитация отжига: двигаем пары по периодам в рамках тех же дней.
 
     Жёсткие ограничения (преподаватель/аудитория/группа) проверяются по
@@ -281,7 +313,7 @@ def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
         return current
 
     def cost_of(items):
-        return _calculate_cost(items, fixed)
+        return _calculate_cost(items, fixed, expected_start=expected_start)
 
     current_cost = cost_of(current)
     best = [dict(item) for item in current]
@@ -344,7 +376,8 @@ def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
     return best
 
 
-def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed, lesson_ids=None):
+def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed,
+                   lesson_ids=None, expected_start=1):
     """Отжиг для уже созданной недели: меняем только `period` (day_id не трогаем).
 
     Составные потоки (группы с «+») пропускаем: их пары зеркалируются в другие
@@ -381,10 +414,10 @@ def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed
 
     plan = [dict(row) for row in rows]
     fixed = [dict(row) for row in fixed_rows]
-    before = _calculate_cost(plan, fixed)
+    before = _calculate_cost(plan, fixed, expected_start=expected_start)
     optimized = _optimize_schedule(plan, seed=seed, fixed=fixed, allowed_periods=allowed_periods,
-                                   same_date_only=True)
-    after = _calculate_cost(optimized, fixed)
+                                   same_date_only=True, expected_start=expected_start)
+    after = _calculate_cost(optimized, fixed, expected_start=expected_start)
 
     original_period = {item['id']: item['period'] for item in plan}
     moved = 0
@@ -439,10 +472,20 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
 
     # Determine course to clamp allowed periods
     group_row = conn.execute(
-        "SELECT course FROM groups_list WHERE id = ? AND deleted_at IS NULL", (group_id,)
+        "SELECT course, shift FROM groups_list WHERE id = ? AND deleted_at IS NULL", (group_id,)
     ).fetchone()
     is_first_course = group_row is not None and group_row['course'] == 1
-    allowed_periods = [1, 2, 3, 4] if is_first_course else list(range(1, 9))
+    group_shift = group_row['shift'] if group_row is not None and 'shift' in group_row.keys() else None
+    if group_shift == 2:
+        # 2-я смена: занятия с 13:30, пары 3–7, ожидаемый старт — 4-я пара
+        allowed_periods = [p for p in SHIFT2_PERIODS if p <= GENERATOR_MAX_PERIOD]
+        expected_start = SHIFT2_EXPECTED_START
+    elif is_first_course:
+        allowed_periods = [1, 2, 3, 4]
+        expected_start = 1
+    else:
+        allowed_periods = list(range(1, GENERATOR_MAX_PERIOD + 1))
+        expected_start = 1
 
     weeks_dates = [_build_week_dates(
         (datetime.strptime(monday_str, '%Y-%m-%d') + timedelta(weeks=w)).strftime('%Y-%m-%d')
@@ -526,7 +569,12 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             )
             if actual_tid is None:
                 return False
-            classroom_id = _pick_classroom(conn, subj_id, actual_tid, date_str, period, None)
+            required_room = _subject_required_room_type(conn, subj_id)
+            classroom_id = _pick_classroom(conn, subj_id, actual_tid, date_str, period, None,
+                                           required_room_type=required_room)
+            # Спец. предмет без свободной аудитории нужного типа не ставим в обычную
+            if required_room and classroom_id is None:
+                return False
             conflicts, blocking = _validate_slot_3d(
                 conn, date_str, period, group_id,
                 teacher_id=actual_tid, classroom_id=classroom_id,
@@ -552,7 +600,7 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             day_id = _get_or_create_day(conn, date_str, group_name)
             max_period = max(allowed_periods) if allowed_periods else 8
             queue = list(lessons)
-            period = allowed_periods[0] if allowed_periods else 1
+            period = expected_start if allowed_periods else 1
             while queue and period <= max_period:
                 subj_id, primary_tid, _prio = queue[0]
                 if try_place(date_str, day_id, period, subj_id, primary_tid):
@@ -576,7 +624,12 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
                 if len(day_lessons[day_idx]) >= limit:
                     continue
                 day_id = _get_or_create_day(conn, date_str, group_name)
-                for period in range(1, min(limit, max(allowed_periods or [8])) + 1):
+                # Сначала ожидаемые периоды (2-я смена — с 4-й пары), затем остальные
+                period_order = sorted(
+                    [p for p in allowed_periods if p >= expected_start]
+                    + [p for p in allowed_periods if p < expected_start]
+                ) if allowed_periods else list(range(1, GENERATOR_MAX_PERIOD + 1))
+                for period in period_order:
                     if try_place(date_str, day_id, period, subj_id, primary_tid):
                         created += 1
                         day_lessons[day_idx].append((subj_id, primary_tid, 0))
@@ -597,7 +650,8 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         if optimize:
             try:
                 _optimize_week(conn, group_id, group_name, week_dates, allowed_periods,
-                               f"{opt_seed}_{wi}", lesson_ids=created_ids)
+                               f"{opt_seed}_{wi}", lesson_ids=created_ids,
+                               expected_start=expected_start)
             except Exception:
                 logger.exception("Annealing failed for %s %s — kept draft", group_name, week_dates[0])
 
