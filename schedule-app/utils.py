@@ -3,6 +3,10 @@
 import re
 from datetime import datetime
 
+# Экзамены/зачёты ликвидационной сессии: «1.Криминалистика», «2.Криминалистика»,
+# «Криминалистика (Экз.ликвид.сесс)» — это разовые события, а не обычные пары.
+SPECIAL_EXAM_RE = re.compile(r'^\s*\d+\.|\(\s*\u042d\u043a\u0437\.?\s*\u043b\u0438\u043a\u0432\u0438\u0434', re.IGNORECASE)
+
 # Схемы колонок для импорта справочников из Excel.
 # Каждое свойство (name/phone/course/specialty) имеет список допустимых заголовков:
 # первый (канонический) используется в скачиваемом шаблоне, остальные — допускаются
@@ -272,6 +276,11 @@ def _validate_slot_3d(conn, date_str, period, group_id, teacher_id=None, classro
             conflicts.append('classroom')
             blocking = True
     return conflicts, blocking
+
+
+def is_special_event_subject(name):
+    """Название предмета похоже на экзамен ликвидационной сессии."""
+    return bool(name and SPECIAL_EXAM_RE.search(str(name)))
 
 
 def _safe_filename(s):

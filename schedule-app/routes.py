@@ -24,7 +24,7 @@ from config import (
 )
 from db import create_backup, prepare_for_restore, verify_db_integrity, find_orphaned_records, cleanup_orphan_schedule_records, get_db, is_date_excluded
 from generator import generate_schedule
-from utils import _safe_filename, _validate_lesson_data, _validate_lesson_slot, LESSON_SELECT, LESSON_SELECT_WITH_DAY, parse_excel_import, EXCEL_IMPORT_SCHEMAS, EXCEL_IMPORT_TEMPLATE_HEADERS, EXCEL_IMPORT_TEMPLATE_EXAMPLES, parse_date_arg, parse_int_arg
+from utils import _safe_filename, _validate_lesson_data, _validate_lesson_slot, LESSON_SELECT, LESSON_SELECT_WITH_DAY, parse_excel_import, EXCEL_IMPORT_SCHEMAS, EXCEL_IMPORT_TEMPLATE_HEADERS, EXCEL_IMPORT_TEMPLATE_EXAMPLES, parse_date_arg, parse_int_arg, is_special_event_subject
 from cache import refs_cache
 from schedule_balancer import weekly_pairs, validate_weekly_load
 
@@ -1974,7 +1974,7 @@ def create_lesson(day_id):
         original_teacher_id = data.get('original_teacher_id')
         substitution_reason = data.get('substitution_reason')
         classroom_id_2 = data.get('classroom_id_2')
-        is_special_event = 1 if data.get('is_special_event') else 0
+        is_special_event = _auto_special_event(conn, subject_id, data.get('is_special_event'))
 
         warnings, blocking = _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id, group_id=group_id, subgroup=subgroup)
         if blocking:
@@ -2057,7 +2057,7 @@ def update_lesson(lesson_id):
         original_teacher_id = _field('original_teacher_id')
         substitution_reason = _field('substitution_reason')
         classroom_id_2 = _field('classroom_id_2')
-        is_special_event = 1 if _field('is_special_event') else 0
+        is_special_event = _auto_special_event(conn, subject_id, _field('is_special_event'))
 
         if not day_id or not period or period not in range(1, 9):
             conn.rollback()
@@ -2401,6 +2401,17 @@ def get_specialties():
     result = [dict(i) for i in items]
     refs_cache.set('ref_list_specialties', result)
     return jsonify(_public_ref('specialties', result))
+
+
+def _auto_special_event(conn, subject_id, requested):
+    """Экзамены ликвид. сессии («1.Криминалистика», «(Экз.ликвид.сесс)»)
+    автоматически становятся разовыми событиями — генератор их не трогает."""
+    if requested:
+        return 1
+    if not subject_id:
+        return 0
+    row = conn.execute('SELECT name FROM subjects WHERE id = ?', (subject_id,)).fetchone()
+    return 1 if row and is_special_event_subject(row['name']) else 0
 
 
 def _validated_shift(value):

@@ -3,7 +3,7 @@ import math
 import random
 import time
 from datetime import datetime, timedelta
-from utils import _validate_slot_3d
+from utils import _validate_slot_3d, is_special_event_subject
 
 logger = logging.getLogger(__name__)
 
@@ -206,11 +206,18 @@ W_GROUP_GAP_BASE = 100    # окно группы: «рваный» день н�
 W_GROUP_GAP_STEP = 100    # +100 за каждую пропущенную пару в разрыве
 W_GROUP_START = 100       # каждая пустая пара в начале дня (день должен начинаться с 1-й)
 W_OVERLOAD = 5            # каждая пара сверх дневного лимита (4 пары подряд — норма)
-W_TEACHER_EIGHTH_PAIR = 100  # 8-я пара у преподавателя — только в крайнем случае
+W_TEACHER_EIGHTH_PAIR = 200  # 8-я пара у преподавателя — только в крайнем случае
 OPTIMIZE_ITERATIONS = 1000
 OPTIMIZE_TIME_BUDGET = 2.5
 ANNEAL_T_START = 8.0
 ANNEAL_T_END = 0.5
+
+
+def _is_friday(date_str):
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d').weekday() == 4
+    except (TypeError, ValueError):
+        return False
 
 
 def _is_saturday(date_str):
@@ -231,13 +238,15 @@ def _gap_cost(periods, base, step):
     return total
 
 
-def _calculate_cost(plan, fixed=None, expected_start=1):
+def _calculate_cost(plan, fixed=None, expected_start=1, friday_start=None):
     """Стоимость плана: чем меньше — тем лучше.
 
     Штрафы: окна преподавателей (сильные), окна групп (средние),
     перегруз дня у группы (слабый). `fixed` — чужие занятия (из БД),
     чтобы окна преподавателя считались по всей его дневной нагрузке.
     `expected_start` — ожидаемый первый период дня (1-я смена — 1, 2-я — 4).
+    `friday_start` — для 1-го курса в пятницу разрешён старт со 2-й пары:
+    и 1-я, и 2-я пары не штрафуются (более поздний старт — штраф).
     """
     teacher_days, group_days = {}, {}
     for item in list(plan) + list(fixed or []):
@@ -259,9 +268,13 @@ def _calculate_cost(plan, fixed=None, expected_start=1):
     for (gid, date), periods in group_days.items():
         cost += _gap_cost(periods, W_GROUP_GAP_BASE, W_GROUP_GAP_STEP)
         first_period = min(periods)
-        if first_period != expected_start:
+        friday_mode = bool(friday_start and _is_friday(date))
+        expected_for_day = friday_start if friday_mode else expected_start
+        if first_period > expected_for_day:
             # День должен начинаться с ожидаемой пары (1-я смена — 1, 2-я — 4).
-            cost += W_GROUP_START * abs(first_period - expected_start)
+            cost += W_GROUP_START * (first_period - expected_for_day)
+        elif first_period < expected_for_day and not friday_mode:
+            cost += W_GROUP_START * (expected_for_day - first_period)
         limit = MAX_PAIRS_SATURDAY if _is_saturday(date) else MAX_PAIRS_WEEKDAY
         if len(periods) > limit:
             cost += W_OVERLOAD * (len(periods) - limit)
@@ -296,7 +309,7 @@ def _slot_taken(occupancy, date, period, item):
 
 def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
                        time_budget=OPTIMIZE_TIME_BUDGET, fixed=None, allowed_periods=None,
-                       same_date_only=False, expected_start=1):
+                       same_date_only=False, expected_start=1, friday_start=None):
     """Имитация отжига: двигаем пары по периодам в рамках тех же дней.
 
     Жёсткие ограничения (преподаватель/аудитория/группа) проверяются по
@@ -317,7 +330,8 @@ def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
         return current
 
     def cost_of(items):
-        return _calculate_cost(items, fixed, expected_start=expected_start)
+        return _calculate_cost(items, fixed, expected_start=expected_start,
+                              friday_start=friday_start)
 
     current_cost = cost_of(current)
     best = [dict(item) for item in current]
@@ -381,7 +395,7 @@ def _optimize_schedule(plan, seed=None, iterations=OPTIMIZE_ITERATIONS,
 
 
 def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed,
-                   lesson_ids=None, expected_start=1):
+                   lesson_ids=None, expected_start=1, friday_start=None):
     """Отжиг для уже созданной недели: меняем только `period` (day_id не трогаем).
 
     Составные потоки (группы с «+») пропускаем: их пары зеркалируются в другие
@@ -419,10 +433,11 @@ def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed
 
     plan = [dict(row) for row in rows]
     fixed = [dict(row) for row in fixed_rows]
-    before = _calculate_cost(plan, fixed, expected_start=expected_start)
+    before = _calculate_cost(plan, fixed, expected_start=expected_start, friday_start=friday_start)
     optimized = _optimize_schedule(plan, seed=seed, fixed=fixed, allowed_periods=allowed_periods,
-                                   same_date_only=True, expected_start=expected_start)
-    after = _calculate_cost(optimized, fixed, expected_start=expected_start)
+                                   same_date_only=True, expected_start=expected_start,
+                                   friday_start=friday_start)
+    after = _calculate_cost(optimized, fixed, expected_start=expected_start, friday_start=friday_start)
 
     original_period = {item['id']: item['period'] for item in plan}
     moved = 0
@@ -491,6 +506,8 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
     else:
         allowed_periods = list(range(1, GENERATOR_MAX_PERIOD + 1))
         expected_start = 1
+    # 1-й курс в пятницу может начинать со 2-й пары (часы/окна) — это не штраф.
+    friday_start = 2 if (is_first_course and group_shift != 2) else None
 
     weeks_dates = [_build_week_dates(
         (datetime.strptime(monday_str, '%Y-%m-%d') + timedelta(weeks=w)).strftime('%Y-%m-%d')
@@ -502,6 +519,10 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
         pool = []
         # Compute total semester load for the plan to derive expected pace
         for item in curriculum:
+            # Экзамены ликвид. сессии («1.Криминалистика», «(Экз.ликвид.сесс)»)
+            # не генерируем: это разовые мероприятия, их ставят вручную.
+            if is_special_event_subject(item['subject_name']):
+                continue
             weeks = item['weeks_in_semester'] or 18
             if wi >= weeks:
                 continue
@@ -605,7 +626,8 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             day_id = _get_or_create_day(conn, date_str, group_name)
             max_period = max(allowed_periods) if allowed_periods else 8
             queue = list(lessons)
-            period = expected_start if allowed_periods else 1
+            day_start = friday_start if (friday_start and _is_friday(date_str)) else expected_start
+            period = day_start if allowed_periods else 1
             while queue and period <= max_period:
                 subj_id, primary_tid, _prio = queue[0]
                 if try_place(date_str, day_id, period, subj_id, primary_tid):
@@ -656,7 +678,7 @@ def generate_schedule(conn, group_id, group_name, semester, monday_str, week_cou
             try:
                 _optimize_week(conn, group_id, group_name, week_dates, allowed_periods,
                                f"{opt_seed}_{wi}", lesson_ids=created_ids,
-                               expected_start=expected_start)
+                               expected_start=expected_start, friday_start=friday_start)
             except Exception:
                 logger.exception("Annealing failed for %s %s — kept draft", group_name, week_dates[0])
 

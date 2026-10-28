@@ -127,3 +127,53 @@ def test_composite_stream_groups_share_slot_after_optimization(app, db):
             (row['date'], row['period'], row['teacher_id'])).fetchone()['c']
         assert mirrors == 2, (
             f'поток разъехался {row["date"]} пара {row["period"]}: зеркальных групп {mirrors}')
+
+
+def test_exam_session_subject_auto_special_event(client, seed_lessons, db, admin_csrf):
+    """Предметы «1.Криминалистика» и «(Экз.ликвид.сесс)» автоматически = мероприятие."""
+    h = {'X-CSRF-Token': admin_csrf}
+    conn = db.get_db()
+    day = conn.execute("SELECT id FROM schedule_days WHERE date = '2026-09-07'").fetchone()
+    room = conn.execute("SELECT id FROM classrooms_list LIMIT 1").fetchone()['id']
+    conn.commit()
+
+    for name, period in (('1.Криминалистика', 5), ('Криминалистика (Экз.ликвид.сесс)', 7)):
+        subject_id = conn.execute("INSERT INTO subjects (name) VALUES (?)", (name,)).lastrowid
+        conn.commit()
+        resp = client.post(f'/api/days/{day["id"]}/lessons', json={
+            'period': period, 'subject_id': subject_id, 'teacher_id': 1,
+            'classroom_id': room, 'group_id': 1,
+        }, headers=h)
+        assert resp.status_code == 201, resp.get_json()
+        lesson_id = resp.get_json()['id']
+        row = conn.execute(
+            "SELECT is_special_event FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+        assert row['is_special_event'] == 1, f'{name}: не помечен как мероприятие'
+
+
+def test_generator_skips_exam_session_subjects(app, db):
+    """Генератор не ставит пары по предметам ликвидационной сессии."""
+    import generator
+    conn = db.get_db()
+    gid = conn.execute(
+        "INSERT INTO groups_list (name, course) VALUES ('Экзам-группа', 2)").lastrowid
+    teacher = conn.execute("INSERT INTO teachers (name) VALUES ('Преподаватель экз.')").lastrowid
+    regular = conn.execute("INSERT INTO subjects (name) VALUES ('Математика')").lastrowid
+    exam = conn.execute("INSERT INTO subjects (name) VALUES ('1.Криминалистика')").lastrowid
+    conn.execute("INSERT INTO classrooms_list (name, room_type) VALUES ('101', NULL)")
+    for subject_id in (regular, exam):
+        conn.execute(
+            "INSERT INTO curriculum (group_id, subject_id, teacher_id, semester, total_hours, weeks_in_semester) "
+            "VALUES (?, ?, ?, 1, 73, 18)", (gid, subject_id, teacher))
+    conn.commit()
+
+    monday = _monday()
+    generator.generate_schedule(conn, gid, 'Экзам-группа', 1, monday, 1, optimize=False)
+    conn.commit()
+
+    exam_lessons = conn.execute(
+        "SELECT COUNT(*) FROM lessons WHERE subject_id = ?", (exam,)).fetchone()[0]
+    regular_lessons = conn.execute(
+        "SELECT COUNT(*) FROM lessons WHERE subject_id = ?", (regular,)).fetchone()[0]
+    assert exam_lessons == 0, 'экзамен ликвид. сессии попал в обычное расписание'
+    assert regular_lessons > 0

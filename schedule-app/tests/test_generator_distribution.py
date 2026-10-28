@@ -52,10 +52,12 @@ def test_weekdays_three_four_saturday_two(app, db):
     assert max(counts[:5]) <= 4, counts
     assert counts[5] == 2, f'суббота должна быть легче: {counts}'
 
-    for periods in days:
+    for index, periods in enumerate(days):
         assert periods, 'пустой учебный день'
-        assert periods[0] == 1, f'день должен начинаться с 1-й пары: {periods}'
-        assert periods == list(range(1, len(periods) + 1)), f'дыры внутри дня: {periods}'
+        # Пятница (индекс 4): 1-му курсу разрешён старт со 2-й пары (правило недели 3)
+        expected_start = 2 if index == 4 else 1
+        assert periods[0] == expected_start, f'старт не с {expected_start}-й пары: {periods}'
+        assert periods == list(range(periods[0], periods[0] + len(periods))), f'дыры внутри дня: {periods}'
 
 
 def test_small_plan_has_no_saturday(app, db):

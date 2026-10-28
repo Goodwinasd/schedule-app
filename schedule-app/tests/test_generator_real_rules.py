@@ -16,10 +16,11 @@ def _monday(days_ahead=21):
     return (today - timedelta(days=today.weekday())).isoformat()
 
 
-def _setup(conn, name='Тест-группа', course=2, shift=None, subjects=(), rooms=()):
+def _setup(conn, name='Тест-группа', course=2, shift=None, subjects=(), rooms=(), is_distance=False):
     """subjects: [(название, required_room_type|None, пар в неделю)], rooms: [(название, room_type|None)]."""
     gid = conn.execute(
-        "INSERT INTO groups_list (name, course, shift) VALUES (?, ?, ?)", (name, course, shift)
+        "INSERT INTO groups_list (name, course, shift, is_distance) VALUES (?, ?, ?, ?)",
+        (name, course, shift, 1 if is_distance else 0)
     ).lastrowid
     for i, (subject_name, required_type, weekly) in enumerate(subjects):
         teacher_id = conn.execute(
@@ -136,6 +137,7 @@ def test_cost_uses_shift_expected_start(app):
 
 
 def test_first_shift_still_starts_at_first_period(app, db):
+    """1-я смена стартует с 1-й пары; в пятницу допустим старт со 2-й (правило недели 3)."""
     conn = db.get_db()
     gid = _setup(conn, course=1, shift=1,
                  subjects=[('Математика', None, 3)],
@@ -144,8 +146,14 @@ def test_first_shift_still_starts_at_first_period(app, db):
     generator.generate_schedule(conn, gid, 'Тест-группа', 1, monday, 1, optimize=False)
     conn.commit()
 
-    periods = [row['period'] for row in _lessons(conn, gid, monday)]
-    assert periods and set(periods) == {1}, f'1-я смена должна начинать с 1-й пары: {periods}'
+    rows = _lessons(conn, gid, monday)
+    assert rows
+    for row in rows:
+        weekday = datetime.strptime(row['date'], '%Y-%m-%d').weekday()
+        if weekday == 4:                       # пятница: 1-я или 2-я пара
+            assert row['period'] in (1, 2), row['period']
+        else:
+            assert row['period'] == 1, f'{row["date"]}: старт с {row["period"]}-й пары'
 
 
 def test_teacher_eighth_pair_is_expensive(app):
@@ -187,3 +195,62 @@ def test_special_event_not_touched_by_generator(app, db):
     assert row['period'] == 7, 'мероприятие переставили'
     assert row['is_special_event'] == 1
     assert row['deleted_at'] is None
+
+
+def test_distance_groups_respect_their_shift(app, db):
+    """Заочники тоже делятся на смены: 1-я — пары 1–4, 2-я — пары 3–8."""
+    conn = db.get_db()
+    monday = _monday()
+
+    first = _setup(conn, name='01-11/26-z', course=1, shift=1, is_distance=True,
+                   subjects=[('Математика-01', None, 3)], rooms=[('101', None)])
+    generator.generate_schedule(conn, first, '01-11/26-z', 1, monday, 1, optimize=False)
+    conn.commit()
+    first_rows = _lessons(conn, first, monday)
+    assert first_rows, 'заочка 1-й смены не сгенерирована'
+    for row in first_rows:
+        weekday = datetime.strptime(row['date'], '%Y-%m-%d').weekday()
+        expected = (1, 2) if weekday == 4 else (1,)
+        assert row['period'] in expected, f'заочка 1-й смены, {row["date"]}: {row["period"]}'
+
+    second = _setup(conn, name='01-11/25-z', course=2, shift=2, is_distance=True,
+                    subjects=[('Математика-02', None, 3)], rooms=[('102', None)])
+    generator.generate_schedule(conn, second, '01-11/25-z', 1, monday, 1, optimize=False)
+    conn.commit()
+    second_periods = [row['period'] for row in _lessons(conn, second, monday)]
+    assert second_periods and min(second_periods) >= 4, f'заочка 2-й смены: {second_periods}'
+
+
+def test_cost_friday_allows_first_or_second_start(app):
+    friday = '2026-09-18'
+    def cost(period):
+        return generator._calculate_cost(
+            [{'date': friday, 'period': period, 'group_id': 1, 'teacher_id': 1}],
+            expected_start=1, friday_start=2)
+    assert cost(1) == 0, 'в пятницу 1-я пара — допустимый старт'
+    assert cost(2) == 0, 'в пятницу 2-я пара — тоже без штрафа'
+    assert cost(3) == generator.W_GROUP_START
+
+
+def test_first_course_friday_can_start_second_period(app, db):
+    """1-й курс в пятницу может начинать со 2-й пары; в остальные дни — с 1-й."""
+    conn = db.get_db()
+    gid = _setup(conn, course=1, shift=1,
+                 subjects=[(f'Предмет {i + 1}', None, 3) for i in range(6)],
+                 rooms=[('101', None)])
+    monday = _monday()
+    generator.generate_schedule(conn, gid, 'Тест-группа', 1, monday, 1, optimize=True)
+    conn.commit()
+
+    rows = _lessons(conn, gid, monday)
+    by_date = {}
+    for row in rows:
+        by_date.setdefault(row['date'], []).append(row['period'])
+    assert len(by_date) == 6, by_date
+    for date, periods in by_date.items():
+        weekday = datetime.strptime(date, '%Y-%m-%d').weekday()
+        first = min(periods)
+        if weekday == 4:                        # пятница
+            assert first in (1, 2), f'пятница началась с {first}-й пары'
+        else:
+            assert first == 1, f'{date}: старт с {first}-й пары'
