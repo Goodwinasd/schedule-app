@@ -1,4 +1,4 @@
-# Изменение №3 (бэкенд-рефакторинг): выделен utils.py
+﻿# Изменение №3 (бэкенд-рефакторинг): выделен utils.py
 
 import re
 from datetime import datetime
@@ -120,18 +120,21 @@ def parse_excel_import(file_stream, entity_type):
 
 LESSON_SELECT = '''SELECT l.*, t.name AS teacher_name, s.name AS subject_name,
        c.name AS classroom_name,
+       c2.name AS classroom_2_name,
        ot.name AS original_teacher_name,
        CASE WHEN l.subgroup IS NOT NULL THEN gl.name || ' (' || l.subgroup || ')' ELSE gl.name END AS groups
 FROM lessons l
 LEFT JOIN teachers t ON l.teacher_id = t.id AND t.deleted_at IS NULL
 LEFT JOIN subjects s ON l.subject_id = s.id AND s.deleted_at IS NULL
 LEFT JOIN classrooms_list c ON l.classroom_id = c.id AND c.deleted_at IS NULL
+LEFT JOIN classrooms_list c2 ON l.classroom_id_2 = c2.id AND c2.deleted_at IS NULL
 LEFT JOIN groups_list gl ON l.group_id = gl.id AND gl.deleted_at IS NULL
 LEFT JOIN teachers ot ON l.original_teacher_id = ot.id AND ot.deleted_at IS NULL'''
 
 LESSON_SELECT_WITH_DAY = '''SELECT l.*, sd.date, sd.group_name, sd.day_name,
        t.name AS teacher_name, s.name AS subject_name,
        c.name AS classroom_name,
+       c2.name AS classroom_2_name,
        ot.name AS original_teacher_name,
        CASE WHEN l.subgroup IS NOT NULL THEN gl.name || ' (' || l.subgroup || ')' ELSE gl.name END AS groups
 FROM lessons l
@@ -139,6 +142,7 @@ JOIN schedule_days sd ON l.day_id = sd.id
 LEFT JOIN teachers t ON l.teacher_id = t.id AND t.deleted_at IS NULL
 LEFT JOIN subjects s ON l.subject_id = s.id AND s.deleted_at IS NULL
 LEFT JOIN classrooms_list c ON l.classroom_id = c.id AND c.deleted_at IS NULL
+LEFT JOIN classrooms_list c2 ON l.classroom_id_2 = c2.id AND c2.deleted_at IS NULL
 LEFT JOIN groups_list gl ON l.group_id = gl.id AND gl.deleted_at IS NULL
 LEFT JOIN teachers ot ON l.original_teacher_id = ot.id AND ot.deleted_at IS NULL'''
 

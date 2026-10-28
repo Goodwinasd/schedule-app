@@ -14,8 +14,8 @@ MAX_PAIRS_WEEKDAY = 4
 MAX_PAIRS_SATURDAY = 3
 
 # Реальные расписания: последняя пара — 7-я (18:25–19:50); 8-ю не ставим.
-GENERATOR_MAX_PERIOD = 7
-SHIFT2_PERIODS = [3, 4, 5, 6, 7]   # 2-я смена начинается с 13:30
+GENERATOR_MAX_PERIOD = 8
+SHIFT2_PERIODS = [3, 4, 5, 6, 7, 8]   # 2-я смена начинается с 13:30
 SHIFT2_EXPECTED_START = 4          # ожидаемый старт 2-й смены
 
 
@@ -206,6 +206,7 @@ W_GROUP_GAP_BASE = 100    # окно группы: «рваный» день н�
 W_GROUP_GAP_STEP = 100    # +100 за каждую пропущенную пару в разрыве
 W_GROUP_START = 100       # каждая пустая пара в начале дня (день должен начинаться с 1-й)
 W_OVERLOAD = 5            # каждая пара сверх дневного лимита (4 пары подряд — норма)
+W_TEACHER_EIGHTH_PAIR = 100  # 8-я пара у преподавателя — только в крайнем случае
 OPTIMIZE_ITERATIONS = 1000
 OPTIMIZE_TIME_BUDGET = 2.5
 ANNEAL_T_START = 8.0
@@ -252,6 +253,9 @@ def _calculate_cost(plan, fixed=None, expected_start=1):
     cost = 0
     for periods in teacher_days.values():
         cost += _gap_cost(periods, W_TEACHER_GAP_BASE, W_TEACHER_GAP_STEP)
+        if 8 in periods:
+            # 7 пар у преподавателя — норма (бывает и 8, как у Балашовой), но дорого
+            cost += W_TEACHER_EIGHTH_PAIR
     for (gid, date), periods in group_days.items():
         cost += _gap_cost(periods, W_GROUP_GAP_BASE, W_GROUP_GAP_STEP)
         first_period = min(periods)
@@ -400,6 +404,7 @@ def _optimize_week(conn, group_id, group_name, week_dates, allowed_periods, seed
         FROM lessons l
         JOIN schedule_days sd ON l.day_id = sd.id
         WHERE l.group_id = ? AND sd.date IN ({placeholders}) AND l.id IN ({ids_clause})
+          AND COALESCE(l.is_special_event, 0) = 0
           AND l.deleted_at IS NULL AND sd.deleted_at IS NULL
     """, [group_id] + list(week_dates) + list(lesson_ids)).fetchall()
     if len(rows) < 2:

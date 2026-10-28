@@ -94,9 +94,6 @@ def e2e_server():
     data_dir = os.path.join(tmp, 'data')
     os.makedirs(data_dir, exist_ok=True)
     src = os.path.join(PROJECT_ROOT, 'data', 'schedule.db')
-    if os.path.exists(src):
-        shutil.copy2(src, os.path.join(data_dir, 'schedule.db'))
-        _seed_fixture_schedule(os.path.join(data_dir, 'schedule.db'))
     env = dict(os.environ)
     env.update({
         'SCHEDULE_DATA_DIR': data_dir,
@@ -108,6 +105,14 @@ def e2e_server():
         'FLASK_DEBUG': '0',
         'PYTHONUNBUFFERED': '1',
     })
+    if os.path.exists(src):
+        shutil.copy2(src, os.path.join(data_dir, 'schedule.db'))
+        # Копия боевой БД может быть на старой ревизии — догоняем миграции,
+        # иначе запросы с новыми колонками (classroom_id_2) падают.
+        subprocess.run(
+            [sys.executable, '-c', 'from db import run_alembic_upgrade; run_alembic_upgrade()'],
+            cwd=PROJECT_ROOT, env=env, check=True, capture_output=True)
+        _seed_fixture_schedule(os.path.join(data_dir, 'schedule.db'))
     runner = (
         'from app import app; '
         f"app.run(host='127.0.0.1', port={E2E_PORT}, use_reloader=False, threaded=True)"

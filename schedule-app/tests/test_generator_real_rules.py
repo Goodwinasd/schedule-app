@@ -77,7 +77,7 @@ def test_second_shift_never_starts_at_first_second_period(app, db):
     assert not ({1, 2} & set(periods)), f'2-я смена попала на 1–2 пары: {periods}'
 
 
-def test_second_shift_uses_periods_up_to_seven_not_eight(app, db):
+def test_second_shift_periods_within_three_eight(app, db):
     conn = db.get_db()
     gid = _setup(conn, course=2, shift=2,
                  subjects=[(f'Предмет {i + 1}', None, 3) for i in range(6)],
@@ -89,9 +89,8 @@ def test_second_shift_uses_periods_up_to_seven_not_eight(app, db):
     rows = _lessons(conn, gid, monday)
     periods = [row['period'] for row in rows]
     assert rows and len(rows) == 18, len(rows)
-    assert max(periods) == generator.GENERATOR_MAX_PERIOD, f'ожидали 7-ю пару: {sorted(set(periods))}'
-    assert all(3 <= p <= 7 for p in periods), f'периоды вне 3–7: {sorted(set(periods))}'
-    assert 8 not in periods, '8-я пара не должна ставиться'
+    assert max(periods) <= generator.GENERATOR_MAX_PERIOD == 8, f'вышли за 8-ю пару: {sorted(set(periods))}'
+    assert all(3 <= p <= 8 for p in periods), f'периоды вне 3–8: {sorted(set(periods))}'
 
 
 def test_gym_subject_goes_only_to_gym_room(app, db):
@@ -147,3 +146,44 @@ def test_first_shift_still_starts_at_first_period(app, db):
 
     periods = [row['period'] for row in _lessons(conn, gid, monday)]
     assert periods and set(periods) == {1}, f'1-я смена должна начинать с 1-й пары: {periods}'
+
+
+def test_teacher_eighth_pair_is_expensive(app):
+    """7 пар у преподавателя — норма, 8-я допустима, но дорого (как у Балашовой)."""
+    def cost(count):
+        return generator._calculate_cost([
+            {'date': '2026-09-07', 'period': p, 'group_id': 1, 'teacher_id': 1}
+            for p in range(1, count + 1)
+        ])
+
+    week = cost(7)
+    eight = cost(8)
+    assert week == generator.W_OVERLOAD * 3          # (7 - 4) пары перегруза
+    assert eight == generator.W_OVERLOAD * 4 + generator.W_TEACHER_EIGHTH_PAIR
+    assert eight - week == generator.W_OVERLOAD + generator.W_TEACHER_EIGHTH_PAIR
+
+
+def test_special_event_not_touched_by_generator(app, db):
+    """Разовое мероприятие остаётся на месте: генератор его не двигает и не удаляет."""
+    conn = db.get_db()
+    gid = _setup(conn, course=2, shift=1,
+                 subjects=[('Математика', None, 3)],
+                 rooms=[('101', None)])
+    monday = _monday()
+    day_id = conn.execute(
+        "INSERT INTO schedule_days (day_name, date, group_name) VALUES ('Понедельник', ?, 'Тест-группа')",
+        (monday,)).lastrowid
+    special_id = conn.execute(
+        "INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, group_id, is_special_event) "
+        "VALUES (?, 7, NULL, NULL, NULL, ?, 1)", (day_id, gid)).lastrowid
+    conn.commit()
+
+    generator.generate_schedule(conn, gid, 'Тест-группа', 1, monday, 1, optimize=True)
+    conn.commit()
+
+    row = conn.execute(
+        "SELECT period, is_special_event, deleted_at FROM lessons WHERE id = ?", (special_id,)).fetchone()
+    assert row is not None, 'мероприятие удалено генератором'
+    assert row['period'] == 7, 'мероприятие переставили'
+    assert row['is_special_event'] == 1
+    assert row['deleted_at'] is None

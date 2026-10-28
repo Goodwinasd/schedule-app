@@ -127,10 +127,10 @@ def _public_ref(table, rows):
         return rows
     allowed = {
         'teachers': ('id', 'name'),
-        'subjects': ('id', 'name'),
-        'classrooms_list': ('id', 'name'),
+        'subjects': ('id', 'name', 'required_room_type'),
+        'classrooms_list': ('id', 'name', 'room_type'),
         'specialties': ('id', 'code', 'name', 'qualification'),
-        'groups_list': ('id', 'name', 'course', 'is_distance', 'specialty_id',
+        'groups_list': ('id', 'name', 'course', 'is_distance', 'shift', 'specialty_id',
                         'specialty_code', 'specialty_name', 'specialty_qualification'),
     }.get(table)
     if not allowed:
@@ -238,7 +238,7 @@ def _get_export_data(schedule_type, name, monday, entity_id=None):
                 if d in lessons_by_date and p in lessons_by_date[d]:
                     raw_list = lessons_by_date[d][p]
                     lessons[d] = '\n---\n'.join(
-                        f"{l['subject_name'] or ''}\n{l['teacher_name'] or ''}\n{l['classroom_name'] or ''}"
+                        f"{l['subject_name'] or ''}\n{l['teacher_name'] or ''}\n{(l['classroom_name'] or '') + (' / ' + l['classroom_2_name'] if l['classroom_2_name'] else '')}"
                         for l in raw_list
                     )
                 else:
@@ -1457,7 +1457,7 @@ def delete_week():
         conn.execute('BEGIN IMMEDIATE')
         if target_type == 'group':
             cur_lessons = conn.execute(
-                f"UPDATE lessons SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ?)",
+                f"UPDATE lessons SET deleted_at = datetime('now') WHERE deleted_at IS NULL AND COALESCE(is_special_event, 0) = 0 AND day_id IN (SELECT id FROM schedule_days WHERE date IN ({placeholders}) AND group_name = ?)",
                 week_dates + [target_id]
             )
             cur_days = conn.execute(
@@ -1780,7 +1780,7 @@ def delete_day(day_id):
     conn.execute("UPDATE schedule_days SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL", (day_id,))
     # deleted_at IS NULL обязателен: без него повторное удаление дня перезаписывало
     # время удаления у уже удалённых уроков, и корзина/автоочистка считали их заново.
-    conn.execute("UPDATE lessons SET deleted_at = datetime('now') WHERE day_id = ? AND deleted_at IS NULL", (day_id,))
+    conn.execute("UPDATE lessons SET deleted_at = datetime('now') WHERE day_id = ? AND deleted_at IS NULL AND COALESCE(is_special_event, 0) = 0", (day_id,))
     conn.commit()
     conn.close()
     return jsonify({"success": True})
@@ -1973,6 +1973,8 @@ def create_lesson(day_id):
         is_substitution = bool(data.get('is_substitution', False))
         original_teacher_id = data.get('original_teacher_id')
         substitution_reason = data.get('substitution_reason')
+        classroom_id_2 = data.get('classroom_id_2')
+        is_special_event = 1 if data.get('is_special_event') else 0
 
         warnings, blocking = _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id, group_id=group_id, subgroup=subgroup)
         if blocking:
@@ -1980,8 +1982,8 @@ def create_lesson(day_id):
             return jsonify({"error": "Conflict detected", "warnings": warnings}), 409
 
         cursor = conn.execute(
-            'INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, group_id, subgroup, is_substitution, original_teacher_id, substitution_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (day_id, period, subject_id, teacher_id, classroom_id, group_id, subgroup, int(is_substitution), original_teacher_id, substitution_reason)
+            'INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, is_substitution, original_teacher_id, substitution_reason, is_special_event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, int(is_substitution), original_teacher_id, substitution_reason, is_special_event)
         )
         lesson_id = cursor.lastrowid
         conn.commit()
@@ -2054,6 +2056,8 @@ def update_lesson(lesson_id):
         is_substitution = bool(_field('is_substitution'))
         original_teacher_id = _field('original_teacher_id')
         substitution_reason = _field('substitution_reason')
+        classroom_id_2 = _field('classroom_id_2')
+        is_special_event = 1 if _field('is_special_event') else 0
 
         if not day_id or not period or period not in range(1, 9):
             conn.rollback()
@@ -2077,11 +2081,12 @@ def update_lesson(lesson_id):
         )
 
         conn.execute(
-            'UPDATE lessons SET day_id = ?, period = ?, subject_id = ?, teacher_id = ?, classroom_id = ?, group_id = ?, subgroup = ?, is_substitution = ?, original_teacher_id = ?, substitution_reason = ? WHERE id = ?',
-            (day_id, period, subject_id, teacher_id, classroom_id, group_id, subgroup,
+            'UPDATE lessons SET day_id = ?, period = ?, subject_id = ?, teacher_id = ?, classroom_id = ?, classroom_id_2 = ?, group_id = ?, subgroup = ?, is_substitution = ?, original_teacher_id = ?, substitution_reason = ?, is_special_event = ? WHERE id = ?',
+            (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup,
              int(is_substitution),
              original_teacher_id,
              substitution_reason,
+             is_special_event,
              lesson_id)
         )
         conn.commit()
@@ -2292,7 +2297,8 @@ def schedule_table():
                 raw_list = lessons_by_date[d][p]
                 lessons[d] = [{
                     'id': l['id'], 'subject': l['subject_name'], 'teacher': l['teacher_name'],
-                    'classroom': l['classroom_name'], 'groups': l['groups'],
+                    'classroom': l['classroom_name'], 'classroom_2': l['classroom_2_name'],
+                    'is_special_event': bool(l['is_special_event']), 'groups': l['groups'],
                     'day_id': l['day_id'],
                     'subject_id': l['subject_id'], 'teacher_id': l['teacher_id'],
                     'classroom_id': l['classroom_id'],
@@ -2373,9 +2379,9 @@ def classroom_schedule_table():
     return jsonify({'days': week_dates, 'periods': _build_schedule_periods(week_dates, lessons_by_date_period)})
 
 
-generic_crud('subjects', 'subjects', 'name', extra_fields=['default_teacher_id'])
+generic_crud('subjects', 'subjects', 'name', extra_fields=['default_teacher_id', 'required_room_type'])
 generic_crud('teachers', 'teachers', 'name', extra_fields=['phone'])
-generic_crud('classrooms_list', 'classrooms', 'CAST(name AS INTEGER), name')
+generic_crud('classrooms_list', 'classrooms', 'CAST(name AS INTEGER), name', extra_fields=['room_type'])
 
 
 @bp.route('/api/specialties', methods=['GET'])
@@ -2395,6 +2401,17 @@ def get_specialties():
     result = [dict(i) for i in items]
     refs_cache.set('ref_list_specialties', result)
     return jsonify(_public_ref('specialties', result))
+
+
+def _validated_shift(value):
+    """Смена группы: 1 или 2; None — прежняя логика генератора (старт с 1-й пары)."""
+    if value in (None, '', 0, '0'):
+        return None
+    try:
+        shift = int(value)
+    except (TypeError, ValueError):
+        return None
+    return shift if shift in (1, 2) else None
 
 
 def _validated_specialty_id(conn, raw):
@@ -2621,6 +2638,7 @@ def create_group():
         return jsonify({"error": "Name required"}), 400
     course = data.get('course', 1)
     is_distance = 1 if data.get('is_distance') else 0
+    shift = _validated_shift(data.get('shift'))
     conn = get_db()
     specialty_id = _validated_specialty_id(conn, data.get('specialty_id'))
     active = conn.execute("SELECT id FROM groups_list WHERE LOWER(name) = LOWER(?) AND deleted_at IS NULL", (name,)).fetchone()
@@ -2629,15 +2647,15 @@ def create_group():
         return jsonify({"error": "Группа с таким названием уже существует"}), 400
     deleted = conn.execute("SELECT id, course, is_distance FROM groups_list WHERE LOWER(name) = LOWER(?) AND deleted_at IS NOT NULL", (name,)).fetchone()
     if deleted:
-        conn.execute("UPDATE groups_list SET deleted_at = NULL, course = ?, is_distance = ?, specialty_id = ? WHERE id = ?", (course, is_distance, specialty_id, deleted['id']))
+        conn.execute("UPDATE groups_list SET deleted_at = NULL, course = ?, is_distance = ?, specialty_id = ?, shift = ? WHERE id = ?", (course, is_distance, specialty_id, shift, deleted['id']))
         conn.commit()
         conn.close()
         refs_cache.invalidate_prefix('ref_list_groups_list')
-        return jsonify({"id": deleted['id'], "name": name, "course": course, "is_distance": is_distance, "specialty_id": specialty_id, "restored": True}), 200
+        return jsonify({"id": deleted['id'], "name": name, "course": course, "is_distance": is_distance, "shift": shift, "specialty_id": specialty_id, "restored": True}), 200
     try:
         cursor = conn.execute(
-            'INSERT INTO groups_list (name, course, is_distance, specialty_id) VALUES (?, ?, ?, ?)',
-            (name, course, is_distance, specialty_id)
+            'INSERT INTO groups_list (name, course, is_distance, specialty_id, shift) VALUES (?, ?, ?, ?, ?)',
+            (name, course, is_distance, specialty_id, shift)
         )
         conn.commit()
         item_id = cursor.lastrowid
@@ -2646,7 +2664,7 @@ def create_group():
         return jsonify({"error": "Уже существует"}), 409
     conn.close()
     refs_cache.invalidate_prefix('ref_list_groups_list')
-    return jsonify({"id": item_id, "name": name, "course": course, "is_distance": is_distance, "specialty_id": specialty_id}), 201
+    return jsonify({"id": item_id, "name": name, "course": course, "is_distance": is_distance, "shift": shift, "specialty_id": specialty_id}), 201
 
 
 @bp.route('/api/groups/<int:item_id>', methods=['PUT'])
@@ -2683,6 +2701,7 @@ def update_group(item_id):
         return jsonify({"error": "Name required"}), 400
     course = data.get('course', 1)
     is_distance = 1 if data.get('is_distance') else 0
+    shift = _validated_shift(data.get('shift'))
     conn = get_db()
     specialty_id = _validated_specialty_id(conn, data.get('specialty_id'))
     existing = conn.execute(
@@ -2693,8 +2712,8 @@ def update_group(item_id):
         conn.close()
         return jsonify({"error": "Группа с таким названием уже существует"}), 400
     conn.execute(
-        'UPDATE groups_list SET name = ?, course = ?, is_distance = ?, specialty_id = ? WHERE id = ?',
-        (name, course, is_distance, specialty_id, item_id)
+        'UPDATE groups_list SET name = ?, course = ?, is_distance = ?, specialty_id = ?, shift = ? WHERE id = ?',
+        (name, course, is_distance, specialty_id, shift, item_id)
     )
     conn.commit()
     conn.close()
