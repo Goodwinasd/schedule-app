@@ -27,6 +27,7 @@ function checkConflictsForLesson(lesson, dayDate, period) {
 
 function renderScheduleTable(data) {
     const { days, periods } = data;
+    const todayISO = toISODate(new Date());
     Object.keys(state.lessonsMap).forEach(k => delete state.lessonsMap[k]);
     const canEdit = state.isAdmin && (state.currentScheduleType === 'group' || state.currentScheduleType === 'teacher');
     // Build excluded dates lookup
@@ -50,8 +51,12 @@ function renderScheduleTable(data) {
         const d = new Date(day.date + 'T00:00:00');
         const dn = DAY_ORDER[d.getDay() === 0 ? 6 : d.getDay() - 1];
         const exc = excludedByDate[day.date];
-        const excCls = exc ? ' style="background:var(--warning-bg);color:var(--warning-text)"' : '';
-        html += `<th class="col-day"${excCls}>${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
+        const isToday = day.date === todayISO;
+        const cls = ['col-day'];
+        if (exc) cls.push('is-excluded');
+        if (isToday) cls.push('is-today');
+        if (d.getDay() === 6) cls.push('is-weekend');
+        html += `<th class="${cls.join(' ')}">${dn}<span class="day-date">${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}</span></th>`;
     }
     html += '</tr></thead><tbody>';
 
@@ -59,32 +64,41 @@ function renderScheduleTable(data) {
     for (const day of days) {
         const exc = excludedByDate[day.date];
         if (exc) {
-            html += `<tr class="shift-row"><td colspan="${days.length + 1}" style="background:var(--warning-bg);color:var(--warning-text);font-size:12px;padding:8px;text-align:center">🚩 ${day.date} — ${exc.join('; ')}</td></tr>`;
+            html += `<tr class="shift-row shift-row--notice"><td colspan="${days.length + 1}">Исключение: ${escapeHtml(day.date)} — ${escapeHtml(exc.join('; '))}</td></tr>`;
         }
     }
     let lastShift = 0;
     for (const p of periods) {
         if (p.shift !== lastShift) { lastShift = p.shift; html += `<tr class="shift-row"><td colspan="${days.length + 1}">${shiftLabel(p.shift)}</td></tr>`; }
         html += '<tr data-period-row="' + p.period + '">';
-        html += `<td class="time-cell"><span class="period-num">${p.period}</span>${escapeHtml(p.start)} – ${escapeHtml(p.end)}</td>`;
+        html += `<td class="time-cell"><span class="period-num">${p.period}</span><span class="period-time">${escapeHtml(p.start)} – ${escapeHtml(p.end)}</span></td>`;
         for (const day of days) {
             const isExcluded = excludedByDate[day.date];
+            const isToday = day.date === todayISO;
+            const isSaturday = new Date(day.date + 'T00:00:00').getDay() === 6;
+            const dayCls = ['day-cell'];
+            if (isToday) dayCls.push('is-today');
+            if (isSaturday) dayCls.push('is-weekend');
             if (isExcluded) {
-                html += `<td class="day-cell" style="background:var(--warning-bg);text-align:center;font-size:11px;color:var(--warning-text)">🚩 отменено</td>`;
+                html += `<td class="${dayCls.join(' ')} is-excluded">Отменено</td>`;
                 continue;
             }
             const lessons = p.lessons[day.date] || [];
             const busy = lessons.length > 0;
             if (state.currentScheduleType === 'classroom') {
-                html += busy ? `<td class="day-cell busy-cell">${lessons.map(l => `<div class="lesson-content"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${escapeHtml(l.teacher)}\n${escapeHtml(l.groups || '')}</div></div>`).join('')}</td>` : '<td class="day-cell empty-cell"></td>';
+                html += busy
+                    ? `<td class="${dayCls.join(' ')} busy-cell">${lessons.map(l => `<div class="lesson-content"><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${escapeHtml(l.teacher)}\n${escapeHtml(l.groups || '')}</div></div>`).join('')}</td>`
+                    : `<td class="${dayCls.join(' ')} empty-cell"></td>`;
             } else {
                 if (busy) {
                     const inner = lessons.map(l => {
                         state.lessonsMap[l.id] = l;
                         const isSub = l.is_substitution ? true : false;
                         const subCls = isSub ? ' is-substitution' : '';
-                        let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${l.classroom ? ' · ауд. ' + escapeHtml(l.classroom) : ''}`;
-                        if (isSub) meta += ' 🔄 замена';
+                        const roomText = (l.classroom || '') + (l.classroom_2 ? ' / ' + l.classroom_2 : '');
+                        let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${roomText ? ' · ауд. ' + escapeHtml(roomText) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${roomText ? ' · ауд. ' + escapeHtml(roomText) : ''}`;
+                        if (l.is_special_event) meta += ' · 📌 мероприятие';
+                        if (isSub) meta += ' · замена';
                         const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
                         const drag = canEdit ? ` draggable="true" data-lesson-id="${l.id}" data-day-id="${l.day_id || ''}" data-period="${p.period}"` : '';
                         const conflict = checkConflictsForLesson(l, day.date, p.period);
@@ -92,7 +106,8 @@ function renderScheduleTable(data) {
                         const tip = conflict ? ` title="${escapeHtml(conflict.tooltip)}"` : '';
                         return `<div class="lesson-content${cCls}${subCls}"${oc}${drag}${tip}><div class="lesson-subject">${escapeHtml(l.subject)}</div><div class="lesson-meta">${meta}</div></div>`;
                     }).join('');
-                    html += `<td class="day-cell${canEdit ? ' editable-cell' : ''}" data-day-id="${day.day_id || ''}" data-date="${day.date}" data-period="${p.period}">${inner}</td>`;
+                    if (canEdit) dayCls.push('editable-cell');
+                    html += `<td class="${dayCls.join(' ')}" data-day-id="${day.day_id || ''}" data-date="${day.date}" data-period="${p.period}">${inner}</td>`;
                 } else {
                     const di = day.day_id;
                     let oc = '';
@@ -101,7 +116,8 @@ function renderScheduleTable(data) {
                         // Раньше дата попадала в dayGroup и терялся dateStr — день не определялся.
                         oc = state.currentScheduleType === 'teacher' ? ` onclick="showAddLessonModal(${di || 'null'}, ${p.period}, null, '${day.date}', ${state.currentScheduleId})"` : ` onclick="showAddLessonModal(${di}, ${p.period}, ${state.currentScheduleId})"`;
                     }
-                    html += `<td class="day-cell empty-cell${canEdit && (di || state.currentScheduleType === 'teacher') ? ' addable-cell' : ''}" data-day-id="${di || ''}" data-date="${day.date}" data-period="${p.period}"${oc}></td>`;
+                    if (canEdit && (di || state.currentScheduleType === 'teacher')) dayCls.push('addable-cell');
+                    html += `<td class="${dayCls.join(' ')} empty-cell" data-day-id="${di || ''}" data-date="${day.date}" data-period="${p.period}"${oc}></td>`;
                 }
             }
         }
@@ -143,7 +159,7 @@ export async function loadScheduleTable() {
     if (!data || !data.periods || !data.periods.length || data.week_exists === false) {
         const bar = document.getElementById('schedule-status-bar');
         if (bar) bar.style.display = 'none';
-        cont.innerHTML = '<div class="no-schedule"><span class="emoji">📅</span><p>Нет расписания на эту неделю</p></div>';
+        cont.innerHTML = '<div class="no-schedule"><p>Нет расписания на эту неделю</p></div>';
         return;
     }
     // Check excluded dates for this week
@@ -174,15 +190,15 @@ function renderPublishStatus(data) {
         return;
     }
     const editable = state.isAdmin;
-    const pubCls = published ? 'btn-success active' : 'btn-outline-secondary';
-    const draftCls = published ? 'btn-outline-secondary' : 'btn-warning active';
     const actionAttr = editable
         ? 'data-action="toggleWeekPublish"'
         : 'disabled';
+    const pubLabel = published ? 'Опубликовано' : 'Опубликовать';
+    const draftLabel = published ? 'В черновик' : 'Черновик';
     const group = `
         <div class="publish-group" role="group" aria-label="Статус публикации недели">
-            <button type="button" class="btn btn-sm ${pubCls}" ${actionAttr} data-params='[1]' title="Опубликовать неделю">Опубликовано</button>
-            <button type="button" class="btn btn-sm ${draftCls}" ${actionAttr} data-params='[0]' title="Перевести неделю в черновик">В черновик</button>
+            <button type="button" class="btn btn-sm publish-btn publish-published${published ? ' is-active' : ''}" ${actionAttr} data-params='[1]' aria-pressed="${published}" title="Опубликовать неделю">${pubLabel}</button>
+            <button type="button" class="btn btn-sm publish-btn publish-draft${published ? '' : ' is-active'}" ${actionAttr} data-params='[0]' aria-pressed="${!published}" title="Перевести неделю в черновик">${draftLabel}</button>
         </div>`;
     bar.innerHTML = `<div class="schedule-status-wrap">${group}</div>`;
     bar.style.display = '';
@@ -248,7 +264,7 @@ export async function toggleWeekPublish(publish) {
         return;
     }
     const bar = document.getElementById('schedule-status-bar');
-    const activeBtn = bar && bar.querySelector('[data-action="toggleWeekPublish"].active');
+    const activeBtn = bar && bar.querySelector('[data-action="toggleWeekPublish"].is-active');
     if (activeBtn) {
         const current = JSON.parse(activeBtn.dataset.params)[0];
         if (current === publish) {
@@ -285,7 +301,7 @@ export async function loadPlanProgress() {
     const weekNumber = data.current_week || weekNum || 6;
     const totalWeeks = data.total_weeks || 16;
     let html = `<div class="plan-progress-header">
-        <h3>📊 Выполнение плана семестра</h3>
+        <h3>Выполнение плана семестра</h3>
         <p class="plan-progress-subtitle">
             Расчёт нагрузки к <b>${weekNum}-й неделе</b> из ${totalWeeks}.
             Показывает, успевает ли группа вычитать программу или есть отставание от графика.
@@ -293,21 +309,21 @@ export async function loadPlanProgress() {
     </div>`;
     for (const s of data.subjects) {
         const pct = Math.min(s.percentage, 100);
-        const color = s.status === 'danger' ? '#d32f2f' : s.status === 'warning' ? '#f9a825' : '#43a047';
         let badge = '';
         let badgeClass = 'badge-success';
         if (s.actual_pairs > s.expected_pairs) {
             badgeClass = 'badge-info';
-            badge = `🔵 Опережаем график на +${s.actual_pairs - s.expected_pairs} пар${plural(s.actual_pairs - s.expected_pairs)}`;
+            badge = `Опережаем график на +${s.actual_pairs - s.expected_pairs} пар${plural(s.actual_pairs - s.expected_pairs)}`;
         } else if (s.status === 'danger' && s.delta_pace < -4) {
             badgeClass = 'badge-danger';
-            badge = `🔴 Сильное отставание (-${-s.delta_pace} пар)`;
+            badge = `Сильное отставание (-${-s.delta_pace} пар)`;
         } else if (s.status === 'warning') {
             badgeClass = 'badge-warning';
-            badge = `🟡 Отстаём от темпа на ${-s.delta_pace} пар${plural(-s.delta_pace)}`;
+            badge = `Отстаём от темпа на ${-s.delta_pace} пар${plural(-s.delta_pace)}`;
         } else {
-            badge = '🟢 Идём по графику';
+            badge = 'Идём по графику';
         }
+        const statusClass = s.status === 'danger' ? 'status-danger' : s.status === 'warning' ? 'status-warning' : 'status-success';
         const lag = s.delta_pace < 0;
         const tip = `По учебному плану на весь семестр положено ${s.plan_pairs} пар. ` +
             `К ${weekNum}-й неделе должно быть проведено около ${s.expected_pairs} пар. ` +
@@ -322,7 +338,7 @@ export async function loadPlanProgress() {
                 <div class="plan-stat"><span class="plan-stat-label">Норма к ${weekNum}-й неделе</span><span class="plan-stat-value">${s.expected_pairs} пар${plural(s.expected_pairs)}</span></div>
                 <div class="plan-stat"><span class="plan-stat-label">Всего на семестр</span><span class="plan-stat-value">${s.plan_pairs} пар${plural(s.plan_pairs)}</span></div>
             </div>
-            <div class="plan-progress-bar"><span style="width:${pct}%;background:${color}"></span></div>
+            <div class="plan-progress-bar"><span class="${statusClass}" style="width:${pct}%"></span></div>
             <span class="badge ${badgeClass}">${badge}</span>
         </div>`;
     }
@@ -465,6 +481,13 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     populateSelect('lesson-teacher', state.teachersList, '— выбрать —');
     populateSelect('lesson-group', state.groupsList, '— выбрать —');
     populateSelect('lesson-classroom', state.classroomsList, '— выбрать —');
+    populateSelect('lesson-classroom-2', state.classroomsList, '— не нужна —');
+    const specialBox = document.getElementById('lesson-is-special-event');
+    if (specialBox) specialBox.checked = false;
+    const specialFields = document.getElementById('special-event-fields');
+    if (specialFields) specialFields.style.display = 'none';
+    const room2 = document.getElementById('lesson-classroom-2');
+    if (room2) room2.value = '';
     const tf = document.getElementById('lesson-teacher');
     if (state.currentScheduleType === 'teacher' && teacherId) { tf.value = teacherId; tf.disabled = true; document.getElementById('lesson-group').value = ''; }
     else { tf.disabled = false; if (state.currentLessonDayGroup) document.getElementById('lesson-group').value = state.currentLessonDayGroup; }
@@ -498,6 +521,8 @@ async function collectLessonData() {
         is_substitution: isSub,
         original_teacher_id: isSub ? (parseInt(document.getElementById('lesson-original-teacher').value) || null) : null,
         substitution_reason: isSub ? (document.getElementById('lesson-substitution-reason').value || null) : null,
+        classroom_id_2: parseInt(document.getElementById('lesson-classroom-2')?.value) || null,
+        is_special_event: !!document.getElementById('lesson-is-special-event')?.checked,
     };
 }
 
@@ -545,7 +570,15 @@ export function editLesson(lesson) {
     populateSelect('lesson-teacher', state.teachersList, '— выбрать —');
     populateSelect('lesson-group', state.groupsList, '— выбрать —');
     populateSelect('lesson-classroom', state.classroomsList, '— выбрать —');
+    populateSelect('lesson-classroom-2', state.classroomsList, '— не нужна —');
     ['subject', 'teacher', 'classroom', 'group'].forEach(f => document.getElementById(`lesson-${f}`).value = lesson[`${f}_id`] || '');
+    const room2El = document.getElementById('lesson-classroom-2');
+    if (room2El) room2El.value = lesson.classroom_id_2 || '';
+    const specialEl = document.getElementById('lesson-is-special-event');
+    const isSpecial = !!lesson.is_special_event;
+    if (specialEl) specialEl.checked = isSpecial;
+    const specialFieldsEl = document.getElementById('special-event-fields');
+    if (specialFieldsEl) specialFieldsEl.style.display = isSpecial ? '' : 'none';
     document.getElementById('lesson-subgroup').value = lesson.subgroup || '';
     document.getElementById('lesson-teacher').disabled = state.currentScheduleType === 'teacher';
     populateSelect('lesson-original-teacher', state.teachersList, '— не указан —');

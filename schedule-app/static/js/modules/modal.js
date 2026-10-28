@@ -57,10 +57,10 @@ export function showKimiAlert(message, title) {
 
         const modal = document.createElement('div');
         modal.id = 'kimi-alert-modal';
-        modal.className = 'modal';
+        modal.className = 'modal modal-narrow';
         modal.style.cssText = 'display:';
         // title/message приходят из ответов API — в innerHTML их можно только экранированными
-        modal.innerHTML = `<div class="modal-content"><h2>${escapeHtml(title)}</h2><p style="text-align:center;margin:8px 0;font-size:14px;line-height:1.5">${escapeHtml(message)}</p><div class="modal-actions" style="justify-content:center"><button class="btn btn-primary" id="kimi-alert-ok">OK</button></div></div>`;
+        modal.innerHTML = `<div class="modal-content"><h2>${escapeHtml(title)}</h2><p class="modal-message">${escapeHtml(message)}</p><div class="modal-actions"><button class="btn btn-primary" id="kimi-alert-ok">OK</button></div></div>`;
         document.body.appendChild(modal);
         overlay.classList.add('active');
         modal.style.display = '';
@@ -93,10 +93,10 @@ export function showKimiPrompt(message, defaultValue) {
 
         const modal = document.createElement('div');
         modal.id = 'kimi-prompt-modal';
-        modal.className = 'modal';
+        modal.className = 'modal modal-narrow';
         modal.style.cssText = 'display:';
         // Значение по умолчанию тоже может прийти из БД — escapeHtml закрывает и кавычки, и <>&
-        modal.innerHTML = `<div class="modal-content"><h2>${escapeHtml(message)}</h2><input type="text" id="kimi-prompt-input" class="input" value="${escapeHtml(defaultValue || '')}" style="margin:8px 0"><div class="modal-actions"><button class="btn btn-ghost" id="kimi-prompt-cancel">Отмена</button><button class="btn btn-primary" id="kimi-prompt-ok">OK</button></div></div>`;
+        modal.innerHTML = `<div class="modal-content"><h2>${escapeHtml(message)}</h2><input type="text" id="kimi-prompt-input" class="input kimi-input" value="${escapeHtml(defaultValue || '')}"><div class="modal-actions"><button class="btn btn-ghost" id="kimi-prompt-cancel">Отмена</button><button class="btn btn-primary" id="kimi-prompt-ok">OK</button></div></div>`;
         document.body.appendChild(modal);
         overlay.classList.add('active');
         modal.style.display = '';
@@ -137,9 +137,9 @@ export function showKimiSelect(title, options, defaultValue) {
         ).join('');
         const modal = document.createElement('div');
         modal.id = 'kimi-select-modal';
-        modal.className = 'modal';
+        modal.className = 'modal modal-narrow';
         modal.style.cssText = 'display:';
-        modal.innerHTML = `<div class="modal-content"><h2>${escapeHtml(title)}</h2><select id="kimi-select-input" class="input" style="margin:8px 0;width:100%">${optsHtml}</select><div class="modal-actions"><button class="btn btn-ghost" id="kimi-select-cancel">Отмена</button><button class="btn btn-primary" id="kimi-select-ok">OK</button></div></div>`;
+        modal.innerHTML = `<div class="modal-content"><h2>${escapeHtml(title)}</h2><select id="kimi-select-input" class="input kimi-input">${optsHtml}</select><div class="modal-actions"><button class="btn btn-ghost" id="kimi-select-cancel">Отмена</button><button class="btn btn-primary" id="kimi-select-ok">OK</button></div></div>`;
         document.body.appendChild(modal);
         overlay.classList.add('active');
         modal.style.display = '';

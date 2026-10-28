@@ -40,7 +40,7 @@ export function updateUI() {
 export function toggleConflicts() {
     state.showConflicts = !state.showConflicts;
     const cb = document.getElementById('btn-toggle-conflicts');
-    if (cb) cb.textContent = state.showConflicts ? '✔ Конфликты' : 'Конфликты';
+    if (cb) cb.textContent = state.showConflicts ? 'Конфликты: вкл' : 'Конфликты';
     loadScheduleTable();
 }
 window._onUnauthorized = updateUI;
@@ -110,31 +110,131 @@ export function showLoginModal() {
 
 /* ======================== Homepage & References ======================== */
 
+function plural(n, forms) {
+    const abs = Math.abs(n) % 100;
+    const last = abs % 10;
+    if (abs > 10 && abs < 20) return forms[2];
+    if (last === 1) return forms[0];
+    if (last >= 2 && last <= 4) return forms[1];
+    return forms[2];
+}
+
+function _setCount(id, value, forms) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${value} ${plural(value, forms)}`;
+}
+
+function _initials(name) {
+    const words = String(name || '').replace(/[.]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return '—';
+    return words.slice(0, 2).map(w => w[0].toUpperCase()).join('');
+}
+
 export function renderHomePage() {
     const reg = state.groupsList.filter(g => !g.is_distance);
     const dist = state.groupsList.filter(g => g.is_distance);
     const gc = document.getElementById('groups-grid');
-    if (!reg.length && !dist.length) { gc.innerHTML = '<div class="empty-grid">Нет групп. Добавьте через справочники.</div>'; }
+    if (!reg.length) { gc.innerHTML = '<div class="empty-grid">Нет групп на очной форме. Добавьте их через справочники.</div>'; }
     else {
         let html = '';
         for (let c = 1; c <= 4; c++) {
             const cg = reg.filter(g => g.course === c);
             if (!cg.length) continue;
-            html += `<div class="course-subsection"><h3 class="course-subtitle">Курс ${c}</h3><div class="select-grid">${cg.map(g => makeCard('group', g.id, g.name, 'Расписание группы')).join('')}</div></div>`;
+            html += `<div class="course-subsection"><div class="course-heading"><h3 class="course-subtitle">Курс ${c}</h3><span class="course-rule" aria-hidden="true"></span></div><div class="select-grid">${cg.map(g => makeCard('group', g.id, g.name, 'Расписание группы', {
+                avatar: String(c),
+                kicker: 'Группа',
+                meta: 'Курс ' + c + ' · ' + (g.specialty_code || 'Очная форма'),
+            })).join('')}</div></div>`;
         }
-        if (reg.length && !html) html = `<div class="select-grid">${reg.map(g => makeCard('group', g.id, g.name, 'Расписание группы')).join('')}</div>`;
+        if (reg.length && !html) html = `<div class="select-grid">${reg.map(g => makeCard('group', g.id, g.name, 'Расписание группы', { kicker: 'Группа' })).join('')}</div>`;
         gc.innerHTML = html;
     }
     const dc = document.getElementById('distance-grid');
-    if (dc) dc.innerHTML = dist.length ? `<div class="select-grid">${dist.map(g => makeCard('group', g.id, g.name, 'Расписание группы')).join('')}</div>` : '<div class="empty-grid">Нет заочных групп.</div>';
-    document.getElementById('teachers-grid').innerHTML = state.teachersWithSchedule.length ? state.teachersWithSchedule.map(t => makeCard('teacher', t.id, t.name, 'Расписание преподавателя')).join('') : '<div class="empty-grid">Нет преподавателей.</div>';
-    document.getElementById('classrooms-grid').innerHTML = state.classroomsWithSchedule.length ? state.classroomsWithSchedule.map(c => makeCard('classroom', c.id, c.name, 'Занятость', 'Ауд. ')).join('') : '<div class="empty-grid">Нет аудиторий.</div>';
+    if (dc) dc.innerHTML = dist.length
+        ? `<div class="select-grid">${dist.map(g => makeCard('group', g.id, g.name, 'Расписание группы', { kicker: 'Заочная группа', meta: 'Заочное отделение' })).join('')}</div>`
+        : '<div class="empty-grid">Нет заочных групп.</div>';
+    document.getElementById('teachers-grid').innerHTML = state.teachersWithSchedule.length
+        ? state.teachersWithSchedule.map(t => makeCard('teacher', t.id, t.name, 'Расписание преподавателя', {
+            avatar: _initials(t.name),
+            kicker: 'Преподаватель',
+            meta: 'Недельная нагрузка',
+        })).join('')
+        : '<div class="empty-grid">Нет преподавателей.</div>';
+    document.getElementById('classrooms-grid').innerHTML = state.classroomsWithSchedule.length
+        ? state.classroomsWithSchedule.map(c => makeCard('classroom', c.id, c.name, 'Занятость', '', {
+            kicker: 'Аудитория',
+            meta: 'Занятость и свободные окна',
+            icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V6l8-3 8 3v14M9 20v-5h6v5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        })).join('')
+        : '<div class="empty-grid">Нет аудиторий.</div>';
+
+    _setCount('stat-groups', state.groupsList.length, ['группа', 'группы', 'групп']);
+    _setCount('stat-teachers', state.teachersWithSchedule.length, ['преподаватель', 'преподавателя', 'преподавателей']);
+    _setCount('stat-classrooms', state.classroomsWithSchedule.length, ['аудитория', 'аудитории', 'аудиторий']);
+    _setCount('groups-count', reg.length, ['группа', 'группы', 'групп']);
+    _setCount('teachers-count', state.teachersWithSchedule.length, ['преподаватель', 'преподавателя', 'преподавателей']);
+    _setCount('classrooms-count', state.classroomsWithSchedule.length, ['аудитория', 'аудитории', 'аудиторий']);
+    _setCount('distance-count', dist.length, ['группа', 'группы', 'групп']);
+
+    const dateEl = document.getElementById('home-date');
+    const yearEl = document.getElementById('hero-academic-year');
+    if (dateEl || yearEl) {
+        const now = new Date();
+        if (dateEl) {
+            const formatted = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
+            dateEl.textContent = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+        }
+        if (yearEl) {
+            const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+            yearEl.textContent = `${startYear} / ${startYear + 1}`;
+        }
+    }
+
+    const search = document.getElementById('home-search');
+    filterHomePage(search ? search.value : '');
 }
 
-function makeCard(type, id, name, subtitle, prefix = '') {
-    const safe = escapeHtml(name).replace(/'/g, "&#39;");
-    return `<div class="select-card" onclick="showSchedule('${type}', ${id}, '${safe}')"><div class="select-card-title">${prefix}${safe}</div><div class="select-card-subtitle">${subtitle}</div></div>`;
+export function filterHomePage(rawQuery) {
+    const q = String(rawQuery || '').trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('#home-view .select-card').forEach(card => {
+        const match = !q || card.textContent.toLowerCase().includes(q);
+        card.hidden = !match;
+        if (match) visible += 1;
+    });
+    document.querySelectorAll('#home-view .course-subsection').forEach(sub => {
+        sub.hidden = !sub.querySelector('.select-card:not([hidden])');
+    });
+    document.querySelectorAll('#home-view .section-block').forEach(section => {
+        section.hidden = Boolean(q) && !section.querySelector('.select-card:not([hidden])');
+    });
+    const empty = document.getElementById('home-empty');
+    if (empty) empty.hidden = !q || visible > 0;
 }
+
+function makeCard(type, id, name, subtitle, prefix = '', extra = {}) {
+    if (prefix && typeof prefix === 'object') { extra = prefix; prefix = ''; }
+    const safe = escapeHtml(name).replace(/'/g, "&#39;");
+    const kind = extra.kicker || (type === 'group' ? 'Группа' : type === 'teacher' ? 'Преподаватель' : 'Аудитория');
+    let avatar = '';
+    if (extra.icon) {
+        avatar = `<span class="select-card-avatar select-card-avatar--icon" aria-hidden="true">${extra.icon}</span>`;
+    } else if (extra.avatar) {
+        avatar = `<span class="select-card-avatar" aria-hidden="true">${escapeHtml(extra.avatar)}</span>`;
+    }
+    const meta = extra.meta ? `<span class="select-card-meta">${escapeHtml(extra.meta)}</span>` : '';
+    return `<div class="select-card select-card--${type}" role="button" tabindex="0" data-ref-type="${type}" onclick="showSchedule('${type}', ${id}, '${safe}')">`
+        + avatar
+        + '<span class="select-card-body">'
+        + `<span class="select-card-kicker">${escapeHtml(kind)}</span>`
+        + `<span class="select-card-title">${prefix}${safe}</span>`
+        + `<span class="select-card-subtitle">${escapeHtml(subtitle)}</span>`
+        + meta
+        + '</span>'
+        + '<span class="select-card-arrow" aria-hidden="true">→</span>'
+        + '</div>';
+}
+
 
 export function showAdminPanel() {
     openModal('references-modal');
@@ -437,7 +537,7 @@ export function ensureDOMNotEmpty(containerId, fallbackMessage) {
     }
     if (!cont.innerHTML.trim() || !cont.textContent.trim()) {
         console.error(`[UI Watchdog] Контейнер #${containerId} остался пустым после рендера!`);
-        cont.innerHTML = `<div class="ui-watchdog-fallback avail-empty"><div class="ui-watchdog-title">${fallbackMessage || 'Интерфейс не получил данных для отображения.'}</div><button class="btn btn-sm" onclick="loadAvailability()">Повторить запрос</button></div>`;
+        cont.innerHTML = `<div class="ui-watchdog-fallback avail-empty"><div class="ui-watchdog-title">${fallbackMessage || 'Интерфейс не получил данных для отображения.'}</div><button class="btn btn-primary btn-sm" onclick="loadAvailability()">Повторить запрос</button></div>`;
         return false;
     }
     return true;
@@ -461,16 +561,16 @@ function renderAnalytics() {
         if (!Object.keys(d.teacher_stats || {}).length
             && !Object.keys(d.classroom_stats || {}).length
             && !Object.keys(d.group_lesson_count || {}).length) {
-            cont.innerHTML = '<div class="analytics-section"><h3 class="analytics-title">📊 Аналитика нагрузки</h3><div class="avail-empty">Нет данных для отображения. Сначала сгенерируйте расписание на выбранную неделю.</div></div>';
+            cont.innerHTML = '<div class="analytics-section"><h3 class="analytics-title">Аналитика нагрузки</h3><div class="avail-empty">Нет данных для отображения. Сначала сгенерируйте расписание на выбранную неделю.</div></div>';
             return;
         }
 
-        let html = '<div class="analytics-section"><h3 class="analytics-title">📊 Аналитика нагрузки</h3><div class="analytics-grid">';
+        let html = '<div class="analytics-section"><h3 class="analytics-title">Аналитика нагрузки</h3><div class="analytics-grid">';
 
         // Teacher stats — top 5
         const teachers = Object.values(d.teacher_stats || {}).sort((a, b) => b.total - a.total).slice(0, 5);
         if (teachers.length) {
-            html += '<div class="analytics-card"><div class="analytics-card-header">👨‍🏫 Преподаватели</div><div class="analytics-card-body">';
+            html += '<div class="analytics-card"><div class="analytics-card-header">Преподаватели</div><div class="analytics-card-body">';
             html += '<table class="analytics-table"><tr><th>Преподаватель</th><th>Пар</th><th>Своб.</th><th>Загрузка</th></tr>';
             for (const t of teachers) {
                 html += `<tr><td>${escapeHtml(t.name)}</td><td>${t.total}</td><td>${t.free}</td><td><div class="load-bar"><div class="load-bar-fill" style="width:${Math.min(t.load_pct, 100)}%"></div><span>${t.load_pct}%</span></div></td></tr>`;
@@ -481,7 +581,7 @@ function renderAnalytics() {
         // Classroom stats — top 5
         const rooms = Object.values(d.classroom_stats || {}).sort((a, b) => b.total - a.total).slice(0, 5);
         if (rooms.length) {
-            html += '<div class="analytics-card"><div class="analytics-card-header">🏫 Аудитории (топ)</div><div class="analytics-card-body">';
+            html += '<div class="analytics-card"><div class="analytics-card-header">Аудитории (топ)</div><div class="analytics-card-body">';
             html += '<table class="analytics-table"><tr><th>Аудитория</th><th>Пар</th><th>Своб.</th><th>Загрузка</th></tr>';
             for (const r of rooms) {
                 html += `<tr><td>${escapeHtml(r.name)}</td><td>${r.total}</td><td>${r.free}</td><td><div class="load-bar"><div class="load-bar-fill" style="width:${Math.min(r.load_pct, 100)}%"></div><span>${r.load_pct}%</span></div></td></tr>`;
@@ -492,7 +592,7 @@ function renderAnalytics() {
         // Group lesson count
         const groups = Object.values(d.group_lesson_count || {}).sort((a, b) => b.lessons - a.lessons);
         if (groups.length) {
-            html += '<div class="analytics-card"><div class="analytics-card-header">📚 Группы</div><div class="analytics-card-body">';
+            html += '<div class="analytics-card"><div class="analytics-card-header">Группы</div><div class="analytics-card-body">';
             html += '<table class="analytics-table"><tr><th>Группа</th><th>Пар</th></tr>';
             for (const g of groups) {
                 html += `<tr><td>${escapeHtml(g.name)}</td><td>${g.lessons}</td></tr>`;
@@ -504,7 +604,7 @@ function renderAnalytics() {
         cont.innerHTML = html;
     } catch (error) {
         console.error('Ошибка рендеринга Аналитики:', error);
-        cont.innerHTML = '<div class="analytics-section"><h3 class="analytics-title">📊 Аналитика нагрузки</h3><div class="avail-empty">Не удалось отобразить аналитику.</div></div>';
+        cont.innerHTML = '<div class="analytics-section"><h3 class="analytics-title">Аналитика нагрузки</h3><div class="avail-empty">Не удалось отобразить аналитику.</div></div>';
     }
     ensureDOMNotEmpty('avail-analytics', 'Не удалось отобразить аналитику.');
 }
@@ -648,19 +748,26 @@ export function closeAvailability() {
 
 /** Тематические цвета графиков (тёмная/светлая темы приложения). */
 function _chartTheme() {
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    return dark ? {
-        grid: 'rgba(255,255,255,0.08)',
-        ticks: 'rgba(229,231,235,0.92)',
-        legend: 'rgba(229,231,235,0.92)',
-        tooltipBg: 'rgba(15,23,42,0.95)',
-        tooltipBorder: 'rgba(34,197,94,0.35)',
-    } : {
-        grid: 'rgba(0,0,0,0.07)',
-        ticks: 'rgba(75,85,99,0.95)',
-        legend: 'rgba(17,24,39,0.92)',
-        tooltipBg: 'rgba(17,24,39,0.92)',
-        tooltipBorder: 'rgba(59,130,246,0.35)',
+    const css = getComputedStyle(document.documentElement);
+    const token = (name) => css.getPropertyValue(name).trim();
+    const series = [
+        token('--accent-500'),
+        token('--color-info'),
+        token('--color-warning'),
+        token('--accent-700'),
+        token('--color-danger'),
+        token('--color-success'),
+    ].filter(Boolean);
+    return {
+        grid: token('--color-border'),
+        ticks: token('--color-text-muted'),
+        legend: token('--color-text'),
+        tooltipBg: token('--color-surface'),
+        tooltipBorder: token('--color-border-strong'),
+        tooltipTitle: token('--color-text'),
+        tooltipBody: token('--color-text-secondary'),
+        series,
+        surface: token('--color-surface'),
     };
 }
 
@@ -706,8 +813,8 @@ export function renderCharts() {
                 datasets: [{
                     label: 'Загрузка, %',
                     data: teachers.map(t => t.load_pct),
-                    backgroundColor: teachers.map((_, i) => (i < 3 ? '#22c55e' : i < 7 ? '#3b82f6' : '#f97316')),
-                    borderRadius: 8,
+                    backgroundColor: teachers.map((_, i) => th.series[Math.min(i, th.series.length - 1)]),
+                    borderRadius: 6,
                     maxBarThickness: 42,
                 }],
             },
@@ -720,8 +827,8 @@ export function renderCharts() {
                         backgroundColor: th.tooltipBg,
                         borderColor: th.tooltipBorder,
                         borderWidth: 1,
-                        titleColor: '#ffffff',
-                        bodyColor: '#e5e7eb',
+                        titleColor: th.tooltipTitle,
+                        bodyColor: th.tooltipBody,
                         callbacks: {
                             afterLabel: (ctx) => {
                                 const t = teachers[ctx.dataIndex];
@@ -755,8 +862,8 @@ export function renderCharts() {
                 datasets: [{
                     label: 'Занятость аудиторий',
                     data: topRooms.map(r => r.total),
-                    backgroundColor: ['#22c55e', '#3b82f6', '#f97316', '#06b6d4', '#a855f7', '#eab308', '#22c55e', '#3b82f6', '#f97316', '#06b6d4'],
-                    borderColor: (document.documentElement.getAttribute('data-theme') === 'dark') ? 'rgba(15,23,42,1)' : '#ffffff',
+                    backgroundColor: topRooms.map((_, i) => th.series[i % th.series.length]),
+                    borderColor: th.surface,
                     borderWidth: 2,
                 }],
             },
@@ -770,8 +877,8 @@ export function renderCharts() {
                         backgroundColor: th.tooltipBg,
                         borderColor: th.tooltipBorder,
                         borderWidth: 1,
-                        titleColor: '#ffffff',
-                        bodyColor: '#e5e7eb',
+                        titleColor: th.tooltipTitle,
+                        bodyColor: th.tooltipBody,
                         callbacks: {
                             label: (ctx) => {
                                 const r = topRooms[ctx.dataIndex];
@@ -926,5 +1033,25 @@ function _availRow(row, busyMap, days, periods, freeOnly, isHeatmap) {
     if (freeOnly && !freeCount) return '';
     return `<tr><td>${escapeHtml(row.name)}</td>${cells.join('')}<td class="avail-summary">${freeCount}</td></tr>`;
 }
+
+/* Поиск по главной: фильтруем карточки на месте, не перерисовывая DOM,
+   чтобы не терять фокус в поле и не дёргать справочники. */
+document.addEventListener('input', (event) => {
+    if (event.target && event.target.id === 'home-search') filterHomePage(event.target.value);
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && event.target && event.target.id === 'home-search') {
+        event.target.value = '';
+        filterHomePage('');
+        event.target.blur();
+        return;
+    }
+    if ((event.key === 'Enter' || event.key === ' ') && event.target && event.target.classList
+        && event.target.classList.contains('select-card')) {
+        event.preventDefault();
+        event.target.click();
+    }
+});
 
 

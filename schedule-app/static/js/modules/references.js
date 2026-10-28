@@ -1,9 +1,12 @@
-import state from './state.js';
+﻿import state from './state.js';
 import { api } from './api.js';
 import { escapeHtml, populateSelect, populateSelectByName } from './utils.js';
 import { confirmModal, showKimiAlert, showKimiPrompt, showKimiSelect, triggerErrorShake, openModal } from './modal.js';
 import { showToast } from './toast.js';
 import { dispatchEvent, onEvent, REFERENCES_UPDATED, DATA_MUTATED } from './events.js';
+
+const SHIFT_LABELS = { 1: '1 см.', 2: '2 см.' };
+const ROOM_TYPE_LABELS = { gym: 'Спортзал', computer: 'Компьютерный', court: 'Зал суда', normal: 'Обычная' };
 
 export async function loadReferences() {
     const refs = await Promise.all([
@@ -54,15 +57,17 @@ export async function renderRefList(endpoint, containerId) {
     else if (endpoint === 'specialties') { state.specialtiesList = items; populateGroupSpecialtySelect(); renderSpecialtiesTable(container, items); return; }
     container.innerHTML = items.length ? items.map(i => {
         let extra = '';
-        if (endpoint === 'groups') extra = ` <span class="ref-item-tag">${i.course}к.</span>${i.is_distance ? ' <span class="ref-item-tag tag-distance">Заочн.</span>' : ''}${i.specialty_code ? ` <span class="ref-item-tag tag-specialty">${escapeHtml(i.specialty_code)} · ${escapeHtml(i.specialty_name)}</span>` : ''}`;
+        if (endpoint === 'groups') extra = ` <span class="ref-item-tag">${i.course}к.</span>${i.shift ? ` <span class="ref-item-tag">${SHIFT_LABELS[i.shift] || i.shift + ' см.'}</span>` : ''}${i.is_distance ? ' <span class="ref-item-tag tag-distance">Заочн.</span>' : ''}${i.specialty_code ? ` <span class="ref-item-tag tag-specialty">${escapeHtml(i.specialty_code)} · ${escapeHtml(i.specialty_name)}</span>` : ''}`;
         if (endpoint === 'subjects' && i.default_teacher_id) { const t = state.teachersList.find(t => t.id === i.default_teacher_id); if (t) extra += ` <span class="ref-item-tag">${escapeHtml(t.name)}</span>`; }
+        if (endpoint === 'subjects' && i.required_room_type) extra += ` <span class="ref-item-tag tag-specialty">${escapeHtml(ROOM_TYPE_LABELS[i.required_room_type] || i.required_room_type)}</span>`;
+        if (endpoint === 'classrooms' && i.room_type && i.room_type !== 'normal') extra += ` <span class="ref-item-tag tag-specialty">${escapeHtml(ROOM_TYPE_LABELS[i.room_type] || i.room_type)}</span>`;
         if (endpoint === 'teachers' && i.phone) extra += ` <span class="ref-item-tag tag-phone">${escapeHtml(i.phone)}</span>`;
         if (endpoint === 'specialties') {
             extra += ` <span class="ref-item-tag tag-code">${escapeHtml(i.code)}</span>`;
             if (i.qualification) extra += ` <span class="ref-item-tag tag-phone">${escapeHtml(i.qualification)}</span>`;
         }
         const editFn = endpoint === 'subjects' ? `editSubject(${i.id})` : endpoint === 'teachers' ? `editTeacher(${i.id})` : endpoint === 'classrooms' ? `editClassroom(${i.id})` : endpoint === 'specialties' ? `editSpecialty(${i.id})` : `editGroup(${i.id})`;
-        return `<div class="ref-item"><span class="ref-item-name">${escapeHtml(i.name)}${extra}</span><div class="ref-item-actions"><button class="btn btn-ghost btn-sm" onclick="${editFn}">Изм</button><button type="button" class="btn btn-danger btn-sm delete-btn" data-endpoint="${endpoint}" data-id="${i.id}" data-container="${containerId}">×</button></div></div>`;
+        return `<div class="ref-item"><span class="ref-item-name">${escapeHtml(i.name)}${extra}</span><div class="ref-item-actions"><button class="btn btn-ghost btn-xs" onclick="${editFn}">Изменить</button><button type="button" class="btn btn-danger btn-icon btn-sm delete-btn" data-endpoint="${endpoint}" data-id="${i.id}" data-container="${containerId}" aria-label="Удалить">×</button></div></div>`;
     }).join('') : '<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">Пусто</div>';
 }
 
@@ -115,8 +120,8 @@ function renderSpecialtiesTable(container, items) {
             <td>${escapeHtml(i.name)}</td>
             <td>${escapeHtml(i.qualification || '')}</td>
             <td class="ref-table-actions">
-                <button class="btn btn-ghost btn-sm" onclick="editSpecialty(${i.id})">Редактировать</button>
-                <button type="button" class="btn btn-danger btn-sm delete-btn" data-endpoint="specialties" data-id="${i.id}" data-container="ref-specialties">Удалить</button>
+                <button class="btn btn-ghost btn-xs" onclick="editSpecialty(${i.id})">Редактировать</button>
+                <button type="button" class="btn btn-danger btn-xs delete-btn" data-endpoint="specialties" data-id="${i.id}" data-container="ref-specialties">Удалить</button>
             </td>
         </tr>`).join('');
     container.innerHTML = `<table class="ref-table"><thead><tr><th>Код</th><th>Название</th><th>Квалификация / Направленность</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -128,9 +133,12 @@ export async function addGroup() {
     if (!name) { triggerErrorShake(inp); return; }
     const specialtySel = document.getElementById('ref-groups-specialty');
     const specialty_id = specialtySel && specialtySel.value ? parseInt(specialtySel.value) : null;
-    const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked, specialty_id }) });
+    const shiftSel = document.getElementById('ref-groups-shift');
+    const shift = shiftSel && shiftSel.value ? parseInt(shiftSel.value) : null;
+    const res = await api('/api/groups', { method: 'POST', body: JSON.stringify({ name, course: parseInt(document.getElementById('ref-groups-course').value), is_distance: document.getElementById('ref-groups-distance').checked, specialty_id, shift }) });
     if (res.error) { await showKimiAlert(res.error); return; }
     inp.value = ''; document.getElementById('ref-groups-distance').checked = false; if (specialtySel) specialtySel.value = '';
+    if (shiftSel) shiftSel.value = '';
     dispatchEvent(REFERENCES_UPDATED);
     renderRefList('groups', 'ref-groups');
 }
@@ -154,7 +162,13 @@ export async function editGroup(id) {
     const spOpts = [{ value: '', label: 'Без специальности' }, ...(state.specialtiesList || []).map(s => ({ value: String(s.id), label: `${s.code} — ${s.name}` }))];
     const sp = await showKimiSelect('Специальность:', spOpts, g.specialty_id ? String(g.specialty_id) : '');
     if (sp === null) return;
-    const res = await api(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), course: parseInt(nc) || g.course, is_distance: dist, specialty_id: sp ? parseInt(sp) : null }) });
+    const sh = await showKimiSelect('Смена обучения:', [
+        { value: '', label: 'Не указана (старт с 1-й пары)' },
+        { value: '1', label: '1 смена (с 8:30)' },
+        { value: '2', label: '2 смена (с 13:30)' },
+    ], g.shift ? String(g.shift) : '');
+    if (sh === null) return;
+    const res = await api(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), course: parseInt(nc) || g.course, is_distance: dist, specialty_id: sp ? parseInt(sp) : null, shift: sh ? parseInt(sh) : null }) });
     if (res.error) { await showKimiAlert(res.error); return; }
     dispatchEvent(REFERENCES_UPDATED);
     renderRefList('groups', 'ref-groups');
@@ -166,10 +180,12 @@ export async function addSubject() {
     const name = inp.value.trim();
     if (!name) { triggerErrorShake(inp); return; }
     const body = { name };
+    const roomSel = document.getElementById('ref-subjects-room');
+    if (roomSel && roomSel.value) body.required_room_type = roomSel.value;
     if (sel && sel.value) body.default_teacher_id = parseInt(sel.value);
     const res = await api('/api/subjects', { method: 'POST', body: JSON.stringify(body) });
     if (res.error) { await showKimiAlert(res.error); return; }
-    inp.value = ''; if (sel) sel.value = '';
+    inp.value = ''; if (sel) sel.value = ''; if (roomSel) roomSel.value = '';
     dispatchEvent(REFERENCES_UPDATED);
     renderRefList('subjects', 'ref-subjects');
 }
@@ -192,7 +208,14 @@ export async function editClassroom(id) {
     if (!c) return;
     const nn = await showKimiPrompt('Название аудитории:', c.name);
     if (nn === null || !nn.trim()) return;
-    const res = await api(`/api/classrooms/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim() }) });
+    const rt = await showKimiSelect('Тип аудитории:', [
+        { value: 'normal', label: 'Обычная' },
+        { value: 'gym', label: 'Спортзал' },
+        { value: 'computer', label: 'Компьютерный класс' },
+        { value: 'court', label: 'Зал суда' },
+    ], c.room_type || 'normal');
+    if (rt === null) return;
+    const res = await api(`/api/classrooms/${id}`, { method: 'PUT', body: JSON.stringify({ name: nn.trim(), room_type: rt }) });
     if (res.error) { await showKimiAlert(res.error); return; }
     renderRefList('classrooms', 'ref-classrooms');
 }
@@ -209,6 +232,14 @@ export async function editSubject(id) {
     const body = { name: nn.trim() };
     if (!isNaN(ti) && ti > 0 && ti <= state.teachersList.length) body.default_teacher_id = state.teachersList[ti - 1].id;
     else body.default_teacher_id = null;
+    const room = await showKimiSelect('Требуемая аудитория:', [
+        { value: '', label: 'Любая обычная' },
+        { value: 'gym', label: 'Спортзал' },
+        { value: 'computer', label: 'Компьютерный класс' },
+        { value: 'court', label: 'Зал суда' },
+    ], s.required_room_type || '');
+    if (room === null) return;
+    body.required_room_type = room || null;
     const res = await api(`/api/subjects/${id}`, { method: 'PUT', body: JSON.stringify(body) });
     if (res.error) { await showKimiAlert(res.error); return; }
     dispatchEvent(REFERENCES_UPDATED);
@@ -304,7 +335,7 @@ export async function uploadImportExcel() {
             return;
         }
         if (result) {
-            let html = `<div style="color:var(--accent);font-weight:600">✅ Импортировано записей: ${data.created}, пропущено: ${data.skipped}</div>`;
+            let html = `<div style="color:var(--accent);font-weight:600">Импортировано записей: ${data.created}, пропущено: ${data.skipped}</div>`;
             if (data.errors && data.errors.length) {
                 html += `<div style="margin-top:6px;color:var(--warning-text,#e6a700)">Предупреждения (${data.errors.length}):<ul style="margin:4px 0 0 16px;font-size:12px">`;
                 html += data.errors.slice(0, 10).map(e => `<li>${escapeHtml(e)}</li>`).join('');
@@ -330,10 +361,12 @@ export async function addRefItem(endpoint, inputId, containerId) {
     if (!name) { triggerErrorShake(inp); return; }
     const body = { name };
     if (endpoint === 'teachers') { const phone = document.getElementById('ref-teachers-phone'); if (phone) body.phone = phone.value.trim(); }
+    if (endpoint === 'classrooms') { const rt = document.getElementById('ref-classrooms-type'); if (rt && rt.value) body.room_type = rt.value; }
     const res = await api(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify(body) });
     if (res.error) { await showKimiAlert(res.error); return; }
     inp.value = '';
     if (endpoint === 'teachers') { const phone = document.getElementById('ref-teachers-phone'); if (phone) phone.value = ''; }
+    if (endpoint === 'classrooms') { const rt = document.getElementById('ref-classrooms-type'); if (rt) rt.value = 'normal'; }
     dispatchEvent(REFERENCES_UPDATED);
     renderRefList(endpoint, containerId);
 }

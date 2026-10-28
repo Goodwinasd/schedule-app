@@ -1,4 +1,4 @@
-﻿import state from './state.js';
+import state from './state.js';
 import { DAY_ORDER } from './config.js';
 import { escapeHtml, toISODate, getMonday, addDays, getWeekNumber, formatChipRange, formatShortDate, populateSelectByName } from './utils.js';
 import { api } from './api.js';
@@ -99,9 +99,9 @@ export async function renderCarousel() {
     html += `<select id="carousel-year" class="carousel-year" onchange="setYear(this.value)" title="Год">`;
     for (const y of years) html += `<option value="${y}"${y === year ? ' selected' : ''}>${y}</option>`;
     html += '<option value="add_year">+ Добавить год</option>';
-    if (year > cy + 1) html += `<option value="delete_year">🗑️ Удалить текущий год (${year})</option>`;
+    if (year > cy + 1) html += `<option value="delete_year">Удалить текущий год (${year})</option>`;
     html += '</select>';
-    html += `<button class="btn btn-ghost btn-sm btn-today" onclick="goToCurrentWeek()" title="Перейти к текущей неделе">📅 Сегодня</button>`;
+    html += `<button class="btn btn-ghost btn-sm btn-today" onclick="goToCurrentWeek()" title="Перейти к текущей неделе">Сегодня</button>`;
     html += '</div>';
     cont.innerHTML = html;
     // Возвращаем позицию полосы, чтобы перерисовка не «прыгала» к началу.

@@ -24,7 +24,7 @@ export async function loadBellScheduleTab() {
     _bellPresets = Array.isArray(data.presets) ? data.presets : [];
     const byPeriod = {};
     for (const s of schedule) byPeriod[s.period] = s;
-    let html = '<div style="margin:12px 0"><strong style="font-size:14px">🔔 Расписание звонков</strong></div>';
+    let html = '<div style="margin:12px 0"><strong style="font-size:14px">Расписание звонков</strong></div>';
     html += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Схема звонков для всех смен. Изменения применяются к сетке расписания после сохранения.</div>';
     html += '<div class="field-row" style="margin-bottom:10px">';
     html += '<label style="font-size:12px;color:var(--text-secondary)">Применить пресет:</label>';
@@ -48,7 +48,7 @@ export async function loadBellScheduleTab() {
         html += `<td style="padding:6px 8px;border-bottom:1px solid var(--border)"><input type="time" class="input bell-end" data-period="${p}" value="${toTimeInput(s.end)}" style="max-width:120px"></td></tr>`;
     }
     html += '</tbody></table>';
-    html += '<div class="field-row" style="margin-top:10px"><button class="btn btn-primary btn-sm" data-action="saveBellSchedule">💾 Сохранить расписание звонков</button></div>';
+    html += '<div class="field-row" style="margin-top:10px"><button class="btn btn-primary btn-sm" data-action="saveBellSchedule">Сохранить расписание звонков</button></div>';
     cont.innerHTML = html;
 }
 
@@ -106,14 +106,14 @@ export async function loadSettingsTab() {
 <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 <div style="margin:12px 0"><strong style="font-size:14px">Резервное копирование и Восстановление</strong></div>
 <div class="field-row" style="margin-bottom:8px">
-    <button class="btn btn-primary btn-sm" data-action="downloadBackup">📥 Скачать резервную копию БД</button>
+    <button class="btn btn-primary btn-sm" data-action="downloadBackup">Скачать резервную копию БД</button>
 </div>
 <div class="field-row" style="margin-bottom:8px">
     <input type="file" id="restore-file-input" accept=".sqlite,.db" style="font-size:13px">
-    <button class="btn btn-primary btn-sm" data-action="restoreBackup">📤 Восстановить БД из файла</button>
+    <button class="btn btn-primary btn-sm" data-action="restoreBackup">Восстановить БД из файла</button>
 </div>
 <div class="field-row">
-    <button class="btn btn-primary btn-sm" data-action="checkOrphans">🧹 Проверить целостность БД</button>
+    <button class="btn btn-primary btn-sm" data-action="checkOrphans">Проверить целостность БД</button>
 </div>
 <div id="orphan-result" style="margin-top:8px;font-size:13px"></div>
     `);
@@ -145,7 +145,7 @@ export async function loadExcludedDates() {
         for (const d of data) {
             const label = d.start_date === d.end_date ? d.start_date : `${d.start_date} – ${d.end_date}`;
             html += `<div class="ref-item"><span class="ref-item-name">${escapeHtml(label)}${d.reason ? ' <span style="color:var(--text-secondary)">— ' + escapeHtml(d.reason) + '</span>' : ''}</span>`;
-            html += `<div class="ref-item-actions"><button class="btn btn-danger btn-sm" data-action="deleteExcludedDate" data-params='[${d.id}]'>×</button></div></div>`;
+            html += `<div class="ref-item-actions"><button class="btn btn-danger btn-icon btn-sm" data-action="deleteExcludedDate" data-params='[${d.id}]' aria-label="Удалить исключение">×</button></div></div>`;
         }
         html += '</div>';
     }
@@ -239,7 +239,7 @@ export async function checkOrphans() {
 </div>
 <div class="field-row" style="margin-top:8px">
     <button class="btn btn-danger btn-sm" data-action="confirmDeleteOrphans">Удалить их</button>
-    <button class="btn btn-sm" data-action="clearOrphanResult">Отмена</button>
+    <button class="btn btn-ghost btn-sm" data-action="clearOrphanResult">Отмена</button>
 </div>`;
 }
 

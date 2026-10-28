@@ -55,7 +55,7 @@ export async function loadTrashTab() {
         if (meta) html += `<div class="trash-card-meta">${escapeHtml(meta)}</div>`;
         html += `<div class="trash-card-date">${escapeHtml(date)}</div>
             <div class="trash-card-actions">
-                <button class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${ep}',${item.id})">↺ Восстановить</button>
+                <button class="btn btn-outline-accent btn-sm" onclick="restoreTrashItem('${ep}',${item.id})">Восстановить</button>
             </div>
         </div>`;
     }

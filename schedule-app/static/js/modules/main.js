@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Точка входа приложения
  * Привязывает функции к window для обратной совместимости с onclick-атрибутами в HTML
  * @module main
@@ -120,14 +120,20 @@ document.addEventListener('keydown', e => {
 });
 
 /** Theme Management */
+function _syncThemeButton(theme) {
+    const label = document.getElementById('btn-theme-label');
+    if (label) label.textContent = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+}
+
 function initTheme() {
     let theme = localStorage.getItem('theme');
     if (!theme) {
         theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     document.documentElement.setAttribute('data-theme', theme);
-    const btn = document.getElementById('btn-theme');
-    if (btn) btn.textContent = theme === 'dark' ? '☀️ Светлая тема' : '🌙 Тёмная тема';
+    _syncThemeButton(theme);
 }
 
 export function toggleTheme() {
@@ -135,8 +141,7 @@ export function toggleTheme() {
     const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
-    const btn = document.getElementById('btn-theme');
-    if (btn) btn.textContent = next === 'dark' ? '☀️ Светлая тема' : '🌙 Тёмная тема';
+    _syncThemeButton(next);
 }
 
 /** Инициализация */

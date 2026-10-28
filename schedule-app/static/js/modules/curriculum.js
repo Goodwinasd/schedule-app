@@ -80,7 +80,7 @@ window.loadCurriculumPlan = async function() {
     const group = state.groupsList.find(g => String(g.id) === String(groupId));
     let applyBtn = '';
     if (group && group.specialty_id) {
-        applyBtn = `<button class="btn btn-ghost btn-sm" style="color:var(--accent)" onclick="window.applySpecialtyPlan()">🔄 Заполнить из плана специальности</button>`;
+        applyBtn = `<button class="btn btn-outline-accent btn-sm" onclick="window.applySpecialtyPlan()">Заполнить из плана специальности</button>`;
     }
 
     // Группировка по циклам
@@ -116,7 +116,7 @@ window.loadCurriculumPlan = async function() {
             const tname = item.teacher_name || '—';
             html += `<tr><td>${escapeHtml(item.subject_name || '—')}</td><td>${escapeHtml(tname)}</td><td>${item.total_hours}</td><td>${weekly}</td>`;
             html += `<td>${controlBadge(item.control_form)}</td>`;
-            html += `<td><button class="btn btn-danger btn-sm" onclick="window.deleteCurriculumItem(${item.id})">×</button></td></tr>`;
+            html += `<td><button class="btn btn-danger btn-icon btn-sm" onclick="window.deleteCurriculumItem(${item.id})" aria-label="Удалить дисциплину">×</button></td></tr>`;
         }
         html += '</tbody></table></div>';
     }
@@ -131,7 +131,7 @@ window.loadCurriculumPlan = async function() {
     if (items.length) {
         const overload = totalWeekly > 18;
         html += `<div style="padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:12px;background:${overload ? 'rgba(255,69,58,0.12)' : 'rgba(91,140,122,0.12)'};color:${overload ? 'var(--danger)' : 'var(--accent)'}">`;
-        html += `📋 Всего: ${totalHours} ч · ${totalWeekly} пар/нед`;
+        html += `Всего: ${totalHours} ч · ${totalWeekly} пар/нед`;
         if (overload) html += ' ⚠️ перегруз (>18)';
         html += '</div>';
     }
