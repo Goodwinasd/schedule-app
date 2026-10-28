@@ -1,4 +1,4 @@
-"""Реальные правила техникума: смены, типы аудиторий, максимум 7 пар.
+﻿"""Реальные правила техникума: смены, типы аудиторий, максимум 7 пар.
 
 Основано на выгрузках расписания за 31.08–06.09.2026:
 - 1-й курс начинает с 1-й пары (8:30), 4-й курс — со 2-й смены (13:30, пары 3–7);
@@ -202,10 +202,12 @@ def test_distance_groups_respect_their_shift(app, db):
     conn = db.get_db()
     monday = _monday()
 
-    first = _setup(conn, name='01-11/26-z', course=1, shift=1, is_distance=True,
+    first = _setup(conn, name='01-11/26', course=1, shift=1, is_distance=True,
                    subjects=[('Математика-01', None, 3)], rooms=[('101', None)])
-    generator.generate_schedule(conn, first, '01-11/26-z', 1, monday, 1, optimize=False)
+    generator.generate_schedule(conn, first, '01-11/26', 1, monday, 1, optimize=False)
     conn.commit()
+    row_db = conn.execute("SELECT shift, is_distance FROM groups_list WHERE id = ?", (first,)).fetchone()
+    assert row_db['shift'] == 1 and row_db['is_distance'] == 1, '01-11/26: смена/заочка не сохранены'
     first_rows = _lessons(conn, first, monday)
     assert first_rows, 'заочка 1-й смены не сгенерирована'
     for row in first_rows:
@@ -213,9 +215,9 @@ def test_distance_groups_respect_their_shift(app, db):
         expected = (1, 2) if weekday == 4 else (1,)
         assert row['period'] in expected, f'заочка 1-й смены, {row["date"]}: {row["period"]}'
 
-    second = _setup(conn, name='01-11/25-z', course=2, shift=2, is_distance=True,
+    second = _setup(conn, name='01-11/25', course=2, shift=2, is_distance=True,
                     subjects=[('Математика-02', None, 3)], rooms=[('102', None)])
-    generator.generate_schedule(conn, second, '01-11/25-z', 1, monday, 1, optimize=False)
+    generator.generate_schedule(conn, second, '01-11/25', 1, monday, 1, optimize=False)
     conn.commit()
     second_periods = [row['period'] for row in _lessons(conn, second, monday)]
     assert second_periods and min(second_periods) >= 4, f'заочка 2-й смены: {second_periods}'
