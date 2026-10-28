@@ -177,3 +177,67 @@ def test_generator_skips_exam_session_subjects(app, db):
         "SELECT COUNT(*) FROM lessons WHERE subject_id = ?", (regular,)).fetchone()[0]
     assert exam_lessons == 0, 'экзамен ликвид. сессии попал в обычное расписание'
     assert regular_lessons > 0
+def test_custom_time_event_not_touched_by_generator(app, db):
+    """Мероприятие вне сетки (custom_start_time) генератор не двигает."""
+    import generator
+    conn = db.get_db()
+    gid = conn.execute("INSERT INTO groups_list (name, course) VALUES ('Событие-группа', 2)").lastrowid
+    teacher = conn.execute("INSERT INTO teachers (name) VALUES ('Т-событие')").lastrowid
+    subject = conn.execute("INSERT INTO subjects (name) VALUES ('Выездное мероприятие')").lastrowid
+    conn.execute("INSERT INTO classrooms_list (name, room_type) VALUES ('101', NULL)")
+    conn.execute(
+        "INSERT INTO curriculum (group_id, subject_id, teacher_id, semester, total_hours, weeks_in_semester) "
+        "VALUES (?, ?, ?, 1, 73, 18)", (gid, subject, teacher))
+    monday = _monday()
+    day_id = conn.execute(
+        "INSERT INTO schedule_days (day_name, date, group_name) VALUES ('Вторник', ?, 'Событие-группа')",
+        ((datetime.strptime(monday, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d'),)).lastrowid
+    event_id = conn.execute(
+        "INSERT INTO lessons (day_id, period, subject_id, teacher_id, group_id, is_special_event, "
+        "custom_start_time, custom_end_time, event_type) VALUES (?, 3, ?, ?, ?, 1, '11:00', '12:30', 'event')",
+        (day_id, subject, teacher, gid)).lastrowid
+    conn.commit()
+
+    generator.generate_schedule(conn, gid, 'Событие-группа', 1, monday, 1, optimize=True)
+    conn.commit()
+
+    row = conn.execute(
+        "SELECT period, custom_start_time, custom_end_time, deleted_at FROM lessons WHERE id = ?",
+        (event_id,)).fetchone()
+    assert row is not None and row['deleted_at'] is None
+    assert row['period'] == 3 and row['custom_start_time'] == '11:00', dict(row)
+
+
+def test_coursework_is_special_event(client, seed_lessons, db, admin_csrf):
+    """«Курсовая работа» в названии предмета → is_special_event автоматически."""
+    h = {'X-CSRF-Token': admin_csrf}
+    conn = db.get_db()
+    day = conn.execute("SELECT id FROM schedule_days WHERE date = '2026-09-07'").fetchone()
+    room = conn.execute("SELECT id FROM classrooms_list LIMIT 1").fetchone()['id']
+    subject = conn.execute(
+        "INSERT INTO subjects (name) VALUES ('Спец. техника / Курсовая работа')").lastrowid
+    conn.commit()
+    resp = client.post(f'/api/days/{day["id"]}/lessons', json={
+        'period': 8, 'subject_id': subject, 'teacher_id': 1, 'classroom_id': room, 'group_id': 1,
+    }, headers=h)
+    assert resp.status_code == 201, resp.get_json()
+    row = conn.execute("SELECT is_special_event FROM lessons WHERE id = ?",
+                       (resp.get_json()['id'],)).fetchone()
+    assert row['is_special_event'] == 1
+
+
+def test_week5_constraints(app):
+    """Неделя 5: пятница 1 курса (1–2 без штрафа), суббота 1–4, 2-я смена 3–5/6+."""
+    import generator
+    friday = '2026-09-25'
+    saturday = '2026-09-26'
+    def cost(period, date=friday, shift=1):
+        return generator._calculate_cost(
+            [{'date': date, 'period': period, 'group_id': 1, 'teacher_id': 1}], shift=shift)
+    assert cost(1) == 0 and cost(2) == 0
+    assert cost(3) == generator.START_PENALTIES_SHIFT1_FRIDAY[3]
+    for period in (1, 2, 3, 4):
+        assert cost(period, date=saturday) == 0, f'суббота, старт {period}'
+    for period in (3, 4, 5):
+        assert cost(period, date='2026-09-22', shift=2) in (0, 5), period
+    assert cost(6, date='2026-09-22', shift=2) == generator.START_PENALTIES_SHIFT2[6]

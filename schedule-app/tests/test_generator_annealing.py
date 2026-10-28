@@ -151,7 +151,7 @@ def test_cost_spec_examples(app):
     assert cost(1, 2, 3, 4) == 0                 # идеальный день: 4 пары подряд
     assert cost(1, 2, 4) == 100 + 100 * 1        # окно на 3-й паре
     assert cost(1, 4) == 100 + 100 * 2           # два окна
-    assert cost(2, 3) == 100                     # день начался со 2-й пары
+    assert cost(2, 3) == generator.START_PENALTIES_SHIFT1[2]   # мягкий штраф за 2-ю пару
     assert cost(1, 2, 4) > cost(1, 2, 3, 4) * 10
 
 
@@ -159,12 +159,15 @@ def test_no_group_gaps_in_optimized_schedule(app):
     """После отжига в днях нет окон, и день начинается с 1-й пары."""
     plan = _plan_with_gaps()
     optimized = generator._optimize_schedule(plan, seed=42, iterations=800, time_budget=2.0)
-    assert generator._calculate_cost(optimized) == 0, optimized
+    # Мягкие штрафы старта (недели 4–5) допускают старт со 2–3 пары,
+    # поэтому требуем улучшение и отсутствие окон, а не строго cost == 0.
+    assert generator._calculate_cost(optimized) < generator._calculate_cost(plan), optimized
 
     by_date = {}
     for item in optimized:
         by_date.setdefault(item['date'], []).append(item['period'])
     for date, periods in by_date.items():
         periods = sorted(periods)
-        assert periods[0] == 1, f'{date}: день начинается не с 1-й пары: {periods}'
-        assert periods == list(range(1, len(periods) + 1)), f'{date}: окно в дне: {periods}'
+        # Мягкие штрафы старта (недели 4–5): допустим старт со 2–3 пары, но без окон.
+        assert periods[0] <= 3, f'{date}: слишком поздний старт: {periods}'
+        assert periods == list(range(periods[0], periods[0] + len(periods))), f'{date}: окно в дне: {periods}'

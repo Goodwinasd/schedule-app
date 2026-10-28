@@ -129,10 +129,10 @@ def test_cost_uses_shift_expected_start(app):
     def cost(*periods):
         return generator._calculate_cost(
             [{'date': '2026-09-07', 'period': p, 'group_id': 2, 'teacher_id': p} for p in periods],
-            expected_start=generator.SHIFT2_EXPECTED_START)
+            expected_start=generator.SHIFT2_EXPECTED_START, shift=2)
 
     assert cost(4, 5, 6) == 0
-    assert cost(3, 4) == generator.W_GROUP_START          # раньше ожидаемого на пару
+    assert cost(3, 4) == generator.START_PENALTIES_SHIFT2[3]   # старт с 3-й пары — мягкий штраф
     assert cost(4) == 0
 
 
@@ -231,7 +231,7 @@ def test_cost_friday_allows_first_or_second_start(app):
             expected_start=1, friday_start=2)
     assert cost(1) == 0, 'в пятницу 1-я пара — допустимый старт'
     assert cost(2) == 0, 'в пятницу 2-я пара — тоже без штрафа'
-    assert cost(3) == generator.W_GROUP_START
+    assert cost(3) == generator.START_PENALTIES_SHIFT1_FRIDAY[3]
 
 
 def test_first_course_friday_can_start_second_period(app, db):

@@ -95,8 +95,10 @@ function renderScheduleTable(data) {
                         state.lessonsMap[l.id] = l;
                         const isSub = l.is_substitution ? true : false;
                         const subCls = isSub ? ' is-substitution' : '';
+                        const customTime = l.custom_start_time ? ` · ${l.custom_start_time}–${l.custom_end_time || ''}` : '';
                         const roomText = (l.classroom || '') + (l.classroom_2 ? ' / ' + l.classroom_2 : '');
                         let meta = state.currentScheduleType === 'group' ? `${escapeHtml(l.teacher)}${roomText ? ' · ауд. ' + escapeHtml(roomText) : ''}${l.groups ? ' · ' + escapeHtml(l.groups) : ''}` : `${escapeHtml(l.groups || '')}${roomText ? ' · ауд. ' + escapeHtml(roomText) : ''}`;
+                        if (customTime) meta = `${escapeHtml(customTime.slice(3))} · ` + meta;
                         if (l.is_special_event) meta += ' · 📌 мероприятие';
                         if (isSub) meta += ' · замена';
                         const oc = canEdit ? ` onclick="editLesson(lessonsMap[${l.id}])"` : '';
@@ -488,6 +490,16 @@ export function showAddLessonModal(dayId, period, dayGroup, dateStr, teacherId) 
     if (specialFields) specialFields.style.display = 'none';
     const room2 = document.getElementById('lesson-classroom-2');
     if (room2) room2.value = '';
+    const evt = document.getElementById('lesson-event-type');
+    if (evt) evt.value = '';
+    const custom = document.getElementById('lesson-custom-time');
+    if (custom) custom.checked = false;
+    const customFields = document.getElementById('custom-time-fields');
+    if (customFields) customFields.style.display = 'none';
+    const cstart = document.getElementById('lesson-custom-start');
+    if (cstart) cstart.value = '';
+    const cend = document.getElementById('lesson-custom-end');
+    if (cend) cend.value = '';
     const tf = document.getElementById('lesson-teacher');
     if (state.currentScheduleType === 'teacher' && teacherId) { tf.value = teacherId; tf.disabled = true; document.getElementById('lesson-group').value = ''; }
     else { tf.disabled = false; if (state.currentLessonDayGroup) document.getElementById('lesson-group').value = state.currentLessonDayGroup; }
@@ -523,6 +535,11 @@ async function collectLessonData() {
         substitution_reason: isSub ? (document.getElementById('lesson-substitution-reason').value || null) : null,
         classroom_id_2: parseInt(document.getElementById('lesson-classroom-2')?.value) || null,
         is_special_event: !!document.getElementById('lesson-is-special-event')?.checked,
+        custom_start_time: document.getElementById('lesson-custom-time')?.checked
+            ? (document.getElementById('lesson-custom-start')?.value || null) : null,
+        custom_end_time: document.getElementById('lesson-custom-time')?.checked
+            ? (document.getElementById('lesson-custom-end')?.value || null) : null,
+        event_type: document.getElementById('lesson-event-type')?.value || null,
     };
 }
 
@@ -579,6 +596,17 @@ export function editLesson(lesson) {
     if (specialEl) specialEl.checked = isSpecial;
     const specialFieldsEl = document.getElementById('special-event-fields');
     if (specialFieldsEl) specialFieldsEl.style.display = isSpecial ? '' : 'none';
+    const evtEl = document.getElementById('lesson-event-type');
+    if (evtEl) evtEl.value = lesson.event_type || '';
+    const customEl = document.getElementById('lesson-custom-time');
+    const hasCustom = !!(lesson.custom_start_time || lesson.custom_end_time);
+    if (customEl) customEl.checked = hasCustom;
+    const customFieldsEl = document.getElementById('custom-time-fields');
+    if (customFieldsEl) customFieldsEl.style.display = hasCustom ? '' : 'none';
+    const csEl = document.getElementById('lesson-custom-start');
+    if (csEl) csEl.value = lesson.custom_start_time || '';
+    const ceEl = document.getElementById('lesson-custom-end');
+    if (ceEl) ceEl.value = lesson.custom_end_time || '';
     document.getElementById('lesson-subgroup').value = lesson.subgroup || '';
     document.getElementById('lesson-teacher').disabled = state.currentScheduleType === 'teacher';
     populateSelect('lesson-original-teacher', state.teachersList, '— не указан —');

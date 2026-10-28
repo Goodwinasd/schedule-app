@@ -238,7 +238,8 @@ def _get_export_data(schedule_type, name, monday, entity_id=None):
                 if d in lessons_by_date and p in lessons_by_date[d]:
                     raw_list = lessons_by_date[d][p]
                     lessons[d] = '\n---\n'.join(
-                        f"{l['subject_name'] or ''}\n{l['teacher_name'] or ''}\n{(l['classroom_name'] or '') + (' / ' + l['classroom_2_name'] if l['classroom_2_name'] else '')}"
+                        (f"{l['custom_start_time']}–{l['custom_end_time']}\n" if l['custom_start_time'] else '')
+                        + f"{l['subject_name'] or ''}\n{l['teacher_name'] or ''}\n{(l['classroom_name'] or '') + (' / ' + l['classroom_2_name'] if l['classroom_2_name'] else '')}"
                         for l in raw_list
                     )
                 else:
@@ -1974,7 +1975,12 @@ def create_lesson(day_id):
         original_teacher_id = data.get('original_teacher_id')
         substitution_reason = data.get('substitution_reason')
         classroom_id_2 = data.get('classroom_id_2')
+        custom_start_time = (data.get('custom_start_time') or None)
+        custom_end_time = (data.get('custom_end_time') or None)
+        event_type = (data.get('event_type') or None)
         is_special_event = _auto_special_event(conn, subject_id, data.get('is_special_event'))
+        if custom_start_time:
+            is_special_event = 1
 
         warnings, blocking = _validate_lesson_data(conn, day_id, period, teacher_id, classroom_id, subject_id, group_id=group_id, subgroup=subgroup)
         if blocking:
@@ -1982,8 +1988,8 @@ def create_lesson(day_id):
             return jsonify({"error": "Conflict detected", "warnings": warnings}), 409
 
         cursor = conn.execute(
-            'INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, is_substitution, original_teacher_id, substitution_reason, is_special_event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, int(is_substitution), original_teacher_id, substitution_reason, is_special_event)
+            'INSERT INTO lessons (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, is_substitution, original_teacher_id, substitution_reason, is_special_event, custom_start_time, custom_end_time, event_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup, int(is_substitution), original_teacher_id, substitution_reason, is_special_event, custom_start_time, custom_end_time, event_type)
         )
         lesson_id = cursor.lastrowid
         conn.commit()
@@ -2057,7 +2063,12 @@ def update_lesson(lesson_id):
         original_teacher_id = _field('original_teacher_id')
         substitution_reason = _field('substitution_reason')
         classroom_id_2 = _field('classroom_id_2')
+        custom_start_time = _field('custom_start_time')
+        custom_end_time = _field('custom_end_time')
+        event_type = _field('event_type')
         is_special_event = _auto_special_event(conn, subject_id, _field('is_special_event'))
+        if custom_start_time and not is_special_event:
+            is_special_event = 1
 
         if not day_id or not period or period not in range(1, 9):
             conn.rollback()
@@ -2081,12 +2092,15 @@ def update_lesson(lesson_id):
         )
 
         conn.execute(
-            'UPDATE lessons SET day_id = ?, period = ?, subject_id = ?, teacher_id = ?, classroom_id = ?, classroom_id_2 = ?, group_id = ?, subgroup = ?, is_substitution = ?, original_teacher_id = ?, substitution_reason = ?, is_special_event = ? WHERE id = ?',
+            'UPDATE lessons SET day_id = ?, period = ?, subject_id = ?, teacher_id = ?, classroom_id = ?, classroom_id_2 = ?, group_id = ?, subgroup = ?, is_substitution = ?, original_teacher_id = ?, substitution_reason = ?, is_special_event = ?, custom_start_time = ?, custom_end_time = ?, event_type = ? WHERE id = ?',
             (day_id, period, subject_id, teacher_id, classroom_id, classroom_id_2, group_id, subgroup,
              int(is_substitution),
              original_teacher_id,
              substitution_reason,
              is_special_event,
+             custom_start_time,
+             custom_end_time,
+             event_type,
              lesson_id)
         )
         conn.commit()
@@ -2299,6 +2313,8 @@ def schedule_table():
                     'id': l['id'], 'subject': l['subject_name'], 'teacher': l['teacher_name'],
                     'classroom': l['classroom_name'], 'classroom_2': l['classroom_2_name'],
                     'is_special_event': bool(l['is_special_event']), 'groups': l['groups'],
+                    'custom_start_time': l['custom_start_time'], 'custom_end_time': l['custom_end_time'],
+                    'event_type': l['event_type'],
                     'day_id': l['day_id'],
                     'subject_id': l['subject_id'], 'teacher_id': l['teacher_id'],
                     'classroom_id': l['classroom_id'],
